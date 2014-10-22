@@ -1,5 +1,5 @@
 #####BAT - Biodiversity Assessment Tools R package
-#####Version 1.0 - 19.VIII.2014
+#####Version 1.0.1 - 22.X.2014
 #####By Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 
@@ -84,7 +84,7 @@ qrare <- function(comm, tree, n = 1){
 	}
 }
 
-#####minimum terminal branch length, =1 in case of TD
+#####minimum terminal branch length, = 1 in case of TD
 minBranch <- function(comm, tree){
 	if (missing(tree)){
 		return(1)
@@ -145,7 +145,7 @@ betaObs <- function(comm, tree, abund = FALSE, func = "jaccard"){
 	return(list(Btotal = (b+c)/denominator, Brepl = 2*min(b,c)/denominator, Brich = abs(b-c)/denominator))
 }
 
-#' Alpha diversity (TD, PD or FD).
+#' Alpha diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).
 #' @description Observed alpha diversity with possible rarefaction, multiple sites simultaneously.
 #' @param comm A sites x species matrix, with either abundance or incidence data.
 #' @param tree An hclust or phylo object (used only for PD or FD).
@@ -156,10 +156,12 @@ betaObs <- function(comm, tree, abund = FALSE, func = "jaccard"){
 #' If not specified, default is 0.
 #' @param runs Number of resampling runs for rarefaction. If not specified, default is 100.
 #' @details TD is equivalent to species richness. Calculations of PD and FD are based on Faith (1992) and Petchey & Gaston (2002, 2006), which measure PD and FD of a community as the total branch length of a tree linking all species represented in such community.
-#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object).
+#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
+#' The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001)
 #' @return A matrix of sites x diversity values (either "Obs" OR "Avg, Min, LowerCL, UpperCL and Max").
 #' @references Faith, D.P. (1992) Conservation evaluation and phylogenetic diversity. Biological Conservation, 61, 1-10.
+#' @references Gotelli, N.J. & Colwell, R.K. (2001) Quantifying biodiversity: procedures and pitfalls in the measurement and comparison of species richness. Ecology Letters, 4, 379-391.
 #' @references Petchey, O.L. & Gaston, K.J. (2002) Functional diversity (FD), species richness and community composition. Ecology Letters, 5, 402-411.
 #' @references Petchey, O.L. & Gaston, K.J. (2006) Functional diversity: back to basics and looking forward. Ecology Letters, 9, 741-758.
 #' @examples comm <- matrix(c(0,0,1,1,0,0,2,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
@@ -197,26 +199,44 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 }
 
 #' Alpha diversity accumulation curves (observed and estimated).
-#' @description Estimation of alpha diversity of a single site with accumulation of samples.
-#' @param comm A samples x species matrix, with either abundance or incidence data.
-#' @param tree An hclust or phylo object (used only for PD or FD).
+#' @description Estimation of alpha diversity of a single site with accumulation of sampling units.
+#' @param comm A sampling units x species matrix, with either abundance or incidence data.
+#' @param tree An hclust or phylo object (used only for Phylogenetic (PD) or Functional (FD) Diversity, not for Taxon Diversity (TD)).
 #' @param func The class of estimators to be used:
 #' If func is partial match of "curve", TD, PD or FD are based on extrapolating the accumulation curve of observed diversity.
 #' If func is partial match of "nonparametric", TD, PD or FD are based on non-parametric estimators.
 #' If func is partial match of "completeness", PD or FD estimates are based on the completeness of TD (requires a tree to be used).
 #' If not specified, default is "nonparametric.
-#' @param runs Number of random permutations to be made to the sample order. If not specified, default is 100.
+#' @param runs Number of random permutations to be made to the sampling order. If not specified, default is 100.
 #' @details Observed diversity often is an underestimation of true diversity. Several approaches have been devised to estimate species richness (TD) from incomplete sampling.
 #' These include: (1) fitting asymptotic functions to randomised accumulation curves (Soberon & Llorente 1993; Flather 1996)
 #' (2) the use of non-parametric estimators based on the incidence or abundance of rare species (Heltshe & Forrester 1983; Chao 1984, 1987; Colwell & Coddington 1994).
 #' A correction to non-parametric estimators has also been recently proposed, based on the proportion of singleton or unique species
-#' (species represented by a single individual or in a single sample respectively; Lopez et al. 2012).
+#' (species represented by a single individual or in a single sampling unit respectively; Lopez et al. 2012).
 #' Cardoso et al. (2014) have proposed a way of adapting these approaches to estimate PD and FD, also adding a third possible approach for
 #' these dimensions of diversity: (3) correct PD and FD values based on the completeness of TD, where completeness equals the proportion of estimated true diversity that was observed.
 #' Calculations of PD and FD are based on Faith (1992) and Petchey & Gaston (2002, 2006), which measure PD and FD of a community as the total branch length of a tree linking all species represented in such community.
-#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object).
+#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
-#' @return A matrix of samples x diversity values (samples, individuals, observed and estimated diversity).
+#' @return A matrix of sampling units x diversity values (sampling units, individuals, observed and estimated diversity).
+#' The values provided by this function are: 
+#' @return Sampl - Number of sampling units;
+#' @return Ind - Number of individuals;
+#' @return Obs - Observed diversity;
+#' @return S1 - Singletons;
+#' @return S2 - Doubletons;
+#' @return Q1 - Uniques;
+#' @return Q2 - Duplicates;
+#' @return Jack1ab - First order jackknife estimator for abundance data;
+#' @return Jack1in - First order jackknife estimator for incidence data;
+#' @return Jack2ab - Second order jackknife estimator for abundance data;
+#' @return Jack2in - Second order jackknife estimator for incidence data;
+#' @return Chao1 - Chao estimator for abundance data;
+#' @return Chao2 - Chao estimator for incidence data;
+#' @return Clench - Clench or Michaelis-Menten curve;
+#' @return Exponential - Exponential curve;
+#' @return Weibull - Weibull curve.
+#' @return The P-corrected version of all non-parametric estimators is also provided.
 #' @references Cardoso, P., Rigal, F., Borges, P.A.V. & Carvalho, J.C. (2014) A new frontier in biodiversity inventory: a proposal for estimators of phylogenetic and functional diversity. Methods in Ecology and Evolution, in press.
 #' @references Chao, A. (1984) Nonparametric estimation of the number of classes in a population. Scandinavian Journal of Statistics, 11, 265-270.
 #' @references Chao, A. (1987). Estimating the population size for capture-recapture data with unequal catchability. Biometrics 43, 783-791.
@@ -251,7 +271,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", runs = 100){
 	switch(func, nonparametric = {
 		resultsArray <- array(0, dim = c(nrow(comm), 19, runs))
 		for (r in 1:runs){
-			comm <- comm[sample(nrow(comm)),, drop=FALSE]			#shuffle rows (samples)
+			comm <- comm[sample(nrow(comm)),, drop=FALSE]			#shuffle rows (sampling units)
 			data <- matrix(0,1,ncol(comm))
 			runData <- matrix(0,0,19)
 			for (q in 1:nrow(comm)){
@@ -302,7 +322,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", runs = 100){
 		results <- alpha.accum(comm, , "nonparametric", runs)
 		obs <- matrix(0,nrow(comm),1)
 		for (r in 1:runs){
-			comm <- comm[sample(nrow(comm)),, drop=FALSE]			#shuffle rows (samples)
+			comm <- comm[sample(nrow(comm)),, drop=FALSE]			#shuffle rows (sampling units)
 			for (s in 1:nrow(comm)){
 				obs[s,1] <- obs[s,1] + sobs(comm[1:s,], tree)
 			}
@@ -316,7 +336,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", runs = 100){
 	}, curve = {
 		results <- matrix(0,nrow(comm),6)
 		for (r in 1:runs){
-			comm <- comm[sample(nrow(comm)),, drop=FALSE]		#shuffle rows (samples)
+			comm <- comm[sample(nrow(comm)),, drop=FALSE]		#shuffle rows (sampling units)
 			runData <- matrix(0,0,6)
 			for (s in 1:nrow(comm)){
 				n <- sum(rowSums(comm[1:s,,drop=FALSE]))
@@ -326,7 +346,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", runs = 100){
 			results <- results + runData
 		}
 		results <- results / runs
-		for (s in 3:nrow(results)){				##fit curves only with 3 or more samples
+		for (s in 3:nrow(results)){				##fit curves only with 3 or more sampling units
 			x <- results[1:s,1]
 			y <- results[1:s,3]
 			#####Clench
@@ -350,30 +370,39 @@ alpha.accum <- function(comm, tree, func = "nonparametric", runs = 100){
 				results[s,6] <- a
 			}
 		}
-		colnames(results) <- c("Samples", "Ind", "Obs", "Clench", "Exponential", "Weibull")
+		colnames(results) <- c("Sampl", "Ind", "Obs", "Clench", "Exponential", "Weibull")
 		return (results)
 	})
-	colnames(results) <- c("Samples", "Ind", "Obs", "S1", "S2", "Q1", "Q2", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
+	colnames(results) <- c("Sampl", "Ind", "Obs", "S1", "S2", "Q1", "Q2", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
 	return(results)
 }
 
 #' Alpha diversity estimates.
 #' @description Estimation of alpha diversity of multiple sites simultaneously.
 #' @param comm A sites x species matrix, with either abundances or number of incidences.
-#' @param tree An hclust or phylo object (used only for PD or FD).
+#' @param tree An hclust or phylo object (used only for Phylogenetic (PD) or Functional (FD) Diversity, not for Taxon Diversity (TD)).
 #' @param func The class of estimators to be used:
 #' If func is partial match of "nonparametric", TD, PD or FD are based on non-parametric estimators.
 #' If func is partial match of "completeness", PD or FD estimates are based on the completeness of TD (requires a tree to be used).
 #' If not specified, default is "nonparametric".
 #' @details Observed diversity often is an underestimation of true diversity.
 #' Non-parametric estimators based on the incidence or abundance of rare species have been proposed to overcome the problem of undersampling (Heltshe & Forrester 1983; Chao 1984, 1987; Colwell & Coddington 1994).
-#' A correction to non-parametric estimators has also been recently proposed, based on the proportion of singleton or unique species
-#' (species represented by a single individual or in a single sample respectively; Lopez et al. 2012).
+#' A correction to non-parametric estimators has also been recently proposed, based on the proportion (P) of singleton or unique species
+#' (species represented by a single individual or in a single sampling unit respectively; Lopez et al. 2012).
 #' Cardoso et al. (2014) have proposed a way of adapting non-parametric species richness estimators to PD and FD. They have also proposed correcting PD and FD values based on the completeness of TD, where completeness equals the proportion of estimated true diversity that was observed.
 #' Calculations of PD and FD are based on Faith (1992) and Petchey & Gaston (2002, 2006), which measure PD and FD of a community as the total branch length of a tree linking all species represented in such community.
-#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object).
+#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
 #' @return A matrix of sites x diversity values (individuals, observed and estimated diversity).
+#' The values provided by this function are: 
+#' @return Ind - Number of individuals;
+#' @return Obs - Observed diversity;
+#' @return S1 - Singletons;
+#' @return S2 - Doubletons;
+#' @return Jack1ab - First order jackknife estimator for abundance data;
+#' @return Jack2ab - Second order jackknife estimator for abundance data;
+#' @return Chao1 - Chao estimator for abundance data.
+#' @return The P-corrected version of all estimators is also provided.
 #' @references Cardoso, P., Rigal, F., Borges, P.A.V. & Carvalho, J.C. (2014) A new frontier in biodiversity inventory: a proposal for estimators of phylogenetic and functional diversity. Methods in Ecology and Evolution, in press.
 #' @references Chao, A. (1984) Nonparametric estimation of the number of classes in a population. Scandinavian Journal of Statistics, 11, 265-270.
 #' @references Chao, A. (1987). Estimating the population size for capture-recapture data with unequal catchability. Biometrics 43, 783-791.
@@ -436,7 +465,7 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
 	return(results)
 }
 
-#' Beta diversity (TD, PD or FD).
+#' Beta diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).
 #' @description Beta diversity with possible rarefaction, multiple sites simultaneously.
 #' @param comm A sites x species matrix, with either abundance or incidence data.
 #' @param tree An hclust or phylo object (used only for PD or FD).
@@ -449,13 +478,16 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
 #' If not specified, default is 0.
 #' @param runs Number of resampling runs for rarefaction. If not specified, default is 100.
 #' @details The beta diversity measures used here follow the partitioning framework independently developed by Podani & Schmera (2011) and Carvalho et al. (2012)
-#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich. Btotal = total beta diversity, reflecting both species replacement and loss/gain;
+#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
+#' Btotal = total beta diversity, reflecting both species replacement and loss/gain;
 #' Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone.
-#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object).
+#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
+#' The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001)
 #' @return Three distance matrices between sites, one per each of the three beta diversity measures (either "Obs" OR "Avg, Min, LowerCL, UpperCL and Max").
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 #' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
+#' @references Gotelli, N.J. & Colwell, R.K. (2001) Quantifying biodiversity: procedures and pitfalls in the measurement and comparison of species richness. Ecology Letters, 4, 379-391.
 #' @references Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
 #' @examples comm <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)
 #' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
@@ -515,21 +547,23 @@ beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 
 }
 
 #' Beta diversity accumulation curves.
-#' @description Beta diversity between two sites with accumulation of samples.
-#' @param comm1 A samples x species matrix for the first site, with either abundance or incidence data.
-#' @param comm2 A samples x species matrix for the second site, with either abundance or incidence data.
-#' @param tree An hclust or phylo object (used only for PD or FD).
+#' @description Beta diversity between two sites with accumulation of sampling units.
+#' @param comm1 A sampling units x species matrix for the first site, with either abundance or incidence data.
+#' @param comm2 A sampling units x species matrix for the second site, with either abundance or incidence data.
+#' @param tree An hclust or phylo object (used only for Phylogenetic (PD) or Functional (FD) Diversity, not for Taxon Diversity (TD)).
 #' @param abund A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis. If not specified, default is FALSE.
 #' @param func Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used. If not specified, default is jaccard.
-#' @param runs Number of random permutations to be made to the sample order. If not specified, default is 100.
+#' @param runs Number of random permutations to be made to the sampling order. If not specified, default is 100.
 #' @details As widely recognized for species richness, beta diversity is also biased when communities are undersampled.
 #' Beta diversity accumulation curves have been proposed by Cardoso et al. (2009) to test if beta diversity has approached an asymptote when comparing two undersampled sites.
 #' The beta diversity measures used here follow the partitioning framework independently developed by Podani & Schmera (2011) and Carvalho et al. (2012)
-#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich. Btotal = total beta diversity, reflecting both species replacement and loss/gain;
-#' Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone.
-#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object).
-#' The number and order of species in comm1 and comm2 must be the same as in tree. Also, the number of samples should be similar in both sites.
-#' @return Three matrices of samples x diversity values, one per each of the three beta diversity measures (samples, individuals and observed diversity).
+#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
+#' Btotal = total beta diversity, reflecting both species replacement and loss/gain;
+#' Brepl = beta diversity explained by replacement of species alone;
+#' Brich = beta diversity explained by species loss/gain (richness differences) alone.
+#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
+#' The number and order of species in comm1 and comm2 must be the same as in tree. Also, the number of sampling units should be similar in both sites.
+#' @return Three matrices of sampling units x diversity values, one per each of the three beta diversity measures (sampling units, individuals and observed diversity).
 #' @references Cardoso, P., Borges, P.A.V. & Veech, J.A. (2009) Testing the performance of beta diversity measures based on incidence data: the robustness to undersampling. Diversity and Distributions, 15, 1081-1090.
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 #' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
@@ -545,17 +579,17 @@ beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 
 #' @export
 beta.accum <- function(comm1, comm2, tree, abund = FALSE, func = "jaccard", runs = 100){
 	if(nrow(comm1) < 2 || nrow(comm1) != nrow(comm2))
-		stop("Both communities should have multiple and the same number of samples")
+		stop("Both communities should have multiple and the same number of sampling units")
 	if (!missing(tree))
 		tree <- xTree(as.hclust(tree))
 	
 	nSamples <- nrow(comm1)
 	results <- matrix(0,nSamples, 4)
-	colnames(results) <- c("Samples", "Btotal", "Brepl", "Brich")
+	colnames(results) <- c("Sampl", "Btotal", "Brepl", "Brich")
 	
 	for (r in 1:runs){
-		comm1 <- comm1[sample(nSamples),, drop=FALSE]			#shuffle samples of first community
-		comm2 <- comm2[sample(nSamples),, drop=FALSE]			#shuffle samples of second community
+		comm1 <- comm1[sample(nSamples),, drop=FALSE]			#shuffle sampling units of first community
+		comm2 <- comm2[sample(nSamples),, drop=FALSE]			#shuffle sampling units of second community
 		for (q in 1:nSamples){
 			commBoth <- as.matrix(rbind(colSums(comm1[1:q,,drop=FALSE]),colSums(comm2[1:q,,drop=FALSE])))
 			results[q,1] <- results[q,1] + q
@@ -572,7 +606,7 @@ beta.accum <- function(comm1, comm2, tree, abund = FALSE, func = "jaccard", runs
 #' Beta diversity among multiple sites.
 #' @description Beta diversity with possible rarefaction - multiple sites measure calculated as the average or variance of all pairwise values.
 #' @param comm A sites x species matrix, with either abundance or incidence data.
-#' @param tree An hclust or phylo object (used only for PD or FD).
+#' @param tree An hclust or phylo object (used only for Phylogenetic (PD) or Functional (FD) Diversity, not for Taxon Diversity (TD)).
 #' @param abund A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.  If not specified, default is FALSE.
 #' @param func Indicates whether the Jaccard or Soerensen family of beta diversity measures should be used. If not specified, default is jaccard.
 #' @param raref An integer specifying the number of individuals for rarefaction (individual based).
@@ -583,9 +617,11 @@ beta.accum <- function(comm1, comm2, tree, abund = FALSE, func = "jaccard", runs
 #' @param runs Number of resampling runs for rarefaction. If not specified, default is 100.
 #' @details Beta diversity of multiple sites simultaneously is calculated as either the average or the variance among all pairwise comparisons (Legendre, 2014).
 #' The beta diversity measures used here follow the partitioning framework independently developed by Podani & Schmera (2011) and Carvalho et al. (2012)
-#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich. Btotal = total beta diversity, reflecting both species replacement and loss/gain;
-#' Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone.
-#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object).
+#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
+#' Btotal = total beta diversity, reflecting both species replacement and loss/gain;
+#' Brepl = beta diversity explained by replacement of species alone;
+#' Brich = beta diversity explained by species loss/gain (richness differences) alone.
+#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
 #' @return A matrix of beta measures x diversity values (average and variance).
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
@@ -614,13 +650,13 @@ beta.multi <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, r
 	return(results)
 }
 
-#' Scaled mean square error of accumulation curves.
-#' @description Accuracy (scaled mean square error) of accumulation curves compared with a known true diversity value (target).
-#' @param accum A matrix resulting from the alpha.accum or beta.accum functions (samples x diversity values).
-#' @param target The true known diversity value, with which the curve will be compared. If not specified, default is the diversity observed with all samples.
+#' Scaled mean squared error of accumulation curves.
+#' @description Accuracy (scaled mean squared error) of accumulation curves compared with a known true diversity value (target).
+#' @param accum A matrix resulting from the alpha.accum or beta.accum functions (sampling units x diversity values).
+#' @param target The true known diversity value, with which the curve will be compared. If not specified, default is the diversity observed with all sampling units.
 #' @details Among multiple measures of accuracy (Walther & Moore 2005) the SMSE presents several advantages, as it is (Cardoso et al. 2014):
 #' (i) scaled to true diversity, so that similar absolute differences are weighted according to how much they represent of the real value;
-#' (ii) scaled to the number of samples, so that values are independent of sample size;
+#' (ii) scaled to the number of sampling units, so that values are independent of sample size;
 #' (iii) squared, so that small, mostly meaningless fluctuations around the true value are down-weighted; and
 #' (iv) independent of positive or negative deviation from the real value, as such differentiation is usually not necessary.
 #' @return Accuracy values for all observed and estimated curves.
@@ -664,10 +700,10 @@ accuracy <- function(accum, target = -1){
 
 #' Slope of accumulation curves.
 #' @description This is similar to the first derivative of the curves at each of its points.
-#' @param accum A matrix resulting from the alpha.accum or beta.accum functions (samples x diversity values).
-#' @details The slope of an accumulation curve, of either observed or estimated diversity, allows verifying if the asymptote has been reached (Cardoso et al. 2011).
+#' @param accum A matrix resulting from the alpha.accum or beta.accum functions (sampling units x diversity values).
+#' @details Slope is the expected gain in diversity when sampling a new individual. The slope of an accumulation curve, of either observed or estimated diversity, allows verifying if the asymptote has been reached (Cardoso et al. 2011).
 #' This is an indication of either the completeness of the inventory (low final slopes of the observed curve indicate high completeness) or reliability of the estimators (stability of the slope around a value of 0 along the curve indicates reliability).
-#' @return A matrix of samples x slope values.
+#' @return A matrix of sampling units x slope values.
 #' @references Cardoso, P., Pekar, S., Jocque, R. & Coddington, J.A. (2011) Global patterns of guild composition and functional diversity of spiders. PLoS One, 6, e21710.
 #' @examples comm1 <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)
 #' comm2 <- matrix(c(1,1,0,0,0,0,2,1,0,0,0,0,2,1,0,0,0,0,2,1), nrow = 4, ncol = 5, byrow = TRUE)
@@ -703,38 +739,38 @@ slope <- function(accum){
 
 #' Sample data of spiders in Arrabida (Portugal)
 #'
-#' A dataset containing the abundance of 338 spider species in each of 320 samples. Details are described in:
+#' A dataset containing the abundance of 338 spider species in each of 320 sampling units. Details are described in:
 #' Cardoso, P., Gaspar, C., Pereira, L.C., Silva, I., Henriques, S.S., Silva, R.R. & Sousa, P. (2008) Assessing spider species richness and composition in Mediterranean cork oak forests. Acta Oecologica, 33: 114-127.
 #' 
 #' @docType data
 #' @keywords datasets
 #' @name arrabida
 #' @usage data(arrabida)
-#' @format A data frame with 320 samples (rows) and 338 species (variables).
+#' @format A data frame with 320 sampling units (rows) and 338 species (variables).
 NULL
 
 #' Sample data of spiders in Geres (Portugal)
 #'
-#' A dataset containing the abundance of 338 spider species in each of 320 samples. Details are described in:
+#' A dataset containing the abundance of 338 spider species in each of 320 sampling units. Details are described in:
 #' Cardoso, P., Scharff, N., Gaspar, C., Henriques, S.S., Carvalho, R., Castro, P.H., Schmidt, J.B., Silva, I., Szuts, T., Castro, A. & Crespo, L.C. (2008) Rapid biodiversity assessment of spiders (Araneae) using semi-quantitative sampling: a case study in a Mediterranean forest. Insect Conservation and Diversity, 1: 71-84.
 #' 
 #' @docType data
 #' @keywords datasets
 #' @name geres
 #' @usage data(geres)
-#' @format A data frame with 320 samples (rows) and 338 species (variables).
+#' @format A data frame with 320 sampling untis (rows) and 338 species (variables).
 NULL
 
 #' Sample data of spiders in Guadiana (Portugal)
 #'
-#' A dataset containing the abundance of 338 spider species in each of 320 samples. Details are described in:
+#' A dataset containing the abundance of 338 spider species in each of 320 sampling units. Details are described in:
 #' Cardoso, P., Henriques, S.S., Gaspar, C., Crespo, L.C., Carvalho, R., Schmidt, J.B., Sousa, P. & Szuts, T. (2009) Species richness and composition assessment of spiders in a Mediterranean scrubland. Journal of Insect Conservation, 13: 45-55.
 #' 
 #' @docType data
 #' @keywords datasets
 #' @name guadiana
 #' @usage data(guadiana)
-#' @format A data frame with 192 samples (rows) and 338 species (variables).
+#' @format A data frame with 192 sampling units (rows) and 338 species (variables).
 NULL
 
 #' Functional tree for 338 species of spiders
