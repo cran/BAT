@@ -3,7 +3,7 @@
 \alias{alpha.accum}
 \title{Alpha diversity accumulation curves (observed and estimated).}
 \usage{
-alpha.accum(comm, tree, func = "nonparametric", runs = 100)
+alpha.accum(comm, tree, func = "nonparametric", target = -2, runs = 100)
 }
 \arguments{
 \item{comm}{A sampling units x species matrix, with either abundance or incidence data.}
@@ -15,6 +15,8 @@ If func is partial match of "curve", TD, PD or FD are based on extrapolating the
 If func is partial match of "nonparametric", TD, PD or FD are based on non-parametric estimators.
 If func is partial match of "completeness", PD or FD estimates are based on the completeness of TD (requires a tree to be used).
 If not specified, default is "nonparametric.}
+
+\item{target}{True diversity value to calculate the accuracy of curves (scaled mean squared error). If not specified do not calculate accuracy (default), -1 uses the total observed diversity as true diversity and any other value is the true known diversity.}
 
 \item{runs}{Number of random permutations to be made to the sampling order. If not specified, default is 100.}
 }
@@ -52,9 +54,9 @@ Clench - Clench or Michaelis-Menten curve;
 
 Exponential - Exponential curve;
 
-Weibull - Weibull curve.
-
 The P-corrected version of all non-parametric estimators is also provided.
+
+Accuracy - if accuracy is to be calculated a list is returned instead, with the second element being the scaled mean squared error of each estimator.
 }
 \description{
 Estimation of alpha diversity of a single site with accumulation of sampling units.
@@ -77,7 +79,8 @@ tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 alpha.accum(comm)
 alpha.accum(comm, func = "nonparametric")
 alpha.accum(comm, tree, "compl")
-alpha.accum(comm, tree, "curve", 100)
+alpha.accum(comm, tree, "curve", runs = 1000)
+alpha.accum(comm, target = -1)
 }
 \references{
 Cardoso, P., Rigal, F., Borges, P.A.V. & Carvalho, J.C. (2014) A new frontier in biodiversity inventory: a proposal for estimators of phylogenetic and functional diversity. Methods in Ecology and Evolution, in press.

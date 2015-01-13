@@ -1,10 +1,14 @@
-#####BAT - Biodiversity Assessment Tools R package
-#####Version 1.0.1 - 22.X.2014
+#####BAT - Biodiversity Assessment Tools
+#####Version 1.1 - 13.I.2015
 #####By Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 
 #####required packages
+library("nls2")
+library("spatstat")
 library("vegan")
+#' @import nls2
+#' @import spatstat
 #' @import vegan
 
 #####xTree function adapted from http://owenpetchey.staff.shef.ac.uk/Code/Code/calculatingfd_assets/Xtree.r
@@ -207,6 +211,7 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 #' If func is partial match of "nonparametric", TD, PD or FD are based on non-parametric estimators.
 #' If func is partial match of "completeness", PD or FD estimates are based on the completeness of TD (requires a tree to be used).
 #' If not specified, default is "nonparametric.
+#' @param target True diversity value to calculate the accuracy of curves (scaled mean squared error). If not specified do not calculate accuracy (default), -1 uses the total observed diversity as true diversity and any other value is the true known diversity.
 #' @param runs Number of random permutations to be made to the sampling order. If not specified, default is 100.
 #' @details Observed diversity often is an underestimation of true diversity. Several approaches have been devised to estimate species richness (TD) from incomplete sampling.
 #' These include: (1) fitting asymptotic functions to randomised accumulation curves (Soberon & Llorente 1993; Flather 1996)
@@ -235,8 +240,8 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 #' @return Chao2 - Chao estimator for incidence data;
 #' @return Clench - Clench or Michaelis-Menten curve;
 #' @return Exponential - Exponential curve;
-#' @return Weibull - Weibull curve.
 #' @return The P-corrected version of all non-parametric estimators is also provided.
+#' @return Accuracy - if accuracy is to be calculated a list is returned instead, with the second element being the scaled mean squared error of each estimator.
 #' @references Cardoso, P., Rigal, F., Borges, P.A.V. & Carvalho, J.C. (2014) A new frontier in biodiversity inventory: a proposal for estimators of phylogenetic and functional diversity. Methods in Ecology and Evolution, in press.
 #' @references Chao, A. (1984) Nonparametric estimation of the number of classes in a population. Scandinavian Journal of Statistics, 11, 265-270.
 #' @references Chao, A. (1987). Estimating the population size for capture-recapture data with unequal catchability. Biometrics 43, 783-791.
@@ -253,9 +258,10 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 #' alpha.accum(comm)
 #' alpha.accum(comm, func = "nonparametric")
 #' alpha.accum(comm, tree, "compl")
-#' alpha.accum(comm, tree, "curve", 100)
+#' alpha.accum(comm, tree, "curve", runs = 1000)
+#' alpha.accum(comm, target = -1)
 #' @export
-alpha.accum <- function(comm, tree, func = "nonparametric", runs = 100){
+alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 100){
 	
 	comm <- as.matrix(comm)
 	if (!missing(tree))
@@ -270,10 +276,12 @@ alpha.accum <- function(comm, tree, func = "nonparametric", runs = 100){
 	#####nonparametric (TD/PD/FD with non-parametric estimators)
 	switch(func, nonparametric = {
 		resultsArray <- array(0, dim = c(nrow(comm), 19, runs))
+		if(target > -2)
+			smse <- matrix(0, runs, 19)
 		for (r in 1:runs){
 			comm <- comm[sample(nrow(comm)),, drop=FALSE]			#shuffle rows (sampling units)
 			data <- matrix(0,1,ncol(comm))
-			runData <- matrix(0,0,19)
+			runData <- matrix(0,nrow(comm),19)
 			for (q in 1:nrow(comm)){
 				data <- rbind(data, comm[q,])
 				n <- sum(rowSums(data))
@@ -295,9 +303,21 @@ alpha.accum <- function(comm, tree, func = "nonparametric", runs = 100){
 				c1P <- c1 * pcorr(obs, s1)
 				c2 <- chao(obs, q1, q2, mb)
 				c2P <- c2 * pcorr(obs, q1)
-				runData <- rbind(runData, c(q, n, obs, s1, s2, q1, q2, j1ab, j1abP, j1in, j1inP, j2ab, j2abP, j2in, j2inP, c1, c1P, c2, c2P))
+				runData[q,] <- c(q, n, obs, s1, s2, q1, q2, j1ab, j1abP, j1in, j1inP, j2ab, j2abP, j2in, j2inP, c1, c1P, c2, c2P)
 			}
 			resultsArray[,,r] <- runData
+			if(exists("smse")){					##if accuracy is to be calculated
+				if(r == 1){
+					if(target == -1){
+						truediv <- runData[nrow(runData),3]
+					}else{
+						truediv <- target
+					}
+				}
+				s <- unlist(accuracy(runData, truediv))
+				smse[r,3] <- s[1]
+				smse[r,8:19] <- s[-1]
+			}
 		}
 		
 		#####calculate averages or medians of all runs
@@ -314,12 +334,14 @@ alpha.accum <- function(comm, tree, func = "nonparametric", runs = 100){
 					results[i,j] <- median(v)
 			}
 		}
+		if(exists("smse"))						##calculate accuracy
+			smse <- colMeans(smse)
 		
 		#####completeness (PD/FD with TD completeness correction)
 	}, completeness = {
 		if (missing(tree))
 			stop("Completeness option not available without a tree...")
-		results <- alpha.accum(comm, , "nonparametric", runs)
+		results <- alpha.accum(comm, , "nonparametric", runs = runs)
 		obs <- matrix(0,nrow(comm),1)
 		for (r in 1:runs){
 			comm <- comm[sample(nrow(comm)),, drop=FALSE]			#shuffle rows (sampling units)
@@ -334,47 +356,65 @@ alpha.accum <- function(comm, tree, func = "nonparametric", runs = 100){
 		
 		#####curve (TD/PD/FD with curve fitting)
 	}, curve = {
-		results <- matrix(0,nrow(comm),6)
-		for (r in 1:runs){
-			comm <- comm[sample(nrow(comm)),, drop=FALSE]		#shuffle rows (sampling units)
-			runData <- matrix(0,0,6)
-			for (s in 1:nrow(comm)){
-				n <- sum(rowSums(comm[1:s,,drop=FALSE]))
-				obs <- sobs(comm[1:s,,drop=FALSE], tree)
-				runData <- rbind(runData, c(s,n,obs,obs,obs,obs))
-			}
-			results <- results + runData
+    results <- matrix(NA,nrow(comm),6)
+    results[,1] <- seq(1,nrow(comm))  ##fill samples column
+    results[,2] <- seq(sum(comm)/nrow(comm),sum(comm), sum(comm)/nrow(comm))  ##fill individuals column
+    runObs <- rep(0,nrow(comm))
+    for (r in 1:runs){
+ 		  comm <- comm[sample(nrow(comm)),, drop=FALSE]		#shuffle rows (sampling units)
+ 		  for (s in 1:nrow(comm)){
+ 		    runObs[s] <- runObs[s] + sobs(comm[1:s,,drop=FALSE], tree)
+ 		  }
 		}
-		results <- results / runs
+		results[,3] <- runObs / runs
+		
+    rich <- results[nrow(comm),3]
+
 		for (s in 3:nrow(results)){				##fit curves only with 3 or more sampling units
-			x <- results[1:s,1]
+		  ## curve fitting
+      x <- results[1:s,1]
 			y <- results[1:s,3]
-			#####Clench
-			clench <- try(nls(y ~ (a*x)/(1+b*x), start = list(a = 100, b = 1), control = nls.control(maxiter = 10000)), silent = TRUE); # does not stop in the case of error
-			if(class(clench) != "try-error"){
-				a <- coef(clench)[1]
-				b <- coef(clench)[2]
+			stlist <- data.frame(a = rich, b = c(0.1, 0.5, 1))
+			##Clench
+      form <- y ~ (a*x)/(1+b*x)
+			mod <- try(nls2(form, start = stlist, algorithm = "random-search"))
+			curve <- try(nls2(form, start = mod, algorithm = "default"))
+			if(class(curve) != "try-error"){
+				a <- coef(curve)[1]
+				b <- coef(curve)[2]
 				results[s,4] <- a/b
 			}
-			#####Exponential
-			exponential <- try(nls(y ~ (a/b)*(1-exp(-b*x)), start = list(a = 100, b = 1), control = nls.control(maxiter = 10000)), silent = TRUE); # does not stop in the case of error
-			if(class(exponential) != "try-error"){
-				a <- coef(exponential)[1]
-				b <- coef(exponential)[2]
+			##Exponential
+      form <- y ~ (a/b)*(1-exp(-b*x))
+			mod <- try(nls2(form, start = stlist, algorithm = "random-search"))
+			curve <- try(nls2(form, start = mod, algorithm = "default"))
+			if(class(curve) != "try-error"){
+				a <- coef(curve)[1]
+				b <- coef(curve)[2]
 				results[s,5] <- a/b
 			}
-			#####Weibull
-			weibull <- try(nls(y ~ a*(1-exp(-(b*(x-c))^d)), start = list(a = 1, b = 1, c = 1, d = 1), control = nls.control(maxiter = 10000)), silent = TRUE); # does not stop in the case of error
-			if(class(weibull) != "try-error"){
-				a <- coef(weibull)[1]
-				results[s,6] <- a
-			}
+			##Weibull
+ 			stlist <- data.frame(a = rich, b = c(0,1,10), c = c(0,0.1,1))
+ 			form <- y ~ a*(1-exp(-b*(x^c)))
+      mod <- try(nls2(form, start = stlist, algorithm = "random-search"))
+ 			curve <- try(nls2(form, start = mod, algorithm = "default"))
+  			if(class(curve) != "try-error"){
+  				a <- coef(curve)[1]
+  				results[s,6] <- a
+  			}
 		}
 		colnames(results) <- c("Sampl", "Ind", "Obs", "Clench", "Exponential", "Weibull")
 		return (results)
 	})
 	colnames(results) <- c("Sampl", "Ind", "Obs", "S1", "S2", "Q1", "Q2", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
-	return(results)
+	if(exists("smse")){
+		smse <- matrix(smse,1,length(smse))
+		colnames(smse) <- colnames(results)
+		smse[,c(1:2,4:7)] <- NA
+		return(list(results, smse))
+	}	else {
+		return(results)
+	}
 }
 
 #' Alpha diversity estimates.
@@ -505,12 +545,11 @@ beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 
 	
 	if(raref < 1){						# no rarefaction if 0 or negative
 		results <- array(0, dim=c(nComm, nComm, 3))
-		for (i in 1:nComm){
-			for (j in 1:nComm){
+		for (i in 1:(nComm-1)){
+			for (j in (i+1):nComm){
 				commBoth <- as.matrix(rbind(comm[i,], comm[j,]))
 				betaValues <- betaObs(commBoth, tree, abund, func)
-				for(k in 1:3)
-					results[i,j,k] <- betaValues[[k]]
+				results[j,i,] <- unlist(betaValues)
 			}
 		}
 		results <- list(Btotal = as.dist(results[,,1]),Brepl = as.dist(results[,,2]),Brich = as.dist(results[,,3]))
@@ -520,8 +559,8 @@ beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 
 		raref <- rarefaction(comm)				# rarefy by minimum n among all communities
 	results <- array(0, dim=c(nComm, nComm, 3, 5))
 	
-	for (i in 1:nComm){
-		for (j in 1:nComm){
+	for (i in 1:(nComm-1)){
+		for (j in (i+1):nComm){
 			run <- matrix(0, runs, 3)
 			for (r in 1:runs){
 				commBoth <- as.matrix(rbind(rrarefy(comm[i,], raref), rrarefy(comm[j,], raref)))
@@ -531,11 +570,11 @@ beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 
 				run[r,3] <- betaValues$Brich
 			}
 			for (b in 1:3){
-				results[i,j,b,1] <- mean(run[,b])
-				results[i,j,b,2] <- min(run[,b])
-				results[i,j,b,3] <- quantile(run[,b], 0.025)
-				results[i,j,b,4] <- quantile(run[,b], 0.975)
-				results[i,j,b,5] <- max(run[,b])
+				results[j,i,b,1] <- mean(run[,b])
+				results[j,i,b,2] <- min(run[,b])
+				results[j,i,b,3] <- quantile(run[,b], 0.025)
+				results[j,i,b,4] <- quantile(run[,b], 0.975)
+				results[j,i,b,5] <- max(run[,b])
 			}
 		}
 	}
@@ -568,8 +607,8 @@ beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 #' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
 #' @references Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
-#' @examples comm1 <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)
-#' comm2 <- matrix(c(1,1,0,0,0,0,2,1,0,0,0,0,2,1,0,0,0,0,2,1), nrow = 4, ncol = 5, byrow = TRUE)
+#' @examples comm1 <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRUE)
+#' comm2 <- matrix(c(1,1,0,0,0,0,2,1,0,0,0,0,2,1,0,0,0,0,2,1), nrow = 4, byrow = TRUE)
 #' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 #' beta.accum(comm1, comm2)
 #' beta.accum(comm1, comm2, func = "Soerensen")
@@ -586,7 +625,6 @@ beta.accum <- function(comm1, comm2, tree, abund = FALSE, func = "jaccard", runs
 	nSamples <- nrow(comm1)
 	results <- matrix(0,nSamples, 4)
 	colnames(results) <- c("Sampl", "Btotal", "Brepl", "Brich")
-	
 	for (r in 1:runs){
 		comm1 <- comm1[sample(nSamples),, drop=FALSE]			#shuffle sampling units of first community
 		comm2 <- comm2[sample(nSamples),, drop=FALSE]			#shuffle sampling units of second community
@@ -600,7 +638,7 @@ beta.accum <- function(comm1, comm2, tree, abund = FALSE, func = "jaccard", runs
 		}
 	}
 	results <- results/runs
-	return (results)
+	return(results)
 }
 
 #' Beta diversity among multiple sites.
@@ -695,7 +733,7 @@ accuracy <- function(accum, target = -1){
 		smse <- smse / nrow(accum)
 		smse <- list(Btotal=smse[1], Brepl=smse[2], Brich=smse[3])
 	}
-	return(smse)
+	return(c(unlist(smse)))
 }
 
 #' Slope of accumulation curves.
@@ -736,6 +774,216 @@ slope <- function(accum){
 	return(sl)
 }
 
+#' Simulation of species abundance distributions (SAD).
+#' @description Creates artificial communities following given SADs.
+#' @param n total number of individuals.
+#' @param s number of species.
+#' @param sad The SAD distribution type (lognormal, uniform, broken stick or geometric). Default is lognormal.
+#' @param sd The standard deviation of lognormal distributions. Default is 1.
+#' @details Species Abundance Distributions may take a number of forms. A lognormal SAD probably is the most supported by empirical data, but we include other common types useful for testing multiple algorithms including several of the functions in BAT. 
+#' @return A matrix of species x abundance per species.
+#' @examples comm1 <- sim.sad(10000, 100)
+#' comm2 <- sim.sad(10000, 100, sd = 2)
+#' comm3 <- sim.sad(10000, 100, sad = "uniform")
+#' par(mfrow=c(1,3))
+#' hist(log(comm1$Freq))
+#' hist(log(comm2$Freq))
+#' hist(log(comm3$Freq))
+#' @export
+sim.sad <- function(n, s, sad = "lognormal", sd = 1) {
+	if (s > n)
+		stop("Number of species can't be larger than number of individuals")
+	sppnames = paste("Sp", 1:s, sep="") ##species names
+	sad <- match.arg(sad, c("lognormal", "uniform", "broken", "geometric"))
+	
+	##lognormal distribution
+	switch(sad, lognormal = {
+		comm = sample(sppnames, size = n, replace = T, prob = c(rlnorm(s, sdlog = sd)))
+		
+		##uniform distribution
+	}, uniform = {
+		comm = sample(sppnames, size = n, replace = T)
+		
+		##broken stick distribution
+	}, broken = {
+		broken.stick <- function(p){
+			result = NULL
+			for(j in 1:p) {
+				E = 0
+				for(x in j:p)
+					E = E+(1/x)
+				result[j] = E/p
+			}
+			return(result)
+		}
+		broken.prob = broken.stick(s)
+		comm = sample(sppnames, size = n, replace = TRUE, prob = c(broken.prob))
+	}, geometric = {
+		geo.ser <- function(s, k = 0.3){
+			result = NULL
+			for (x in 1:s) {
+				result[x] = k*(1-k)^(x-1)/(1-(1-k)^s)
+			}
+			return(result)
+		}
+		geo.prob = geo.ser(s)
+		comm = sample(sppnames, size = n, replace = TRUE, prob = c(geo.prob))
+	})
+	return(as.data.frame(table(comm)))
+}
+
+#' Simulation of species spatial distributions.
+#' @description Creates artificial communities with given SAD and spatial clustering.
+#' @param n total number of individuals.
+#' @param s number of species.
+#' @param sad The SAD distribution type (lognormal, uniform, broken stick or geometric). Default is lognormal.
+#' @param sd The standard deviation of lognormal distributions. Default is 1.
+#' @param dist The spatial distribution of individual species populations (aggregated, random, uniform or gradient). Default is aggregated.
+#' @param clust The clustering parameter (higher values create more clustered populations). Default is 1.
+#' @details The spatial distribution of individuals of given species may take a number of forms.
+#' Competitive exclusion may cause overdispersion, specific habitat needs or cooperation may cause aggregation and environmental gradients may cause abundance gradients.
+#' @return A matrix of individuals x (species, x coords and y coords).
+#' @examples par(mfrow = c(3 ,3))
+#' comm = sim.spatial(100, 9, dist = "uniform")
+#' for(i in 1:9){
+#' 	sp <- comm[comm[1] == paste("Sp", i, sep = ""), ]
+#' 	plot(sp$x, sp$y, main = paste("Sp", i), xlim = c(0,1), ylim = c(0,1))
+#' }
+#' comm = sim.spatial(1000, 9, sad = "lognormal", sd = 0.5, dist = "aggregated", clust = 2)
+#' for(i in 1:9){
+#' 	sp <- comm[comm[1] == paste("Sp", i, sep=""), ]
+#' 	plot(sp$x, sp$y, main = paste("Sp", i), xlim = c(0,1), ylim = c(0,1))
+#' }
+#' @export
+sim.spatial <- function(n, s, sad = "lognormal", sd = 1, dist = "aggregated", clust = 1){
+	repeat{
+		simsad <- sim.sad(n, s, sad, sd)
+		dist <- match.arg(dist, c("aggregated", "random", "uniform", "gradient"))
+	
+		##aggregated distribution
+		switch(dist, aggregated = {
+			clust <- 1/(4*clust)
+			cluster <- vector("list", s)
+			for (i in 1:s)
+				cluster[[i]] = rThomas(1, clust, n, as.owin(c(0,1,0,1)))
+			ppx <- NULL
+			ppy <- NULL
+			for (j in 1:s){
+				ppx <- c(ppx, cluster[[j]]$x[1:simsad[,2][j]])
+				ppy <- c(ppy, cluster[[j]]$y[1:simsad[,2][j]])
+			}
+			spp <- rep(as.character(simsad[,1]), simsad[,2])
+			comm <- data.frame(Spp = spp, x = ppx, y = ppy)
+			
+			##random distribution
+		}, random = {
+			rand <- runifpoint(n, as.owin(c(0,1,0,1)))
+			spp <- rep(as.character(simsad[,1]), simsad[,2])
+			comm <- data.frame(Spp = spp, x = rand$x, y = rand$y)
+			
+			##uniform distribution
+		}, uniform = {
+			rand <- rSSI(1/n, n, as.owin(c(0,1,0,1)))
+			spp <- rep(as.character(simsad[,1]), simsad[,2])
+			comm <- data.frame(Spp = spp, x = rand$x, y = rand$y)
+			
+			##gradient distribution
+		}, gradient = {
+			comm <- rpoint(n, function(x,y){x})
+			spp <- rep(as.character(simsad[,1]), simsad[,2])
+			comm <- data.frame(Spp = spp, x = comm$x, y = comm$y)
+		})
+		if(nrow(comm) == n && length(which(is.na(comm$x))) == 0){
+			break
+		}
+	}
+	return(comm)
+}
+
+#' Plots of simulated species spatial distributions.
+#' @description Plots individuals from artificial communities with given SAD and spatial clustering.
+#' @param comm artificial community data from function sim.spatial.
+#' @param sad boolean indicating if the SAD plot should also be shown. Default is FALSE.
+#' @param n number of species to plot simultaneously. Default is the number of species in comm.
+#' @details Function useful for visualizing the results of sim.spatial.
+#' @examples comm <- sim.spatial(1000, 24)
+#' sim.plot(comm)
+#' sim.plot(comm, sad = TRUE)
+#' sim.plot(comm, n = 9)
+#' @export
+sim.plot <- function(comm, sad = FALSE, n = 0){
+	s <- length(unique(comm$Spp))
+	if(n < 1){
+		if(!sad)
+			side = ceiling(sqrt(s))
+		else
+			side = ceiling(sqrt(s+1))
+	}	else{
+		side = ceiling(sqrt(n))
+	}
+	par(mfrow = c(side,side), mar = c(1,1,2,1))
+	if(sad)
+		hist(log(table(comm[,1])), main = "All species", xlab = "Abundance (log)", xaxt="n")
+	for(i in 1:s){
+		sp <- comm[comm[1] == paste("Sp", i, sep=""), ]
+		plot(sp$x, sp$y, main = paste("Sp", i), xlim = c(0,1), ylim = c(0,1), xlab="", ylab="", xaxt="n", yaxt="n")
+	}
+}
+
+#' Simulated sampling from artificial communities.
+#' @description Simulates a sampling process from artificial communities.
+#' @param comm simulated community data from function sim.spatial.
+#' @param cells number of cells to divide the simulated space into. Default is 100.
+#' @param samples number of samples (cells) to randomly extract. Default is the number of cells (the entire community).
+#' @details The space will be divided in both dimensions by sqrt(cells).
+#' @details Function useful for simulating sampling processes from the results of sim.spatial.
+#' @details May be used as direct input to other functions (e.g. alpha, alpha.accum, beta, beta.accum) to test the behavior of multiple descriptors and estimators.
+#' @return A matrix of samples x species (values are abundance per species per sample).
+#' @examples comm <- sim.spatial(1000, 10)
+#' sim.sample(comm)
+#' sim.sample(comm, cells = 10, samples = 5)
+#' @export
+sim.sample <- function(comm, cells = 100, samples = 0){
+	side <- round(sqrt(cells),0)
+	cells = side^2
+
+	comm$ind <- 0
+	xv <- cut(comm$x, seq(0, 1, 1/side))
+	yv <- cut(comm$y, seq(0, 1, 1/side))
+	grid1 <- data.frame(table(xv, yv))
+	grid1 <- grid1[,-3]
+	
+	s <- 1:cells
+	for (i in 1:cells){
+		id <- NULL
+		id <- which (xv == grid1$xv[s[i]] & yv == grid1$yv[s[i]])
+		comm$ind[id] <- paste("Sample", i, sep="")
+	}
+	comm <- table(comm$ind, comm$Spp) ##entire community
+	comm <- comm[rownames(comm) != "0", ]
+	if (samples < 1 || samples > nrow(comm))
+		samples = nrow(comm)
+	
+	##number of samples to take
+	samp <- comm[sample(nrow(comm), samples, replace = FALSE),] ## sampled community
+	
+	return(samp)
+}
+
+#' Simulated phylogenetic or functional tree.
+#' @description Simulates a random tree.
+#' @param n number of species.
+#' @param m number of genes/traits. Default is 2.
+#' @details A very simple tree based on random genes/traits.
+#' @return An hclust object.
+#' @examples tree <- sim.tree(100)
+#' plot(as.dendrogram(tree))
+#' @export
+sim.tree <- function(n, m = 2){
+	mat <- matrix(sample(0:100, n*m, replace = TRUE), nrow = n, ncol = m)
+	tree <- hclust(dist(mat), method = "average")
+	return(tree)
+}
 
 #' Sample data of spiders in Arrabida (Portugal)
 #'
