@@ -1,5 +1,5 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 1.1 - 13.I.2015
+#####Version 1.2 - 11.II.2015
 #####By Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 
@@ -175,9 +175,12 @@ betaObs <- function(comm, tree, abund = FALSE, func = "jaccard"){
 #' alpha(comm, tree, 2, 100)
 #' @export
 alpha <- function(comm, tree, raref = 0, runs = 100){
-	if (!missing(tree))
+  
+  comm <- as.matrix(comm)
+  if (!missing(tree))
 		tree <- xTree(as.hclust(tree))
-	nComm <- nrow(comm)
+	
+  nComm <- nrow(comm)
 	if(raref < 1){						# no rarefaction if 0 or negative
 		results <- matrix(0, nComm, 1)
 		for (s in 1:nComm){
@@ -459,7 +462,9 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 #' alpha.estimate(comm, tree, func = "completeness")
 #' @export
 alpha.estimate <- function(comm, tree, func = "nonparametric"){
-	if (max(comm) == 1)
+	
+  comm <- as.matrix(comm)
+  if (max(comm) == 1)
 		stop("No estimates are possible without abundance or incidence frequency data")
 	if (!missing(tree))
 		tree <- xTree(as.hclust(tree))
@@ -538,9 +543,10 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
 #' beta(comm, tree, abund = TRUE, "s", raref = 2)
 #' @export
 beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 100){
-	if (!missing(tree))
-		tree <- xTree(as.hclust(tree))
 	
+  comm <- as.matrix(comm)
+  if (!missing(tree))
+		tree <- xTree(as.hclust(tree))
 	nComm <- nrow(comm)
 	
 	if(raref < 1){						# no rarefaction if 0 or negative
@@ -617,9 +623,12 @@ beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 
 #' beta.accum(comm1, comm2, tree, FALSE)
 #' @export
 beta.accum <- function(comm1, comm2, tree, abund = FALSE, func = "jaccard", runs = 100){
-	if(nrow(comm1) < 2 || nrow(comm1) != nrow(comm2))
+	
+  if(nrow(comm1) < 2 || nrow(comm1) != nrow(comm2))
 		stop("Both communities should have multiple and the same number of sampling units")
-	if (!missing(tree))
+  comm1 <- as.matrix(comm1)
+  comm2 <- as.matrix(comm2)
+  if (!missing(tree))
 		tree <- xTree(as.hclust(tree))
 	
 	nSamples <- nrow(comm1)
@@ -772,6 +781,262 @@ slope <- function(accum){
 		}
 	}
 	return(sl)
+}
+
+#' Optimization of alpha diversity sampling protocols.
+#' @description Optimization of alpha diversity sampling protocols when different methods and multiple samples per method are available.
+#' @param comm A samples x species x sites array, with either abundance or incidence data.
+#' @param tree An hclust or phylo object (used only to optimize PD or FD sampling).
+#' @param methods A vector specifying the method of each sample (length must be equal to nrow(comm))
+#' @param samples A vector defining a base protocol from which to build upon (complementarity analysis) (length must be equal to number of methods).
+#' @param runs Number of random permutations to be made to the sample order. Default is 1000.
+#' @details Often a combination of methods allows sampling maximum plot diversity with minimum effort, as it allows sampling different sub-communities, contrary to using single methods.
+#' Cardoso (2009) proposed a way to optimize the number of samples per method when the target is to maximize sampled alpha diversity. It is applied here for TD, PD and FD, and for one or multiple sites simultaneously.
+#' Phylogenetic (PD) and functional (FD) diversities are calculated based on an ultrametric tree (hclust or phylo object).
+#' @return A matrix of samples x methods (values being optimum number of samples per method). The last column is the average alpha diversity value, rescaled to 0-1 if made for several sites, where 1 is the true diversity of each site.
+#' @references Cardoso, P. (2009) Standardization and optimization of arthropod inventories - the case of Iberian spiders. Biodiversity and Conservation, 18, 3949-3962.
+#' @examples comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)
+#' comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
+#' comm <- array(c(comm1, comm2), c(4,3,2))
+#' colnames(comm) <- c("Sp1","Sp2","Sp3")
+#' methods <- c("Met1","Met2","Met2","Met3")
+#' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+#' optim.alpha(comm,,methods)
+#' optim.alpha(comm, tree, methods)
+#' optim.alpha(comm,, methods = methods, samples = c(0,0,1), runs = 100)
+#' @export
+optim.alpha <- function(comm, tree, methods, samples, runs = 1000){
+	
+	##preliminary stats
+	methods <- as.vector(t(methods))
+	nSamples <- length(methods)							##number of samples
+	metUnique <- as.vector(t(unique(methods)))				##list of methods
+	metNum <- length(metUnique)							##number of methods
+	if (missing(samples))										##if no samples to start with for complementarity analysis
+		samples <- rep(0,metNum)
+	nMiss <- nSamples - sum(samples)				##number of samples missing
+	nSamplesMet <- rep(0,metNum)						##samples per method
+	for (m in 1:metNum)											
+		nSamplesMet[m] <- sum(methods == metUnique[m])
+	
+	##accumulation process
+	div <- rep(0,nMiss+1)										##diversity along the optimal accumulation curve
+	if (sum(samples) > 0)															
+		div[1] <- optim.alpha.stats(comm, tree, methods, samples, runs)
+	for (s in 2:(nMiss+1)){
+		samples <- rbind (samples, rep(0,metNum))
+		samples[s,] <- samples[s-1,]
+		metValue <- rep(0, metNum)										#diversity when adding each method
+		for (m in 1:metNum){
+			if (samples[s,m] < nSamplesMet[m]){
+				samples[s,m] <- samples[s,m] + 1
+				metValue[m] <- optim.alpha.stats(comm, tree, methods, samples[s,], runs)
+				samples[s,m] <- samples[s,m] - 1
+			}
+		}
+		div[s] <- max(metValue)
+		best <- which(metValue == div[s])
+		if (length(best) > 1)
+			best = best[sample(1:length(best),1)]						#if tie, choose one of the best methods randomly
+		samples[s, best] <- samples[s, best] + 1
+	}
+	colnames(samples) <- metUnique
+	rownames(samples) <- (0:nMiss+sum(samples[1,]))
+	samples <- cbind(samples, div)
+	return(samples)
+}
+
+#' Efficiency statistics for alpha-sampling.
+#' @description Average alpha diversity observed with a given number of samples per method.
+#' @param comm A samples x species x sites array, with either abundance or incidence data.
+#' @param tree An hclust or phylo object (used only to optimize PD or FD sampling).
+#' @param methods A vector specifying the method of each sample (length must be equal to nrow(comm))
+#' @param samples A vector defining the number of samples per method to be evaluated (length must be equal to number of methods).
+#' @param runs Number of random permutations to be made to the sample order. Default is 1000.
+#' @details Different combinations of samples per method allow sampling different sub-communities.
+#' This function allows knowing the average TD, PD or FD values for a given combination, for one or multiple sites simultaneously.
+#' Phylogenetic (PD) and functional (FD) diversities are calculated based on an ultrametric tree (hclust or phylo object).
+#' @return A single average alpha diversity value. Rescaled to 0-1 if made for several sites, where 1 is the true diversity of each site.
+#' @examples comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)
+#' comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
+#' comm <- array(c(comm1, comm2), c(4,3,2))
+#' colnames(comm) <- c("Sp1","Sp2","Sp3")
+#' methods <- c("Met1","Met2","Met2","Met3")
+#' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+#' optim.alpha.stats(comm,,methods, c(1,1,1))
+#' optim.alpha.stats(comm, tree, methods = methods, samples = c(0,0,1), runs = 100)
+#' @export
+optim.alpha.stats <- function(comm, tree, methods, samples, runs = 1000){
+	
+	##preliminary stats
+	if (!missing(tree))
+		tree <- xTree(as.hclust(tree))
+	if(length(dim(comm)) == 3)					##number of sites
+		nSites <- dim(comm)[3]
+	else
+		nSites <- 1
+	methods <- as.vector(t(methods))
+	metUnique <- as.vector(t(unique(methods)))				##list of methods
+	metNum <- length(metUnique)					##number of methods
+	div <- 0														##average diversity obtained using this particular combination of samples per method
+	
+	for (i in 1:nSites){
+		if (nSites > 1){
+			site <- as.matrix(comm[,,i])
+			true <- sobs(site, tree) 				##true diversity of each site
+		} else {
+			site <- as.matrix(comm)
+			true <- 1
+		}
+		
+		for (r in 1:runs){
+			addSample <- rep(0, ncol(comm))
+			for (m in 1:metNum){
+				if (samples[m] > 0){
+					filterList <- site[which(methods == metUnique[m]),,drop=F]						##filter by method m
+					filterList <- filterList[sample(nrow(filterList),samples[m]),,drop=F]	##randomly select rows
+					addSample <- rbind(addSample, filterList)															##add random samples
+				}
+			}
+			div <- div + sobs(addSample, tree) / runs / nSites / true
+		}
+	}
+	return(div)
+}
+
+#' Optimization of beta diversity sampling protocols.
+#' @description Optimization of beta diversity sampling protocols when different methods and multiple samples per method are available.
+#' @param comm A samples x species x sites array, with either abundance or incidence data.
+#' @param tree An hclust or phylo object (used only to optimize PD or FD sampling).
+#' @param methods A vector specifying the method of each sample (length must be equal to nrow(comm))
+#' @param samples Allows defining a base mandatory protocol from which to build upon (complementarity analysis). It should be a vector with length = number of methods.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.
+#' @param runs Number of random permutations to be made to the sample order. Default is 1000.
+#' @details Often, comparing differences between sites or the same site along time (i.e. measure beta diversity) it is not necessary to sample exhaustively. A minimum combination of samples targeting different sub-communities (that may behave differently) may be enough to perceive such differences, for example, for monitoring purposes.
+#' Cardoso et al. (in prep.) introduce and differentiate the concepts of alpha-sampling and beta-sampling. While alpha-sampling optimization implies maximizing local diversity sampled (Cardoso 2009), beta-sampling optimization implies minimizing differences in beta diversity values between partially and completely sampled communities.
+#' This function uses as beta diversity measures the Btotal, Brepl and Brich partitioning framework (Carvalho et al. 2012) and respective generalizations to PD and FD (Cardoso et al. 2014).
+#' Phylogenetic (PD) and functional (FD) diversities are calculated based on an ultrametric tree (hclust or phylo object).
+#' @return A matrix of samples x methods (values being optimum number of samples per method). The last column is the average absolute difference from real beta.
+#' @references Cardoso, P. (2009) Standardization and optimization of arthropod inventories - the case of Iberian spiders. Biodiversity and Conservation, 18, 3949-3962.
+#' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
+#' @references Cardoso, P., et al. (in prep.) Optimal inventorying and monitoring of taxon, phylogenetic and functional diversity.
+#' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
+#' @examples comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)
+#' comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
+#' comm3 <- matrix(c(2,0,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
+#' comm <- array(c(comm1, comm2, comm3), c(4,3,3))
+#' colnames(comm) <- c("sp1","sp2","sp3")
+#' methods <- c("Met1","Met2","Met2","Met3")
+#' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+#' optim.beta(comm,,methods, runs = 100)
+#' optim.beta(comm, tree, methods = methods, abund = TRUE, samples = c(0,0,1), runs = 100)
+#' @export
+optim.beta <- function(comm, tree, methods, samples, abund = FALSE, runs = 1000){
+	
+	##preliminary stats
+	methods <- as.vector(t(methods))
+	nSamples <- length(methods)							##number of samples
+	metUnique <- as.vector(t(unique(methods)))				##list of methods
+	metNum <- length(metUnique)							##number of methods
+	
+	if (missing(samples))										##if no samples to start with
+		samples <- rep(0,metNum)
+	nMiss <- nSamples - sum(samples)				##number of samples missing
+	nSamplesMet <- rep (0, metNum)					##samples per method
+	for (m in 1:metNum)											
+		nSamplesMet[m] <- sum(methods == metUnique[m])
+	
+	##accumulation process
+	diff <- rep(0,nMiss+1)														#absolute difference along the optimal accumulation curve
+	diff[1] <- optim.beta.stats(comm, tree, methods, samples, abund, runs)
+	if (diff[1] == "NaN")
+		diff[1] = 1
+	for (s in 2:(nMiss+1)){
+		samples <- rbind (samples, rep(0,metNum))
+		samples[s,] <- samples[s-1,]
+		metValue <- rep(1, metNum)										#absolute difference when adding each method
+		for (m in 1:metNum){
+			if (samples[s,m] < nSamplesMet[m]){
+				samples[s,m] <- samples[s,m] + 1
+				metValue[m] <- optim.beta.stats(comm, tree, methods,samples[s,], abund, runs)
+				samples[s,m] <- samples[s,m] - 1
+			}
+		}
+		diff[s] <- min(metValue)
+		best <- which(metValue == diff[s])
+		if (length(best) > 1)
+			best = best[sample(1:length(best),1)]						#if tie, choose one of the best methods randomly
+		samples[s, best] <- samples[s, best] + 1
+	}
+	colnames(samples) <- metUnique
+	rownames(samples) <- (0:nMiss+sum(samples[1,]))
+	samples <- cbind(samples, diff)
+	return(samples)
+}
+
+#' Efficiency statistics for beta-sampling.
+#' @description Average absolute difference between sampled and real beta diversity when using a given number of samples per method.
+#' @param comm A samples x species x sites array, with either abundance or incidence data.
+#' @param tree An hclust or phylo object (used only to optimize PD or FD sampling).
+#' @param methods A vector specifying the method of each sample (length must be equal to nrow(comm))
+#' @param samples The combination of samples per method we want to test. It should be a vector with length = number of methods.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.
+#' @param runs Number of random permutations to be made to the sample order. Default is 1000.
+#' @details Different combinations of samples per method allow sampling different sub-communities.
+#' This function allows knowing the average absolute difference between sampled and real beta diversity for a given combination, for one or multiple sites simultaneously.
+#' Phylogenetic (PD) and functional (FD) diversities are calculated based on an ultrametric tree (hclust or phylo object).
+#' @return A single average absolute beta diversity difference value.
+#' @examples comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)
+#' comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
+#' comm3 <- matrix(c(2,0,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
+#' comm <- array(c(comm1, comm2, comm3), c(4,3,3))
+#' colnames(comm) <- c("sp1","sp2","sp3")
+#' methods <- c("Met1","Met2","Met2","Met3")
+#' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+#' optim.beta.stats(comm,,methods, c(1,1,1))
+#' optim.beta.stats(comm, tree, methods = methods, samples = c(0,0,1), runs = 100)
+#' @export
+optim.beta.stats <- function(comm, tree, methods, samples, abund = FALSE, runs = 1000){
+
+	##preliminary stats
+#	if (!missing(tree))
+#		tree <- xTree(as.hclust(tree))
+	if(length(dim(comm)) == 3){					##number of sites
+		nSites <- dim(comm)[3]
+	}else{
+		message("need sample data from at least two sites to perform analyses")
+		return(0)
+	}
+	methods <- as.vector(t(methods))
+	metUnique <- as.vector(t(unique(methods)))				##list of methods
+	metNum <- length(metUnique)					##number of methods
+	diff <- 0														##average absolute difference between observed and true diversity obtained using this particular combination of samples per method
+	
+	##calculate true beta values
+	sumComm <- matrix(0, nrow = nSites, ncol = ncol(comm))
+	for (i in 1:nSites){
+		sumComm[i,] <- colSums(comm[,,i])
+	}
+	true <- beta(sumComm, tree, abund)
+	
+	##calculate absolute difference between sampled and true beta values
+	for (r in 1:runs){
+		sumComm <- matrix(0, nrow = nSites, ncol = ncol(comm))
+		for (m in 1:metNum){
+			if (samples[m] > 0){
+				filterList <- comm[which(methods == metUnique[m]),,,drop=F] 							##filter by method m
+				filterList <- filterList[sample(nrow(filterList),samples[m]),,,drop=F]		##randomly select rows
+				for (i in 1:nSites){
+					sumComm[i,] <- sumComm[i,] + colSums(filterList[,,i,drop=F])
+				}
+			}
+		}
+		sampleBeta <- beta(sumComm, tree, abund)
+		for(i in 1:3){
+			diff <- diff + mean(abs(sampleBeta[[i]] - true[[i]])) / 3 / runs
+		}
+	}
+	return(diff)
 }
 
 #' Simulation of species abundance distributions (SAD).
@@ -973,14 +1238,19 @@ sim.sample <- function(comm, cells = 100, samples = 0){
 #' Simulated phylogenetic or functional tree.
 #' @description Simulates a random tree.
 #' @param n number of species.
-#' @param m number of genes/traits. Default is 2.
+#' @param m a structural parameter defining the average difference between species. Default is 100. Lower numbers create trees dominated by increasingly similar species, higher numbers by increasingly dissimilar species.
 #' @details A very simple tree based on random genes/traits.
 #' @return An hclust object.
-#' @examples tree <- sim.tree(100)
+#' @examples tree <- sim.tree(10)
 #' plot(as.dendrogram(tree))
+#' tree <- sim.tree(100,10)
+#' plot(as.dendrogram(tree))
+#' tree <- sim.tree(100,1000)
+#' plot(as.dendrogram(tree))
+
 #' @export
-sim.tree <- function(n, m = 2){
-	mat <- matrix(sample(0:100, n*m, replace = TRUE), nrow = n, ncol = m)
+sim.tree <- function(n, m = 100){
+	mat <- matrix(sample(0:m, ceiling(n*m/50), replace = TRUE), nrow = n, ncol = m)
 	tree <- hclust(dist(mat), method = "average")
 	return(tree)
 }
