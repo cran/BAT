@@ -1,5 +1,5 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 1.2 - 11.II.2015
+#####Version 1.2.1 - 05.III.2015
 #####By Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 
@@ -126,7 +126,7 @@ pcorr <- function(obs, s1){
 
 #####observed beta (a = shared species/edges, b/c = species/edges exclusive to either site, comm is a 2sites x species matrix)
 betaObs <- function(comm, tree, abund = FALSE, func = "jaccard"){
-	if (!abund) {														##if incidence data
+	if (!abund) {																			##if incidence data
 		obs1 <- sobs(comm[1,,drop=FALSE], tree)
 		obs2 <- sobs(comm[2,,drop=FALSE], tree)
 		obsBoth <- sobs(comm, tree)
@@ -136,12 +136,21 @@ betaObs <- function(comm, tree, abund = FALSE, func = "jaccard"){
 			denominator <- obs1 + obs2
 		b <- obsBoth - obs2
 		c <- obsBoth - obs1
-	} else {																				##if abundance data
+	} else if (abund & missing(tree)){								##if abundance data
 		a <- 0
 		for (i in 1:ncol(comm))
 			a <- a + min(comm[1,i], comm[2,i])
 		b <- sum(comm[1,]) - a
 		c <- sum(comm[2,]) - a
+		denominator <- a + b + c
+		if(tolower(substr(func, 1, 1)) == "s")
+			denominator <- denominator + a
+	} else {																					##if abundance and tree
+		data <- prep(comm, tree)
+		a = sum(data$lenBranch * apply(data$sampleBranch,2,min))
+		diff = data$lenBranch * (data$sampleBranch[1,] - data$sampleBranch[2,])
+		b = sum(replace(diff, diff < 0, 0))
+		c = sum(replace(diff, diff > 0, 0) * -1)
 		denominator <- a + b + c
 		if(tolower(substr(func, 1, 1)) == "s")
 			denominator <- denominator + a
