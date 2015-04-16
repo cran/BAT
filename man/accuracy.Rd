@@ -12,7 +12,7 @@ accuracy(accum, target = -1)
 \item{target}{The true known diversity value, with which the curve will be compared. If not specified, default is the diversity observed with all sampling units.}
 }
 \value{
-Accuracy values for all observed and estimated curves.
+Accuracy values (both raw and weighted) for all observed and estimated curves.
 }
 \description{
 Accuracy (scaled mean squared error) of accumulation curves compared with a known true diversity value (target).
@@ -23,6 +23,7 @@ Among multiple measures of accuracy (Walther & Moore 2005) the SMSE presents sev
 (ii) scaled to the number of sampling units, so that values are independent of sample size;
 (iii) squared, so that small, mostly meaningless fluctuations around the true value are down-weighted; and
 (iv) independent of positive or negative deviation from the real value, as such differentiation is usually not necessary.
+For alpha diversity accuracy may also be weighted according to how good the data is predicted to be. The weight of each point in the curve is proportional to its sampling intensity (i.e. n/Sobs).
 }
 \examples{
 comm1 <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)

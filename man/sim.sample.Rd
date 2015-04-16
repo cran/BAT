@@ -2,7 +2,7 @@
 % Please edit documentation in R/BAT.R
 \name{sim.sample}
 \alias{sim.sample}
-\title{Simulated sampling from artificial communities.}
+\title{Simulation of sampling from artificial communities.}
 \usage{
 sim.sample(comm, cells = 100, samples = 0)
 }

@@ -27,7 +27,7 @@ Observed alpha diversity with possible rarefaction, multiple sites simultaneousl
 }
 \details{
 TD is equivalent to species richness. Calculations of PD and FD are based on Faith (1992) and Petchey & Gaston (2002, 2006), which measure PD and FD of a community as the total branch length of a tree linking all species represented in such community.
-PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
+PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 The number and order of species in comm must be the same as in tree.
 The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001)
 }

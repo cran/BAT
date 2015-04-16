@@ -2,9 +2,9 @@
 % Please edit documentation in R/BAT.R
 \name{beta.multi}
 \alias{beta.multi}
-\title{Beta diversity among multiple sites.}
+\title{Beta diversity among multiple communities.}
 \usage{
-beta.multi(comm, tree, abund = FALSE, func = "jaccard", raref = 0,
+beta.multi(comm, tree, abund = TRUE, func = "jaccard", raref = 0,
   runs = 100)
 }
 \arguments{
@@ -12,7 +12,7 @@ beta.multi(comm, tree, abund = FALSE, func = "jaccard", raref = 0,
 
 \item{tree}{An hclust or phylo object (used only for Phylogenetic (PD) or Functional (FD) Diversity, not for Taxon Diversity (TD)).}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.  If not specified, default is FALSE.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.  If not specified, default is TRUE.}
 
 \item{func}{Indicates whether the Jaccard or Soerensen family of beta diversity measures should be used. If not specified, default is jaccard.}
 
@@ -37,7 +37,7 @@ and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl +
 Btotal = total beta diversity, reflecting both species replacement and loss/gain;
 Brepl = beta diversity explained by replacement of species alone;
 Brich = beta diversity explained by species loss/gain (richness differences) alone.
-PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
+PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 The number and order of species in comm must be the same as in tree.
 }
 \examples{

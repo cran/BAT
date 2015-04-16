@@ -46,7 +46,7 @@ A correction to non-parametric estimators has also been recently proposed, based
 (species represented by a single individual or in a single sampling unit respectively; Lopez et al. 2012).
 Cardoso et al. (2014) have proposed a way of adapting non-parametric species richness estimators to PD and FD. They have also proposed correcting PD and FD values based on the completeness of TD, where completeness equals the proportion of estimated true diversity that was observed.
 Calculations of PD and FD are based on Faith (1992) and Petchey & Gaston (2002, 2006), which measure PD and FD of a community as the total branch length of a tree linking all species represented in such community.
-PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
+PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 The number and order of species in comm must be the same as in tree.
 }
 \examples{

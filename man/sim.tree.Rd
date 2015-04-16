@@ -2,7 +2,7 @@
 % Please edit documentation in R/BAT.R
 \name{sim.tree}
 \alias{sim.tree}
-\title{Simulated phylogenetic or functional tree.}
+\title{Simulation of phylogenetic or functional tree.}
 \usage{
 sim.tree(n, m = 100)
 }

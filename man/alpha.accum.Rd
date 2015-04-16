@@ -51,9 +51,13 @@ Chao1 - Chao estimator for abundance data;
 
 Chao2 - Chao estimator for incidence data;
 
+Eureqa - Eureqa curve (Cardoso et al. in prep.);
+
 Clench - Clench or Michaelis-Menten curve;
 
 Exponential - Exponential curve;
+
+Weibull - Weibull curve;
 
 The P-corrected version of all non-parametric estimators is also provided.
 
@@ -64,14 +68,14 @@ Estimation of alpha diversity of a single site with accumulation of sampling uni
 }
 \details{
 Observed diversity often is an underestimation of true diversity. Several approaches have been devised to estimate species richness (TD) from incomplete sampling.
-These include: (1) fitting asymptotic functions to randomised accumulation curves (Soberon & Llorente 1993; Flather 1996)
+These include: (1) fitting asymptotic functions to randomised accumulation curves (Soberon & Llorente 1993; Flather 1996; Cardoso et al. in prep.)
 (2) the use of non-parametric estimators based on the incidence or abundance of rare species (Heltshe & Forrester 1983; Chao 1984, 1987; Colwell & Coddington 1994).
 A correction to non-parametric estimators has also been recently proposed, based on the proportion of singleton or unique species
 (species represented by a single individual or in a single sampling unit respectively; Lopez et al. 2012).
 Cardoso et al. (2014) have proposed a way of adapting these approaches to estimate PD and FD, also adding a third possible approach for
 these dimensions of diversity: (3) correct PD and FD values based on the completeness of TD, where completeness equals the proportion of estimated true diversity that was observed.
 Calculations of PD and FD are based on Faith (1992) and Petchey & Gaston (2002, 2006), which measure PD and FD of a community as the total branch length of a tree linking all species represented in such community.
-PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
+PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 The number and order of species in comm must be the same as in tree.
 }
 \examples{

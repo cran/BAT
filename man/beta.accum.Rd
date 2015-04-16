@@ -4,8 +4,7 @@
 \alias{beta.accum}
 \title{Beta diversity accumulation curves.}
 \usage{
-beta.accum(comm1, comm2, tree, abund = FALSE, func = "jaccard",
-  runs = 100)
+beta.accum(comm1, comm2, tree, abund = TRUE, func = "jaccard", runs = 100)
 }
 \arguments{
 \item{comm1}{A sampling units x species matrix for the first site, with either abundance or incidence data.}
@@ -14,7 +13,7 @@ beta.accum(comm1, comm2, tree, abund = FALSE, func = "jaccard",
 
 \item{tree}{An hclust or phylo object (used only for Phylogenetic (PD) or Functional (FD) Diversity, not for Taxon Diversity (TD)).}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis. If not specified, default is FALSE.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis. If not specified, default is TRUE.}
 
 \item{func}{Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used. If not specified, default is jaccard.}
 
@@ -34,7 +33,7 @@ and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl +
 Btotal = total beta diversity, reflecting both species replacement and loss/gain;
 Brepl = beta diversity explained by replacement of species alone;
 Brich = beta diversity explained by species loss/gain (richness differences) alone.
-PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
+PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 The number and order of species in comm1 and comm2 must be the same as in tree. Also, the number of sampling units should be similar in both sites.
 }
 \examples{
@@ -44,7 +43,7 @@ tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 beta.accum(comm1, comm2)
 beta.accum(comm1, comm2, func = "Soerensen")
 beta.accum(comm1, comm2, tree)
-beta.accum(comm1, comm2, abund = TRUE)
+beta.accum(comm1, comm2, abund = FALSE)
 beta.accum(comm1, comm2, tree, FALSE)
 }
 \references{

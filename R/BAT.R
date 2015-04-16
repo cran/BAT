@@ -1,7 +1,14 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 1.2.1 - 05.III.2015
+#####Version 1.3.0 (2015-04-16)
 #####By Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
+#####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6, 232-236.
+#####Changed from v1.2.1:
+#####added functions contribution, dispersion & uniqueness
+#####now trees do not need to be ultrametric
+#####added new curve-fitting estimator (eureqa)
+#####improved the calculation of accuracy (can be weighted according to the effort (n/S) of each point of the accumulation curve)
+#####improved function sim.tree (now rescaled to max height = 1)
 
 #####required packages
 library("nls2")
@@ -11,40 +18,61 @@ library("vegan")
 #' @import spatstat
 #' @import vegan
 
-#####xTree function adapted from http://owenpetchey.staff.shef.ac.uk/Code/Code/calculatingfd_assets/Xtree.r
+#####xTree function partly adapted from http://owenpetchey.staff.shef.ac.uk/Code/Code/calculatingfd_assets/Xtree.r
 #####by Jens Schumacher (described in Petchey & Gaston 2002, 2006)
-xTree <- function(h) {
-	nSpecies <- nrow(as.data.frame(h['order']))
-	H1 <- matrix(0, nSpecies, 2 * nSpecies - 2) 
-	l <- vector("numeric", 2 * nSpecies - 2)
-	for(i in 1:(nSpecies - 1)) {
-		if(h$merge[i, 1] < 0) {
-			l[2 * i - 1] <- h$height[order(h$height)[i]] 
-			H1[ - h$merge[i, 1], 2 * i - 1] <- 1
-		} else {
-			l[2 * i - 1] <- h$height[order(h$height)[i]] - h$height[order(h$height)[h$merge[i, 1]]]
-			H1[, 2 * i - 1] <- H1[, 2 * h$merge[i, 1] - 1] + H1[ , 2 * h$merge[i, 1]]
-		} 
-		if(h$merge[i, 2] < 0) {
-			l[2 * i] <- h$height[order(h$height)[i]] 
-			H1[ - h$merge[i, 2], 2 * i] <- 1
-		} else {
-			l[2 * i] <- h$height[order(h$height)[i]] - h$height[order(h$height)[h$merge[i, 2]]]
-			H1[, 2 * i] <- H1[, 2 * h$merge[i, 2] - 1] + H1[, 2 *h$merge[i, 2]]
-		}
-	} 
-	rownames(H1) <- h$labels
-	list(l, H1)
+xTree <- function(tree) {
+  if (class(tree) == "hclust"){
+  	nSpp <- nrow(as.data.frame(tree['order']))
+  	sppEdges <- matrix(0, nSpp, 2 * nSpp - 2) 
+  	lenEdges <- vector("numeric", 2 * nSpp - 2)
+  	for(i in 1:(nSpp - 1)) {
+  		if(tree$merge[i, 1] < 0) {
+  			lenEdges[2 * i - 1] <- tree$height[order(tree$height)[i]] 
+  			sppEdges[ - tree$merge[i, 1], 2 * i - 1] <- 1
+  		} else {
+  			lenEdges[2 * i - 1] <- tree$height[order(tree$height)[i]] - tree$height[order(tree$height)[tree$merge[i, 1]]]
+  			sppEdges[, 2 * i - 1] <- sppEdges[, 2 * tree$merge[i, 1] - 1] + sppEdges[ , 2 * tree$merge[i, 1]]
+  		} 
+  		if(tree$merge[i, 2] < 0) {
+  			lenEdges[2 * i] <- tree$height[order(tree$height)[i]] 
+  			sppEdges[ - tree$merge[i, 2], 2 * i] <- 1
+  		} else {
+  			lenEdges[2 * i] <- tree$height[order(tree$height)[i]] - tree$height[order(tree$height)[tree$merge[i, 2]]]
+  			sppEdges[, 2 * i] <- sppEdges[, 2 * tree$merge[i, 2] - 1] + sppEdges[, 2 *tree$merge[i, 2]]
+  		}
+  	} 
+  	rownames(sppEdges) <- tree$labels
+  	list(lenEdges, sppEdges)
+  } else if (class(tree) == "phylo"){
+    lenEdges <- tree$edge.length
+    nSpp <- length(tree$tip.label)
+    nEdges <- length(tree$edge.length)
+    root <- nSpp + 1
+    sppEdges <- matrix(0, nSpp, nEdges)
+    for(i in 1:nSpp){
+      find = i                                    #start by finding the ith species
+      repeat{
+        row = which(tree$edge[,2] == find)        #locate in which row of the edge table is our species or edge to be found
+        sppEdges[i, row] = 1
+        find = tree$edge[row,1]                   #find next edge if any until reaching the root
+        if(find == root) break                    #all edges of this species were found, go to next species
+      }
+    }
+    rownames(sppEdges) <- tree$tip.label
+    list(lenEdges, sppEdges)
+  } else {
+    cat("Unrecognized tree object!")
+  }
 }
 
 #####auxiliary functions
-prep <- function(comm, tree, abund = TRUE){
-	len <- tree[[1]] 							## length of each branch
-	A <- tree[[2]]									## matrix species X branches
+prep <- function(comm, xtree, abund = TRUE){
+	len <- xtree[[1]] 							## length of each branch
+	A <- xtree[[2]]									## matrix species X branches
 	minBranch <- min(len[colSums(A)==1]) 	## minimum branch length of terminal branches
 	BA <- comm%*%A 												## matrix samples X branches
 	if (!abund)	BA = ifelse(BA >= 1, 1, 0)
-	return (list(lenBranch = len, sampleBranch = BA, minBranch = minBranch))
+	return (list(lenBranch = len, sampleBranch = BA, speciesBranch = A, minBranch = minBranch))
 }
 
 rarefaction <- function(comm){
@@ -55,45 +83,45 @@ rarefaction <- function(comm){
 }
 
 #####observed diversity
-sobs <- function(comm, tree){
-	if (missing(tree)){
+sobs <- function(comm, xtree){
+	if (missing(xtree)){
 		return(length(colSums(comm)[colSums(comm) > 0]))
 	} else {
-		data <- prep(comm, tree)
+		data <- prep(comm, xtree)
 		value <- ifelse (colSums(data$sampleBranch) > 0, 1, 0) # vector of observed branches
 		return (sum(value*data$lenBranch))
 	}
 }
 
 #####diversity of rare species for abundance - singletons, doubletons, tripletons, etc
-srare <- function(comm, tree, n = 1){
-	if(missing(tree)){
+srare <- function(comm, xtree, n = 1){
+	if(missing(xtree)){
 		return(length(colSums(comm)[colSums(comm) == n]))
 	} else {
-		data <- prep(comm, tree)
+		data <- prep(comm, xtree)
 		value <- ifelse (colSums(data$sampleBranch) == n, 1, 0) # vector of branches with given abundance
 		return (sum(value*data$lenBranch))
 	}
 }
 
 #####diversity of rare species for incidence - uniques, duplicates, triplicates, etc
-qrare <- function(comm, tree, n = 1){
-	if(missing(tree)){
+qrare <- function(comm, xtree, n = 1){
+	if(missing(xtree)){
 		comm <- ifelse(comm > 0, 1, 0)
 		return(length(colSums(comm)[colSums(comm) == n]))
 	} else {
-		data <- prep(comm, tree, FALSE)
+		data <- prep(comm, xtree, FALSE)
 		value <- ifelse (colSums(data$sampleBranch) == n, 1, 0) # vector of branches with given incidence
 		return (sum(value*data$lenBranch))
 	}
 }
 
 #####minimum terminal branch length, = 1 in case of TD
-minBranch <- function(comm, tree){
-	if (missing(tree)){
+minBranch <- function(comm, xtree){
+	if (missing(xtree)){
 		return(1)
 	} else {
-		data <- prep(comm, tree)
+		data <- prep(comm, xtree)
 		return(data$minBranch)
 	}
 }
@@ -125,18 +153,18 @@ pcorr <- function(obs, s1){
 }
 
 #####observed beta (a = shared species/edges, b/c = species/edges exclusive to either site, comm is a 2sites x species matrix)
-betaObs <- function(comm, tree, abund = FALSE, func = "jaccard"){
+betaObs <- function(comm, xtree, abund = TRUE, func = "jaccard"){
 	if (!abund) {																			##if incidence data
-		obs1 <- sobs(comm[1,,drop=FALSE], tree)
-		obs2 <- sobs(comm[2,,drop=FALSE], tree)
-		obsBoth <- sobs(comm, tree)
+		obs1 <- sobs(comm[1,,drop=FALSE], xtree)
+		obs2 <- sobs(comm[2,,drop=FALSE], xtree)
+		obsBoth <- sobs(comm, xtree)
 		if(tolower(substr(func, 1, 1)) != "s")
 			denominator <- obsBoth
 		else
 			denominator <- obs1 + obs2
 		b <- obsBoth - obs2
 		c <- obsBoth - obs1
-	} else if (abund & missing(tree)){								##if abundance data
+	} else if (abund & missing(xtree)){								##if abundance data
 		a <- 0
 		for (i in 1:ncol(comm))
 			a <- a + min(comm[1,i], comm[2,i])
@@ -146,7 +174,7 @@ betaObs <- function(comm, tree, abund = FALSE, func = "jaccard"){
 		if(tolower(substr(func, 1, 1)) == "s")
 			denominator <- denominator + a
 	} else {																					##if abundance and tree
-		data <- prep(comm, tree)
+		data <- prep(comm, xtree)
 		a = sum(data$lenBranch * apply(data$sampleBranch,2,min))
 		diff = data$lenBranch * (data$sampleBranch[1,] - data$sampleBranch[2,])
 		b = sum(replace(diff, diff < 0, 0))
@@ -169,7 +197,7 @@ betaObs <- function(comm, tree, abund = FALSE, func = "jaccard"){
 #' If not specified, default is 0.
 #' @param runs Number of resampling runs for rarefaction. If not specified, default is 100.
 #' @details TD is equivalent to species richness. Calculations of PD and FD are based on Faith (1992) and Petchey & Gaston (2002, 2006), which measure PD and FD of a community as the total branch length of a tree linking all species represented in such community.
-#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
+#' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
 #' The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001)
 #' @return A matrix of sites x diversity values (either "Obs" OR "Avg, Min, LowerCL, UpperCL and Max").
@@ -187,7 +215,7 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
   
   comm <- as.matrix(comm)
   if (!missing(tree))
-		tree <- xTree(as.hclust(tree))
+		tree <- xTree(tree)
 	
   nComm <- nrow(comm)
 	if(raref < 1){						# no rarefaction if 0 or negative
@@ -226,14 +254,14 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 #' @param target True diversity value to calculate the accuracy of curves (scaled mean squared error). If not specified do not calculate accuracy (default), -1 uses the total observed diversity as true diversity and any other value is the true known diversity.
 #' @param runs Number of random permutations to be made to the sampling order. If not specified, default is 100.
 #' @details Observed diversity often is an underestimation of true diversity. Several approaches have been devised to estimate species richness (TD) from incomplete sampling.
-#' These include: (1) fitting asymptotic functions to randomised accumulation curves (Soberon & Llorente 1993; Flather 1996)
+#' These include: (1) fitting asymptotic functions to randomised accumulation curves (Soberon & Llorente 1993; Flather 1996; Cardoso et al. in prep.)
 #' (2) the use of non-parametric estimators based on the incidence or abundance of rare species (Heltshe & Forrester 1983; Chao 1984, 1987; Colwell & Coddington 1994).
 #' A correction to non-parametric estimators has also been recently proposed, based on the proportion of singleton or unique species
 #' (species represented by a single individual or in a single sampling unit respectively; Lopez et al. 2012).
 #' Cardoso et al. (2014) have proposed a way of adapting these approaches to estimate PD and FD, also adding a third possible approach for
 #' these dimensions of diversity: (3) correct PD and FD values based on the completeness of TD, where completeness equals the proportion of estimated true diversity that was observed.
 #' Calculations of PD and FD are based on Faith (1992) and Petchey & Gaston (2002, 2006), which measure PD and FD of a community as the total branch length of a tree linking all species represented in such community.
-#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
+#' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
 #' @return A matrix of sampling units x diversity values (sampling units, individuals, observed and estimated diversity).
 #' The values provided by this function are: 
@@ -250,8 +278,10 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 #' @return Jack2in - Second order jackknife estimator for incidence data;
 #' @return Chao1 - Chao estimator for abundance data;
 #' @return Chao2 - Chao estimator for incidence data;
+#' @return Eureqa - Eureqa curve (Cardoso et al. in prep.);
 #' @return Clench - Clench or Michaelis-Menten curve;
 #' @return Exponential - Exponential curve;
+#' @return Weibull - Weibull curve;
 #' @return The P-corrected version of all non-parametric estimators is also provided.
 #' @return Accuracy - if accuracy is to be calculated a list is returned instead, with the second element being the scaled mean squared error of each estimator.
 #' @references Cardoso, P., Rigal, F., Borges, P.A.V. & Carvalho, J.C. (2014) A new frontier in biodiversity inventory: a proposal for estimators of phylogenetic and functional diversity. Methods in Ecology and Evolution, in press.
@@ -277,7 +307,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 	
 	comm <- as.matrix(comm)
 	if (!missing(tree))
-		tree <- xTree(as.hclust(tree))
+		tree <- xTree(tree)
 	
 	#####function options:
 	#####nonparametric (TD/PD/FD with non-parametric estimators)
@@ -326,9 +356,9 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 						truediv <- target
 					}
 				}
-				s <- unlist(accuracy(runData, truediv))
-				smse[r,3] <- s[1]
-				smse[r,8:19] <- s[-1]
+				s <- accuracy(runData, truediv)
+				smse[r,3] <- s[1,1]
+				smse[r,8:19] <- s[1,-1]
 			}
 		}
 		
@@ -368,7 +398,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 		
 		#####curve (TD/PD/FD with curve fitting)
 	}, curve = {
-    results <- matrix(NA,nrow(comm),6)
+    results <- matrix(NA,nrow(comm),7)
     results[,1] <- seq(1,nrow(comm))  ##fill samples column
     results[,2] <- seq(sum(comm)/nrow(comm),sum(comm), sum(comm)/nrow(comm))  ##fill individuals column
     runObs <- rep(0,nrow(comm))
@@ -386,36 +416,44 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 		  ## curve fitting
       x <- results[1:s,1]
 			y <- results[1:s,3]
-			stlist <- data.frame(a = rich, b = c(0.1, 0.5, 1))
-			##Clench
-      form <- y ~ (a*x)/(1+b*x)
-			mod <- try(nls2(form, start = stlist, algorithm = "random-search"))
-			curve <- try(nls2(form, start = mod, algorithm = "default"))
+			##Eureqa
+			stlist <- data.frame(a = rich, b = c(0.1, 0.5, 1, 5, 10), c = c(1, 10, 100, 1000, 10000))
+			form <- y ~ (c+(a*x))/(b+x)
+			mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
+			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
 			if(class(curve) != "try-error"){
 				a <- coef(curve)[1]
-				b <- coef(curve)[2]
-				results[s,4] <- a/b
+				results[s,4] <- a
 			}
-			##Exponential
-      form <- y ~ (a/b)*(1-exp(-b*x))
-			mod <- try(nls2(form, start = stlist, algorithm = "random-search"))
-			curve <- try(nls2(form, start = mod, algorithm = "default"))
+			##Clench
+			stlist <- data.frame(a = rich, b = c(0.1, 0.5, 1))
+			form <- y ~ (a*x)/(1+b*x)
+			mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
+			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
 			if(class(curve) != "try-error"){
 				a <- coef(curve)[1]
 				b <- coef(curve)[2]
 				results[s,5] <- a/b
 			}
+			##Negative exponential
+      form <- y ~ a*(1-exp(-b*x))
+			mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
+			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
+			if(class(curve) != "try-error"){
+				a <- coef(curve)[1]
+				results[s,6] <- a
+			}
 			##Weibull
  			stlist <- data.frame(a = rich, b = c(0,1,10), c = c(0,0.1,1))
  			form <- y ~ a*(1-exp(-b*(x^c)))
-      mod <- try(nls2(form, start = stlist, algorithm = "random-search"))
- 			curve <- try(nls2(form, start = mod, algorithm = "default"))
+      mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
+ 			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
   			if(class(curve) != "try-error"){
   				a <- coef(curve)[1]
-  				results[s,6] <- a
+  				results[s,7] <- a
   			}
 		}
-		colnames(results) <- c("Sampl", "Ind", "Obs", "Clench", "Exponential", "Weibull")
+		colnames(results) <- c("Sampl", "Ind", "Obs", "Eureqa", "Clench", "Exponential", "Weibull")
 		return (results)
 	})
 	colnames(results) <- c("Sampl", "Ind", "Obs", "S1", "S2", "Q1", "Q2", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
@@ -443,7 +481,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 #' (species represented by a single individual or in a single sampling unit respectively; Lopez et al. 2012).
 #' Cardoso et al. (2014) have proposed a way of adapting non-parametric species richness estimators to PD and FD. They have also proposed correcting PD and FD values based on the completeness of TD, where completeness equals the proportion of estimated true diversity that was observed.
 #' Calculations of PD and FD are based on Faith (1992) and Petchey & Gaston (2002, 2006), which measure PD and FD of a community as the total branch length of a tree linking all species represented in such community.
-#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
+#' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
 #' @return A matrix of sites x diversity values (individuals, observed and estimated diversity).
 #' The values provided by this function are: 
@@ -476,7 +514,7 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
   if (max(comm) == 1)
 		stop("No estimates are possible without abundance or incidence frequency data")
 	if (!missing(tree))
-		tree <- xTree(as.hclust(tree))
+		tree <- xTree(tree)
 	
 	#####function options:
 	#####nonparametric (TD/PD/FD with non-parametric estimators)
@@ -523,8 +561,8 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
 #' @description Beta diversity with possible rarefaction, multiple sites simultaneously.
 #' @param comm A sites x species matrix, with either abundance or incidence data.
 #' @param tree An hclust or phylo object (used only for PD or FD).
-#' @param abund A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis. If not specified, default is FALSE.
-#' @param func Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is jaccard.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis. If not specified, default is TRUE.
+#' @param func Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is Jaccard.
 #' @param raref An integer specifying the number of individuals for rarefaction (individual based).
 #' If raref < 1 no rarefaction is made.
 #' If raref = 1 rarefaction is made by the minimum abundance among all sites.
@@ -535,7 +573,7 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
 #' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
 #' Btotal = total beta diversity, reflecting both species replacement and loss/gain;
 #' Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone.
-#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
+#' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
 #' The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001)
 #' @return Three distance matrices between sites, one per each of the three beta diversity measures (either "Obs" OR "Avg, Min, LowerCL, UpperCL and Max").
@@ -549,13 +587,13 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
 #' beta(comm, func = "Soerensen")
 #' beta(comm, tree)
 #' beta(comm, raref = 1)
-#' beta(comm, tree, abund = TRUE, "s", raref = 2)
+#' beta(comm, tree, abund = FALSE, "s", raref = 2)
 #' @export
-beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 100){
+beta <- function(comm, tree, abund = TRUE, func = "jaccard", raref = 0, runs = 100){
 	
   comm <- as.matrix(comm)
   if (!missing(tree))
-		tree <- xTree(as.hclust(tree))
+		tree <- xTree(tree)
 	nComm <- nrow(comm)
 	
 	if(raref < 1){						# no rarefaction if 0 or negative
@@ -605,7 +643,7 @@ beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 
 #' @param comm1 A sampling units x species matrix for the first site, with either abundance or incidence data.
 #' @param comm2 A sampling units x species matrix for the second site, with either abundance or incidence data.
 #' @param tree An hclust or phylo object (used only for Phylogenetic (PD) or Functional (FD) Diversity, not for Taxon Diversity (TD)).
-#' @param abund A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis. If not specified, default is FALSE.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis. If not specified, default is TRUE.
 #' @param func Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used. If not specified, default is jaccard.
 #' @param runs Number of random permutations to be made to the sampling order. If not specified, default is 100.
 #' @details As widely recognized for species richness, beta diversity is also biased when communities are undersampled.
@@ -615,7 +653,7 @@ beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 
 #' Btotal = total beta diversity, reflecting both species replacement and loss/gain;
 #' Brepl = beta diversity explained by replacement of species alone;
 #' Brich = beta diversity explained by species loss/gain (richness differences) alone.
-#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
+#' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm1 and comm2 must be the same as in tree. Also, the number of sampling units should be similar in both sites.
 #' @return Three matrices of sampling units x diversity values, one per each of the three beta diversity measures (sampling units, individuals and observed diversity).
 #' @references Cardoso, P., Borges, P.A.V. & Veech, J.A. (2009) Testing the performance of beta diversity measures based on incidence data: the robustness to undersampling. Diversity and Distributions, 15, 1081-1090.
@@ -628,17 +666,17 @@ beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 
 #' beta.accum(comm1, comm2)
 #' beta.accum(comm1, comm2, func = "Soerensen")
 #' beta.accum(comm1, comm2, tree)
-#' beta.accum(comm1, comm2, abund = TRUE)
+#' beta.accum(comm1, comm2, abund = FALSE)
 #' beta.accum(comm1, comm2, tree, FALSE)
 #' @export
-beta.accum <- function(comm1, comm2, tree, abund = FALSE, func = "jaccard", runs = 100){
+beta.accum <- function(comm1, comm2, tree, abund = TRUE, func = "jaccard", runs = 100){
 	
   if(nrow(comm1) < 2 || nrow(comm1) != nrow(comm2))
 		stop("Both communities should have multiple and the same number of sampling units")
   comm1 <- as.matrix(comm1)
   comm2 <- as.matrix(comm2)
   if (!missing(tree))
-		tree <- xTree(as.hclust(tree))
+		tree <- xTree(tree)
 	
 	nSamples <- nrow(comm1)
 	results <- matrix(0,nSamples, 4)
@@ -659,11 +697,11 @@ beta.accum <- function(comm1, comm2, tree, abund = FALSE, func = "jaccard", runs
 	return(results)
 }
 
-#' Beta diversity among multiple sites.
+#' Beta diversity among multiple communities.
 #' @description Beta diversity with possible rarefaction - multiple sites measure calculated as the average or variance of all pairwise values.
 #' @param comm A sites x species matrix, with either abundance or incidence data.
 #' @param tree An hclust or phylo object (used only for Phylogenetic (PD) or Functional (FD) Diversity, not for Taxon Diversity (TD)).
-#' @param abund A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.  If not specified, default is FALSE.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.  If not specified, default is TRUE.
 #' @param func Indicates whether the Jaccard or Soerensen family of beta diversity measures should be used. If not specified, default is jaccard.
 #' @param raref An integer specifying the number of individuals for rarefaction (individual based).
 #' If raref < 1 no rarefaction is made.
@@ -677,7 +715,7 @@ beta.accum <- function(comm1, comm2, tree, abund = FALSE, func = "jaccard", runs
 #' Btotal = total beta diversity, reflecting both species replacement and loss/gain;
 #' Brepl = beta diversity explained by replacement of species alone;
 #' Brich = beta diversity explained by species loss/gain (richness differences) alone.
-#' PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
+#' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
 #' @return A matrix of beta measures x diversity values (average and variance).
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
@@ -692,7 +730,7 @@ beta.accum <- function(comm1, comm2, tree, abund = FALSE, func = "jaccard", runs
 #' beta.multi(comm, raref = 1)
 #' beta.multi(comm, tree, TRUE, "s", raref = 2)
 #' @export
-beta.multi <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 100){
+beta.multi <- function(comm, tree, abund = TRUE, func = "jaccard", raref = 0, runs = 100){
 	pairwise <- beta(comm, tree, abund, func, raref, runs)
 	Btotal.avg <- mean(pairwise$Btotal)
 	Brepl.avg <- mean(pairwise$Brepl)
@@ -706,6 +744,125 @@ beta.multi <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, r
 	return(results)
 }
 
+#' Contribution of individuals or species to total PD or FD.
+#' @description Contribution of each individual or species to the total PD or FD of a number of communities.
+#' @param comm A sites x species matrix, with either abundance or incidence data.
+#' @param tree An hclust or phylo object.
+#' @param abund A boolean (T/F) indicating whether contribution should be calculated per individual (T) or species (F). If not specified, default is TRUE.
+#' @param relative A boolean (T/F) indicating whether contribution should be relative to total PD or FD (proportional contribution per individual or species). If False, the sum of contributions for each site is equal to total PD/FD, if True it is 1.
+#' @details Contribution is equivalent to the evolutionary distinctiveness index (ED) of Isaac et al. (2007) if done by species and to the abundance weighted evolutionary distinctiveness (AED) of Cadotte et al. (2010) if done by individual.
+#' @return A matrix of sites x species values.
+#' @references Isaac, N.J.B., Turvey, S.T., Collen, B., Waterman, C. & Baillie, J.E.M. (2007) Mammals on the EDGE: conservation priorities based on threat and phylogeny. PLoS One, 2: e296.
+#' @references Cadotte, M.W., Davies, T.J., Regetz, J., Kembel, S.W., Cleland, E. & Oakley, T.H. (2010) Phylogenetic diversity metrics for ecological communities: integrating species richness, abundance and evolutionary history. Ecology Letters, 13: 96-105.
+#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRUE)
+#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' contribution(comm, tree)
+#' contribution(comm, tree, FALSE)
+#' contribution(comm, tree, abund = FALSE, relative = TRUE)
+#' @export
+contribution <- function(comm, tree, abund = TRUE, relative = FALSE){
+  if(!abund)
+		comm <- ifelse(comm > 0, 1, 0)
+  if(missing(tree))
+    tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
+  if(class(tree) == "hclust")
+    nEdges <- length(tree$merge)
+  else
+    nEdges <- length(tree$edge.length)
+  comm <- as.matrix(comm)
+	contrib <- matrix(0,nrow(comm),ncol(comm))
+  
+  for (i in 1:nrow(comm)){											#cycle through all sites/samples
+		dataSample <- prep(comm[i,], xTree(tree), TRUE)
+		valueBranch <- dataSample$lenBranch / dataSample$sampleBranch
+		valueBranch <- ifelse(valueBranch == Inf, 0, valueBranch)
+		for (j in 1:ncol(comm)){										#cycle through all species
+			for (k in 1:nEdges){	            				#cycle through all branches
+				contrib[i,j] <- contrib[i,j] + dataSample$speciesBranch[j,k] * valueBranch[k] * comm[i,j]
+			}
+		}
+	}
+  if(abund){
+    contrib <- contrib/comm                      #so that the contribution per individual is given if it is the case
+    contrib <- ifelse(contrib == "NaN", 0, contrib)
+  }
+  if(relative)
+    contrib <- apply(contrib, 2, function(x) x / alpha(comm,tree))
+	return(contrib)
+}
+
+#' Phylogenetic/functional dispersion of individuals or species.
+#' @description Average dissimilarity between any two individuals or species randomly chosen in a community with replacement.
+#' @param comm A sites x species matrix, with either abundance or incidence data.
+#' @param tree An hclust or phylo object.
+#' @param abund A boolean (T/F) indicating whether dissimilarity should be calculated per individual (T) or species (F). If not specified, default is TRUE.
+#' @param relative A boolean (T/F) indicating whether dissimilarity should be relative to the maximum distance between any two species in the tree.
+#' @details If abundance data is used and a tree is given, dispersion is the quadratic entropy of Rao (1982).
+#' If abundance data is not used but a tree is given, dispersion is the phylogenetic dispersion measure of Webb et al. (2002) although with replacement.
+#' If abundance data is used but no tree is given, dispersion is 1 - Simpson's index (Simpson 1949).
+#' @return A vector of values per site.
+#' @references Rao, C.R. (1982) Diversity and dissimilarity coefficients: a unified approach. Theoretical Population Biology, 21: 24-43.
+#' @references Simpson, E.H. (1949) Measurement of diversity. Nature 163: 688.
+#' @references Webb, C.O., Ackerly, D.D., McPeek, M.A. & Donoghue, M.J. (2002) Phylogenies and community ecology. Annual Review of Ecology and Systematics, 33: 475-505.
+#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRUE)
+#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' dispersion(comm)
+#' dispersion(comm, tree)
+#' dispersion(comm, tree, abund = FALSE)
+#' dispersion(comm, tree, abund = FALSE, relative = TRUE)
+#' @export
+dispersion <- function(comm, tree, abund = TRUE, relative = FALSE){
+	if(!abund)
+		comm <- ifelse(comm > 0, 1, 0)
+	if(missing(tree))
+		tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
+	disp <- rep(0,nrow(comm))
+
+  unique <- uniqueness(comm, tree, abund, relative)
+  for (i in 1:nrow(comm)){  						                         #cycle through all sites/samples
+  	present <- which(comm[i,]>0)                                 #which species exist in this site
+  	proportion <- comm[i,present]/sum(comm[i,])                  #proportion incidence/abundance of species in this site
+    disp[i] <- sum(unique[i,present]*proportion)
+  }
+  return(disp)
+}
+
+#' Phylogenetic/functional uniqueness of individuals or species.
+#' @description Average dissimilarity between an individual or species and all others in a community with replacement.
+#' @param comm A sites x species matrix, with either abundance or incidence data.
+#' @param tree An hclust or phylo object.
+#' @param abund A boolean (T/F) indicating whether dissimilarity should be calculated per individual (T) or species (F). If not specified, default is TRUE.
+#' @param relative A boolean (T/F) indicating whether dissimilarity should be relative to the maximum distance between any two species in the tree.
+#' @details Uniqueness is the originality measure of Pavoine et al. (2005).
+#' @return A matrix of sites x species values.
+#' @references Pavoine, S., Ollier, S. & Dufour, A.-B. (2005) Is the originality of a species measurable? Ecology Letters, 8: 579-586.
+#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRUE)
+#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' uniqueness(comm, tree)
+#' uniqueness(comm, tree, abund = FALSE)
+#' uniqueness(comm, tree, abund = FALSE, relative = TRUE)
+#' @export
+uniqueness <- function(comm, tree, abund = TRUE, relative = FALSE){
+  if(!abund)
+    comm <- ifelse(comm > 0, 1, 0)
+  if(missing(tree))
+    tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
+  comm <- as.matrix(comm)
+  unique <- matrix(0,nrow(comm),ncol(comm))
+
+  for (i in 1:nrow(comm)){    					                         #cycle through all sites/samples
+    present <- which(comm[i,]>0)                                 #which species exist in this site
+    nSpp <- length(present)                                      #how many species are present in this site
+    proportion <- comm[i,present]/sum(comm[i,])                  #proportion incidence/abundance of species in this site
+    distance <- as.matrix(cophenetic(tree))[present,present]     #cophenetic distances of species in this site
+    for (r in 1:nSpp)
+      unique[i,present[r]] <- sum(sum(distance[r,] * proportion))
+  }
+  if(relative)
+    unique <- unique / max(cophenetic(tree))
+	return(unique)
+}
+
 #' Scaled mean squared error of accumulation curves.
 #' @description Accuracy (scaled mean squared error) of accumulation curves compared with a known true diversity value (target).
 #' @param accum A matrix resulting from the alpha.accum or beta.accum functions (sampling units x diversity values).
@@ -715,7 +872,8 @@ beta.multi <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, r
 #' (ii) scaled to the number of sampling units, so that values are independent of sample size;
 #' (iii) squared, so that small, mostly meaningless fluctuations around the true value are down-weighted; and
 #' (iv) independent of positive or negative deviation from the real value, as such differentiation is usually not necessary.
-#' @return Accuracy values for all observed and estimated curves.
+#' For alpha diversity accuracy may also be weighted according to how good the data is predicted to be. The weight of each point in the curve is proportional to its sampling intensity (i.e. n/Sobs).
+#' @return Accuracy values (both raw and weighted) for all observed and estimated curves.
 #' @references Cardoso, P., Rigal, F., Borges, P.A.V. & Carvalho, J.C. (2014) A new frontier in biodiversity inventory: a proposal for estimators of phylogenetic and functional diversity. Methods in Ecology and Evolution, in press.
 #' @references Walther, B.A. & Moore, J.L. (2005) The concepts of bias, precision and accuracy, and their use in testing the performance of species richness estimators, with a literature reviewof estimator performance. Ecography, 28, 815-829.
 #' @examples comm1 <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)
@@ -729,17 +887,41 @@ beta.multi <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, r
 #' accuracy(acc.beta, c(1,1,0))
 #' @export
 accuracy <- function(accum, target = -1){
-	if(ncol(accum) > 10){																#if alpha
+  if(ncol(accum) > 5 || accum[nrow(accum), 3] > 1){		#if alpha
 		if (target == -1)
 			target <- accum[nrow(accum), 3]
-		smse <- rep(0, 13)
-		for (i in 1:nrow(accum)){
-			smse[1] <- smse[1] + (accum[i,3] - target)^2
-			for (j in 2:13)
-				smse[j] <- smse[j] + (accum[i,j+6] - target)^2
-		}
-		smse <- smse / (target^2*nrow(accum))
-		smse <- list(Obs=smse[1], Jack1ab=smse[2], Jack1abP=smse[3], Jack1in=smse[4], Jack1inP=smse[5], Jack2ab=smse[6], Jack2abP=smse[7], Jack2in=smse[8], Jack2inP=smse[9], Chao1=smse[10], Chao1P=smse[11], Chao2=smse[12], Chao2P=smse[13])
+		intensTotal = accum[nrow(accum), 2] / accum[nrow(accum), 3]	#sampling intensity = final n / final S
+		if(ncol(accum) > 10){              #if non-parametric
+      smse <- matrix(0, 13, nrow = 2)
+      for (i in 1:nrow(accum)){
+      	intensity = accum[i, 2] / accum[i, 3] / intensTotal
+      	error = (accum[i,3] - target)^2 / (target^2 * nrow(accum))
+      	smse[1,1] <- smse[1,1] + error
+      	smse[2,1] <- smse[2,1] + error * intensity
+      	for (j in 2:13){
+      		error = (accum[i,j+6] - target)^2 / (target^2 * nrow(accum))
+      		smse[1,j] <- smse[1,j] + error
+      		smse[2,j] <- smse[2,j] + error * intensity
+      	}
+      }
+      rownames(smse) <- c("Raw", "Weighted")
+     	colnames(smse) <- c("Obs", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
+    }
+    else{                              #if curve
+      smse <- matrix(0, 5, nrow = 2)
+      for (i in 3:nrow(accum)){
+      	intensity = accum[i, 2] / accum[i, 3] / intensTotal
+      	for (j in 1:5){
+          if (!is.na(accum[i,j+2])){
+          	error = (accum[i,j+2] - target)^2 / (target^2 * nrow(accum))
+          	smse[1,j] <- smse[1,j] + error
+          	smse[2,j] <- smse[2,j] + error * intensity
+          }
+      	}
+      }
+      rownames(smse) <- c("Raw", "Weighted")
+      colnames(smse) <- c("Obs", "Eureqa", "Clench", "Exponential", "Weibull")
+    }
 	} else {																						#if beta
 		if (target[1] == -1)
 			target <- accum[nrow(accum), 2:4]
@@ -750,8 +932,9 @@ accuracy <- function(accum, target = -1){
 		}
 		smse <- smse / nrow(accum)
 		smse <- list(Btotal=smse[1], Brepl=smse[2], Brich=smse[3])
+		smse <- c(unlist(smse))
 	}
-	return(c(unlist(smse)))
+	return(smse)
 }
 
 #' Slope of accumulation curves.
@@ -770,7 +953,7 @@ accuracy <- function(accum, target = -1){
 #' slope(acc.beta)
 #' @export
 slope <- function(accum){
-	if(ncol(accum) > 10){																#if alpha
+	if(ncol(accum) > 5 || accum[nrow(accum), 3] > 1){			#if alpha
 		sl <- accum[,-2]
 		accum <- rbind(rep(0,ncol(accum)), accum)
 		for (i in 1:nrow(sl)){
@@ -779,7 +962,7 @@ slope <- function(accum){
 				sl[i,j] <- (accum[i+1,j+1]-accum[i,j+1])/(accum[i+1,2]-accum[i,2])
 			}
 		}
-	} else {																						#if beta
+	} else {																							#if beta
 		sl <- accum
 		sl[1,] <- 0
 		sl[1,1] <- 1
@@ -797,11 +980,11 @@ slope <- function(accum){
 #' @param comm A samples x species x sites array, with either abundance or incidence data.
 #' @param tree An hclust or phylo object (used only to optimize PD or FD sampling).
 #' @param methods A vector specifying the method of each sample (length must be equal to nrow(comm))
-#' @param samples A vector defining a base protocol from which to build upon (complementarity analysis) (length must be equal to number of methods).
+#' @param base A vector defining a base protocol from which to build upon (complementarity analysis) (length must be equal to number of methods).
 #' @param runs Number of random permutations to be made to the sample order. Default is 1000.
 #' @details Often a combination of methods allows sampling maximum plot diversity with minimum effort, as it allows sampling different sub-communities, contrary to using single methods.
 #' Cardoso (2009) proposed a way to optimize the number of samples per method when the target is to maximize sampled alpha diversity. It is applied here for TD, PD and FD, and for one or multiple sites simultaneously.
-#' Phylogenetic (PD) and functional (FD) diversities are calculated based on an ultrametric tree (hclust or phylo object).
+#' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
 #' @return A matrix of samples x methods (values being optimum number of samples per method). The last column is the average alpha diversity value, rescaled to 0-1 if made for several sites, where 1 is the true diversity of each site.
 #' @references Cardoso, P. (2009) Standardization and optimization of arthropod inventories - the case of Iberian spiders. Biodiversity and Conservation, 18, 3949-3962.
 #' @examples comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)
@@ -812,17 +995,19 @@ slope <- function(accum){
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 #' optim.alpha(comm,,methods)
 #' optim.alpha(comm, tree, methods)
-#' optim.alpha(comm,, methods = methods, samples = c(0,0,1), runs = 100)
+#' optim.alpha(comm,, methods = methods, base = c(0,0,1), runs = 100)
 #' @export
-optim.alpha <- function(comm, tree, methods, samples, runs = 1000){
+optim.alpha <- function(comm, tree, methods, base, runs = 1000){
 	
 	##preliminary stats
 	methods <- as.vector(t(methods))
 	nSamples <- length(methods)							##number of samples
 	metUnique <- as.vector(t(unique(methods)))				##list of methods
 	metNum <- length(metUnique)							##number of methods
-	if (missing(samples))										##if no samples to start with for complementarity analysis
+	if (missing(base))										##if no samples to start with for complementarity analysis
 		samples <- rep(0,metNum)
+	else
+		samples <- base
 	nMiss <- nSamples - sum(samples)				##number of samples missing
 	nSamplesMet <- rep(0,metNum)						##samples per method
 	for (m in 1:metNum)											
@@ -864,7 +1049,7 @@ optim.alpha <- function(comm, tree, methods, samples, runs = 1000){
 #' @param runs Number of random permutations to be made to the sample order. Default is 1000.
 #' @details Different combinations of samples per method allow sampling different sub-communities.
 #' This function allows knowing the average TD, PD or FD values for a given combination, for one or multiple sites simultaneously.
-#' Phylogenetic (PD) and functional (FD) diversities are calculated based on an ultrametric tree (hclust or phylo object).
+#' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
 #' @return A single average alpha diversity value. Rescaled to 0-1 if made for several sites, where 1 is the true diversity of each site.
 #' @examples comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)
 #' comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
@@ -879,7 +1064,7 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 1000){
 	
 	##preliminary stats
 	if (!missing(tree))
-		tree <- xTree(as.hclust(tree))
+		tree <- xTree(tree)
 	if(length(dim(comm)) == 3)					##number of sites
 		nSites <- dim(comm)[3]
 	else
@@ -918,13 +1103,13 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 1000){
 #' @param comm A samples x species x sites array, with either abundance or incidence data.
 #' @param tree An hclust or phylo object (used only to optimize PD or FD sampling).
 #' @param methods A vector specifying the method of each sample (length must be equal to nrow(comm))
-#' @param samples Allows defining a base mandatory protocol from which to build upon (complementarity analysis). It should be a vector with length = number of methods.
+#' @param base Allows defining a base mandatory protocol from which to build upon (complementarity analysis). It should be a vector with length = number of methods.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.
 #' @param runs Number of random permutations to be made to the sample order. Default is 1000.
 #' @details Often, comparing differences between sites or the same site along time (i.e. measure beta diversity) it is not necessary to sample exhaustively. A minimum combination of samples targeting different sub-communities (that may behave differently) may be enough to perceive such differences, for example, for monitoring purposes.
 #' Cardoso et al. (in prep.) introduce and differentiate the concepts of alpha-sampling and beta-sampling. While alpha-sampling optimization implies maximizing local diversity sampled (Cardoso 2009), beta-sampling optimization implies minimizing differences in beta diversity values between partially and completely sampled communities.
 #' This function uses as beta diversity measures the Btotal, Brepl and Brich partitioning framework (Carvalho et al. 2012) and respective generalizations to PD and FD (Cardoso et al. 2014).
-#' Phylogenetic (PD) and functional (FD) diversities are calculated based on an ultrametric tree (hclust or phylo object).
+#' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
 #' @return A matrix of samples x methods (values being optimum number of samples per method). The last column is the average absolute difference from real beta.
 #' @references Cardoso, P. (2009) Standardization and optimization of arthropod inventories - the case of Iberian spiders. Biodiversity and Conservation, 18, 3949-3962.
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
@@ -937,10 +1122,10 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 1000){
 #' colnames(comm) <- c("sp1","sp2","sp3")
 #' methods <- c("Met1","Met2","Met2","Met3")
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-#' optim.beta(comm,,methods, runs = 100)
-#' optim.beta(comm, tree, methods = methods, abund = TRUE, samples = c(0,0,1), runs = 100)
+#' optim.beta(comm, methods = methods, runs = 100)
+#' optim.beta(comm, tree, methods = methods, abund = TRUE, base = c(0,0,1), runs = 100)
 #' @export
-optim.beta <- function(comm, tree, methods, samples, abund = FALSE, runs = 1000){
+optim.beta <- function(comm, tree, methods, base, abund = FALSE, runs = 1000){
 	
 	##preliminary stats
 	methods <- as.vector(t(methods))
@@ -948,8 +1133,10 @@ optim.beta <- function(comm, tree, methods, samples, abund = FALSE, runs = 1000)
 	metUnique <- as.vector(t(unique(methods)))				##list of methods
 	metNum <- length(metUnique)							##number of methods
 	
-	if (missing(samples))										##if no samples to start with
+	if (missing(base))										##if no samples to start with
 		samples <- rep(0,metNum)
+	else
+		samples <- base
 	nMiss <- nSamples - sum(samples)				##number of samples missing
 	nSamplesMet <- rep (0, metNum)					##samples per method
 	for (m in 1:metNum)											
@@ -967,7 +1154,7 @@ optim.beta <- function(comm, tree, methods, samples, abund = FALSE, runs = 1000)
 		for (m in 1:metNum){
 			if (samples[s,m] < nSamplesMet[m]){
 				samples[s,m] <- samples[s,m] + 1
-				metValue[m] <- optim.beta.stats(comm, tree, methods,samples[s,], abund, runs)
+				metValue[m] <- optim.beta.stats(comm, tree, methods, samples[s,], abund, runs)
 				samples[s,m] <- samples[s,m] - 1
 			}
 		}
@@ -993,7 +1180,7 @@ optim.beta <- function(comm, tree, methods, samples, abund = FALSE, runs = 1000)
 #' @param runs Number of random permutations to be made to the sample order. Default is 1000.
 #' @details Different combinations of samples per method allow sampling different sub-communities.
 #' This function allows knowing the average absolute difference between sampled and real beta diversity for a given combination, for one or multiple sites simultaneously.
-#' Phylogenetic (PD) and functional (FD) diversities are calculated based on an ultrametric tree (hclust or phylo object).
+#' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
 #' @return A single average absolute beta diversity difference value.
 #' @examples comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)
 #' comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
@@ -1008,8 +1195,6 @@ optim.beta <- function(comm, tree, methods, samples, abund = FALSE, runs = 1000)
 optim.beta.stats <- function(comm, tree, methods, samples, abund = FALSE, runs = 1000){
 
 	##preliminary stats
-#	if (!missing(tree))
-#		tree <- xTree(as.hclust(tree))
 	if(length(dim(comm)) == 3){					##number of sites
 		nSites <- dim(comm)[3]
 	}else{
@@ -1204,7 +1389,7 @@ sim.plot <- function(comm, sad = FALSE, n = 0){
 	}
 }
 
-#' Simulated sampling from artificial communities.
+#' Simulation of sampling from artificial communities.
 #' @description Simulates a sampling process from artificial communities.
 #' @param comm simulated community data from function sim.spatial.
 #' @param cells number of cells to divide the simulated space into. Default is 100.
@@ -1244,7 +1429,7 @@ sim.sample <- function(comm, cells = 100, samples = 0){
 	return(samp)
 }
 
-#' Simulated phylogenetic or functional tree.
+#' Simulation of phylogenetic or functional tree.
 #' @description Simulates a random tree.
 #' @param n number of species.
 #' @param m a structural parameter defining the average difference between species. Default is 100. Lower numbers create trees dominated by increasingly similar species, higher numbers by increasingly dissimilar species.
@@ -1259,8 +1444,9 @@ sim.sample <- function(comm, cells = 100, samples = 0){
 
 #' @export
 sim.tree <- function(n, m = 100){
-	mat <- matrix(sample(0:m, ceiling(n*m/50), replace = TRUE), nrow = n, ncol = m)
-	tree <- hclust(dist(mat), method = "average")
+	sim.matrix <- matrix(sample(0:m, ceiling(n*m/50), replace = TRUE), nrow = n, ncol = m)
+	tree <- hclust(dist(sim.matrix), method = "average")
+	tree$height <- tree$height / max(tree$height)
 	return(tree)
 }
 

@@ -4,7 +4,7 @@
 \alias{optim.beta}
 \title{Optimization of beta diversity sampling protocols.}
 \usage{
-optim.beta(comm, tree, methods, samples, abund = FALSE, runs = 1000)
+optim.beta(comm, tree, methods, base, abund = FALSE, runs = 1000)
 }
 \arguments{
 \item{comm}{A samples x species x sites array, with either abundance or incidence data.}
@@ -13,7 +13,7 @@ optim.beta(comm, tree, methods, samples, abund = FALSE, runs = 1000)
 
 \item{methods}{A vector specifying the method of each sample (length must be equal to nrow(comm))}
 
-\item{samples}{Allows defining a base mandatory protocol from which to build upon (complementarity analysis). It should be a vector with length = number of methods.}
+\item{base}{Allows defining a base mandatory protocol from which to build upon (complementarity analysis). It should be a vector with length = number of methods.}
 
 \item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.}
 
@@ -29,7 +29,7 @@ Optimization of beta diversity sampling protocols when different methods and mul
 Often, comparing differences between sites or the same site along time (i.e. measure beta diversity) it is not necessary to sample exhaustively. A minimum combination of samples targeting different sub-communities (that may behave differently) may be enough to perceive such differences, for example, for monitoring purposes.
 Cardoso et al. (in prep.) introduce and differentiate the concepts of alpha-sampling and beta-sampling. While alpha-sampling optimization implies maximizing local diversity sampled (Cardoso 2009), beta-sampling optimization implies minimizing differences in beta diversity values between partially and completely sampled communities.
 This function uses as beta diversity measures the Btotal, Brepl and Brich partitioning framework (Carvalho et al. 2012) and respective generalizations to PD and FD (Cardoso et al. 2014).
-Phylogenetic (PD) and functional (FD) diversities are calculated based on an ultrametric tree (hclust or phylo object).
+PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
 }
 \examples{
 comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)
@@ -39,8 +39,8 @@ comm <- array(c(comm1, comm2, comm3), c(4,3,3))
 colnames(comm) <- c("sp1","sp2","sp3")
 methods <- c("Met1","Met2","Met2","Met3")
 tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-optim.beta(comm,,methods, runs = 100)
-optim.beta(comm, tree, methods = methods, abund = TRUE, samples = c(0,0,1), runs = 100)
+optim.beta(comm, methods = methods, runs = 100)
+optim.beta(comm, tree, methods = methods, abund = TRUE, base = c(0,0,1), runs = 100)
 }
 \references{
 Cardoso, P. (2009) Standardization and optimization of arthropod inventories - the case of Iberian spiders. Biodiversity and Conservation, 18, 3949-3962.

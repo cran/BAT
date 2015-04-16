@@ -4,16 +4,16 @@
 \alias{beta}
 \title{Beta diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).}
 \usage{
-beta(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 100)
+beta(comm, tree, abund = TRUE, func = "jaccard", raref = 0, runs = 100)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data.}
 
 \item{tree}{An hclust or phylo object (used only for PD or FD).}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis. If not specified, default is FALSE.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis. If not specified, default is TRUE.}
 
-\item{func}{Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is jaccard.}
+\item{func}{Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is Jaccard.}
 
 \item{raref}{An integer specifying the number of individuals for rarefaction (individual based).
 If raref < 1 no rarefaction is made.
@@ -34,7 +34,7 @@ The beta diversity measures used here follow the partitioning framework independ
 and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
 Btotal = total beta diversity, reflecting both species replacement and loss/gain;
 Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone.
-PD and FD are calculated based on an ultrametric tree (hclust or phylo object). The path to the root of the tree is always included in calculations of PD and FD.
+PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 The number and order of species in comm must be the same as in tree.
 The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001)
 }
@@ -45,7 +45,7 @@ beta(comm)
 beta(comm, func = "Soerensen")
 beta(comm, tree)
 beta(comm, raref = 1)
-beta(comm, tree, abund = TRUE, "s", raref = 2)
+beta(comm, tree, abund = FALSE, "s", raref = 2)
 }
 \references{
 Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.

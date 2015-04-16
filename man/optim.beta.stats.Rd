@@ -28,7 +28,7 @@ Average absolute difference between sampled and real beta diversity when using a
 \details{
 Different combinations of samples per method allow sampling different sub-communities.
 This function allows knowing the average absolute difference between sampled and real beta diversity for a given combination, for one or multiple sites simultaneously.
-Phylogenetic (PD) and functional (FD) diversities are calculated based on an ultrametric tree (hclust or phylo object).
+PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
 }
 \examples{
 comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)

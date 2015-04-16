@@ -4,7 +4,7 @@
 \alias{optim.alpha}
 \title{Optimization of alpha diversity sampling protocols.}
 \usage{
-optim.alpha(comm, tree, methods, samples, runs = 1000)
+optim.alpha(comm, tree, methods, base, runs = 1000)
 }
 \arguments{
 \item{comm}{A samples x species x sites array, with either abundance or incidence data.}
@@ -13,7 +13,7 @@ optim.alpha(comm, tree, methods, samples, runs = 1000)
 
 \item{methods}{A vector specifying the method of each sample (length must be equal to nrow(comm))}
 
-\item{samples}{A vector defining a base protocol from which to build upon (complementarity analysis) (length must be equal to number of methods).}
+\item{base}{A vector defining a base protocol from which to build upon (complementarity analysis) (length must be equal to number of methods).}
 
 \item{runs}{Number of random permutations to be made to the sample order. Default is 1000.}
 }
@@ -26,7 +26,7 @@ Optimization of alpha diversity sampling protocols when different methods and mu
 \details{
 Often a combination of methods allows sampling maximum plot diversity with minimum effort, as it allows sampling different sub-communities, contrary to using single methods.
 Cardoso (2009) proposed a way to optimize the number of samples per method when the target is to maximize sampled alpha diversity. It is applied here for TD, PD and FD, and for one or multiple sites simultaneously.
-Phylogenetic (PD) and functional (FD) diversities are calculated based on an ultrametric tree (hclust or phylo object).
+PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
 }
 \examples{
 comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)
@@ -37,7 +37,7 @@ methods <- c("Met1","Met2","Met2","Met3")
 tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 optim.alpha(comm,,methods)
 optim.alpha(comm, tree, methods)
-optim.alpha(comm,, methods = methods, samples = c(0,0,1), runs = 100)
+optim.alpha(comm,, methods = methods, base = c(0,0,1), runs = 100)
 }
 \references{
 Cardoso, P. (2009) Standardization and optimization of arthropod inventories - the case of Iberian spiders. Biodiversity and Conservation, 18, 3949-3962.
