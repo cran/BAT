@@ -1,7 +1,7 @@
 Package: BAT
 Title: Biodiversity Assessment Tools
-Version: 1.3.0
-Date: 2015-04-16
+Version: 1.3.1
+Date: 2015-07-08
 Author: Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 Maintainer: Pedro Cardoso <pedro.cardoso@helsinki.fi>
 Description: Includes algorithms to assess alpha and beta
@@ -9,10 +9,10 @@ Description: Includes algorithms to assess alpha and beta
     diversity), whether communities are completely sampled or not. It allows
     performing a number of analyses based on either species identities or
     phylogenetic/functional trees depicting species relationships.
-Depends: R (>= 3.0.0), vegan, spatstat, nls2
+Depends: R (>= 3.0.0), graphics, nls2, spatstat, stats, vegan
 License: GPL-3
 LazyData: true
-Packaged: 2015-04-16 07:01:38 UTC; localadmin_pcardoso
 NeedsCompilation: no
+Packaged: 2015-07-08 11:57:19 UTC; pcardoso
 Repository: CRAN
-Date/Publication: 2015-04-16 13:06:55
+Date/Publication: 2015-07-08 14:46:23

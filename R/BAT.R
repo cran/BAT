@@ -1,21 +1,23 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 1.3.0 (2015-04-16)
+#####Version 1.3.1 (2015-07-08)
 #####By Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6, 232-236.
-#####Changed from v1.2.1:
-#####added functions contribution, dispersion & uniqueness
-#####now trees do not need to be ultrametric
-#####added new curve-fitting estimator (eureqa)
-#####improved the calculation of accuracy (can be weighted according to the effort (n/S) of each point of the accumulation curve)
-#####improved function sim.tree (now rescaled to max height = 1)
+#####Changed from v1.3.0:
+#####Imports packages other than base
+#####Corrected name of rational function
+#####Simplified betaObs function
 
 #####required packages
+library("graphics")
 library("nls2")
 library("spatstat")
+library("stats")
 library("vegan")
+#' @import graphics
 #' @import nls2
 #' @import spatstat
+#' @import stats
 #' @import vegan
 
 #####xTree function partly adapted from http://owenpetchey.staff.shef.ac.uk/Code/Code/calculatingfd_assets/Xtree.r
@@ -154,14 +156,11 @@ pcorr <- function(obs, s1){
 
 #####observed beta (a = shared species/edges, b/c = species/edges exclusive to either site, comm is a 2sites x species matrix)
 betaObs <- function(comm, xtree, abund = TRUE, func = "jaccard"){
-	if (!abund) {																			##if incidence data
+	if (!abund || max(comm) == 1) {										##if incidence data
 		obs1 <- sobs(comm[1,,drop=FALSE], xtree)
 		obs2 <- sobs(comm[2,,drop=FALSE], xtree)
 		obsBoth <- sobs(comm, xtree)
-		if(tolower(substr(func, 1, 1)) != "s")
-			denominator <- obsBoth
-		else
-			denominator <- obs1 + obs2
+		a <- obs1 + obs2 - obsBoth
 		b <- obsBoth - obs2
 		c <- obsBoth - obs1
 	} else if (abund & missing(xtree)){								##if abundance data
@@ -170,19 +169,17 @@ betaObs <- function(comm, xtree, abund = TRUE, func = "jaccard"){
 			a <- a + min(comm[1,i], comm[2,i])
 		b <- sum(comm[1,]) - a
 		c <- sum(comm[2,]) - a
-		denominator <- a + b + c
-		if(tolower(substr(func, 1, 1)) == "s")
-			denominator <- denominator + a
 	} else {																					##if abundance and tree
+		##due to the way Soerensen doubles the weight of the a component, using a tree or not will be the same with abundance data.
 		data <- prep(comm, xtree)
 		a = sum(data$lenBranch * apply(data$sampleBranch,2,min))
 		diff = data$lenBranch * (data$sampleBranch[1,] - data$sampleBranch[2,])
 		b = sum(replace(diff, diff < 0, 0))
 		c = sum(replace(diff, diff > 0, 0) * -1)
-		denominator <- a + b + c
-		if(tolower(substr(func, 1, 1)) == "s")
-			denominator <- denominator + a
 	}
+	denominator <- a + b + c
+	if(tolower(substr(func, 1, 1)) == "s")
+		denominator <- denominator + a
 	return(list(Btotal = (b+c)/denominator, Brepl = 2*min(b,c)/denominator, Brich = abs(b-c)/denominator))
 }
 
@@ -278,9 +275,9 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 #' @return Jack2in - Second order jackknife estimator for incidence data;
 #' @return Chao1 - Chao estimator for abundance data;
 #' @return Chao2 - Chao estimator for incidence data;
-#' @return Eureqa - Eureqa curve (Cardoso et al. in prep.);
 #' @return Clench - Clench or Michaelis-Menten curve;
 #' @return Exponential - Exponential curve;
+#' @return Rational - Rational function;
 #' @return Weibull - Weibull curve;
 #' @return The P-corrected version of all non-parametric estimators is also provided.
 #' @return Accuracy - if accuracy is to be calculated a list is returned instead, with the second element being the scaled mean squared error of each estimator.
@@ -416,15 +413,6 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 		  ## curve fitting
       x <- results[1:s,1]
 			y <- results[1:s,3]
-			##Eureqa
-			stlist <- data.frame(a = rich, b = c(0.1, 0.5, 1, 5, 10), c = c(1, 10, 100, 1000, 10000))
-			form <- y ~ (c+(a*x))/(b+x)
-			mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
-			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
-			if(class(curve) != "try-error"){
-				a <- coef(curve)[1]
-				results[s,4] <- a
-			}
 			##Clench
 			stlist <- data.frame(a = rich, b = c(0.1, 0.5, 1))
 			form <- y ~ (a*x)/(1+b*x)
@@ -443,6 +431,15 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 				a <- coef(curve)[1]
 				results[s,6] <- a
 			}
+			##Rational
+			stlist <- data.frame(a = rich, b = c(0.1, 0.5, 1, 5, 10), c = c(1, 10, 100, 1000, 10000))
+			form <- y ~ (c+(a*x))/(b+x)
+			mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
+			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
+			if(class(curve) != "try-error"){
+				a <- coef(curve)[1]
+				results[s,4] <- a
+			}
 			##Weibull
  			stlist <- data.frame(a = rich, b = c(0,1,10), c = c(0,0.1,1))
  			form <- y ~ a*(1-exp(-b*(x^c)))
@@ -453,7 +450,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
   				results[s,7] <- a
   			}
 		}
-		colnames(results) <- c("Sampl", "Ind", "Obs", "Eureqa", "Clench", "Exponential", "Weibull")
+		colnames(results) <- c("Sampl", "Ind", "Obs", "Clench", "Exponential", "Rational", "Weibull")
 		return (results)
 	})
 	colnames(results) <- c("Sampl", "Ind", "Obs", "S1", "S2", "Q1", "Q2", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
@@ -920,7 +917,7 @@ accuracy <- function(accum, target = -1){
       	}
       }
       rownames(smse) <- c("Raw", "Weighted")
-      colnames(smse) <- c("Obs", "Eureqa", "Clench", "Exponential", "Weibull")
+      colnames(smse) <- c("Obs", "Clench", "Exponential", "Rational", "Weibull")
     }
 	} else {																						#if beta
 		if (target[1] == -1)
