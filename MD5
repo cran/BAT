@@ -1,6 +1,6 @@
-89615cba312b1f925975bfbf37d2fd7c *DESCRIPTION
-092df319221b1423451ba7dbe5d17bf7 *NAMESPACE
-0c7fde7ea3f1c3f7c0806e20b74577cf *R/BAT.R
+63f7eb62123fa89268343a00f957ecdb *DESCRIPTION
+1fd7e4b2ad74cb83a70bfdb344e9d9e2 *NAMESPACE
+ee95584f63ef8edf7c4c2a1109e0834a *R/BAT.R
 ba7b49c3691bad4bc401c1354807d6ff *data/arrabida.rda
 dd86dc6c6bea68a3b8ff605352919747 *data/functree.rda
 f5337898cf8a2458797e2df7dcae1817 *data/geres.rda
@@ -8,7 +8,7 @@ f5337898cf8a2458797e2df7dcae1817 *data/geres.rda
 e2c9e6339463c22cbe90acc4fe4d13fc *data/phylotree.rda
 06376c00f2fb30b60f8e7b162b058c58 *man/accuracy.Rd
 722d4a293561d8ec99b879cd0671b39f *man/alpha.Rd
-bfc6c3c89c1d0ca55e7b29073dc82002 *man/alpha.accum.Rd
+ea802e6dc4ab2a776603aaa696c839e7 *man/alpha.accum.Rd
 a3a170518ba4cfc92816acbbaf84e7f0 *man/alpha.estimate.Rd
 ea998c3445b72e86c8acab9ea612a94f *man/arrabida.Rd
 708a18ea16fa7688b4cecf8d2b7d0ec4 *man/beta.Rd
@@ -17,13 +17,16 @@ baa3328adcba4617ac323e94479a7c97 *man/beta.multi.Rd
 78cf533a1c299617ddf858d05616a8ce *man/contribution.Rd
 3f69b104c55d5dc1d943ac7529073794 *man/dispersion.Rd
 81f21c2cbda63352840dc0a1c371cd7f *man/functree.Rd
+3a3776cecc7b09a1da9d574882abdcbb *man/gdm.Rd
 020b716b207fd221f7c18fe0d5c8ffac *man/geres.Rd
 e837ac6737240053425ae951299f6203 *man/guadiana.Rd
+c58d835ed53196ba575a4a4cd8bd01e9 *man/iaor.Rd
 565bd23012da6c2c1a2c68011dfa566e *man/optim.alpha.Rd
 1413cb33a1e8c4cfa6f4266093373b73 *man/optim.alpha.stats.Rd
 2b01ac2ab27a6da5529f81de22a7a6ba *man/optim.beta.Rd
 c933e827f9e1fb2626c5c2692c558ff7 *man/optim.beta.stats.Rd
 b0dc95885597a5742a211a1a2bd46992 *man/phylotree.Rd
+62d4313bcbc67482152924531ee8b5bb *man/sar.Rd
 601fecce7da59270ae7914ace1fecb34 *man/sim.plot.Rd
 524dfcfa0e73f39bfe842538ce700f6a *man/sim.sad.Rd
 7db1c36a26de85611009b3e9943a9c65 *man/sim.sample.Rd

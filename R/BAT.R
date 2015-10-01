@@ -1,12 +1,10 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 1.3.1 (2015-07-08)
+#####Version 1.4 (2015-09-30)
 #####By Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6, 232-236.
-#####Changed from v1.3.0:
-#####Imports packages other than base
-#####Corrected name of rational function
-#####Simplified betaObs function
+#####Changed from v1.4:
+#####Added functions sar, gdm and iaor
 
 #####required packages
 library("graphics")
@@ -19,6 +17,51 @@ library("vegan")
 #' @import spatstat
 #' @import stats
 #' @import vegan
+
+#####auxiliary functions
+prep <- function(comm, xtree, abund = TRUE){
+	len <- xtree[[1]] 							## length of each branch
+	A <- xtree[[2]]									## matrix species X branches
+	minBranch <- min(len[colSums(A)==1]) 	## minimum branch length of terminal branches
+	BA <- comm%*%A 												## matrix samples X branches
+	if (!abund)	BA = ifelse(BA >= 1, 1, 0)
+	return (list(lenBranch = len, sampleBranch = BA, speciesBranch = A, minBranch = minBranch))
+}
+
+rarefaction <- function(comm){
+	n <- sum(comm)
+	for (s in 1:nrow(comm))
+		n <- min(n, sum(comm[s,]))
+	return(n)
+}
+
+rss <- function(x, y){
+	return (sum((x-y)^2))
+}
+
+AIC <- function(x, y, k){
+	n = length(x)
+	return(n * log(rss(x,y)/n) + 2*k)
+}
+
+AICc <- function(x, y, k){
+	n = length(x)
+	return(AIC(x, y, k) + (2*k*(k+1))/(n-k-1))
+}
+
+r2 <- function(x, y){
+	SSn <- rss(x, y)
+	SSd <- sum((y-mean(y))^2)
+	return(1-(SSn/SSd))
+}
+
+logit <- function(x){
+	return(log(x/(1-x)))
+}
+
+revLogit <- function(x){
+	return(exp(x)/(1+exp(x)))
+}
 
 #####xTree function partly adapted from http://owenpetchey.staff.shef.ac.uk/Code/Code/calculatingfd_assets/Xtree.r
 #####by Jens Schumacher (described in Petchey & Gaston 2002, 2006)
@@ -67,25 +110,10 @@ xTree <- function(tree) {
   }
 }
 
-#####auxiliary functions
-prep <- function(comm, xtree, abund = TRUE){
-	len <- xtree[[1]] 							## length of each branch
-	A <- xtree[[2]]									## matrix species X branches
-	minBranch <- min(len[colSums(A)==1]) 	## minimum branch length of terminal branches
-	BA <- comm%*%A 												## matrix samples X branches
-	if (!abund)	BA = ifelse(BA >= 1, 1, 0)
-	return (list(lenBranch = len, sampleBranch = BA, speciesBranch = A, minBranch = minBranch))
-}
-
-rarefaction <- function(comm){
-	n <- sum(comm)
-	for (s in 1:nrow(comm))
-		n <- min(n, sum(comm[s,]))
-	return(n)
-}
-
 #####observed diversity
 sobs <- function(comm, xtree){
+	#if (is.vector(comm))
+		#comm = matrix(c(comm,rep(0,length(comm))),ncol=2)
 	if (missing(xtree)){
 		return(length(colSums(comm)[colSums(comm) > 0]))
 	} else {
@@ -296,7 +324,7 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 #' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 #' alpha.accum(comm)
 #' alpha.accum(comm, func = "nonparametric")
-#' alpha.accum(comm, tree, "compl")
+#' alpha.accum(comm, tree, "completeness")
 #' alpha.accum(comm, tree, "curve", runs = 1000)
 #' alpha.accum(comm, target = -1)
 #' @export
@@ -1228,6 +1256,197 @@ optim.beta.stats <- function(comm, tree, methods, samples, abund = FALSE, runs =
 		}
 	}
 	return(diff)
+}
+
+# Optimization of spatial sampling (to be done!!!).
+# @description Optimization of sampling site distribution in space based on environmental (or other) variables.
+# @param spat Either a cells x variables matrix or a list of raster files.
+# @param n The number of intended sampling sites.
+# @details Often, comparing differences between sites or the same site along time (i.e. measure beta diversity) it is not necessary to sample exhaustively. A minimum combination of samples targeting different sub-communities (that may behave differently) may be enough to perceive such differences, for example, for monitoring purposes.
+# Cardoso et al. (in prep.) introduce and differentiate the concepts of alpha-sampling and beta-sampling. While alpha-sampling optimization implies maximizing local diversity sampled (Cardoso 2009), beta-sampling optimization implies minimizing differences in beta diversity values between partially and completely sampled communities.
+# This function uses as beta diversity measures the Btotal, Brepl and Brich partitioning framework (Carvalho et al. 2012) and respective generalizations to PD and FD (Cardoso et al. 2014).
+# PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
+# @return A matrix of samples x methods (values being optimum number of samples per method). The last column is the average absolute difference from real beta.
+# @references Cardoso, P. (2009) Standardization and optimization of arthropod inventories - the case of Iberian spiders. Biodiversity and Conservation, 18, 3949-3962.
+# @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
+# @references Cardoso, P., et al. (in prep.) Optimal inventorying and monitoring of taxon, phylogenetic and functional diversity.
+# @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
+# @examples comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)
+# comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
+# comm3 <- matrix(c(2,0,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
+# comm <- array(c(comm1, comm2, comm3), c(4,3,3))
+# colnames(comm) <- c("sp1","sp2","sp3")
+# methods <- c("Met1","Met2","Met2","Met3")
+# tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+# optim.beta(comm, methods = methods, runs = 100)
+# optim.beta(comm, tree, methods = methods, abund = TRUE, base = c(0,0,1), runs = 100)
+# @export
+# optim.spatial <- function(spat, n){
+# }
+	
+#' Species-area relationship (SAR).
+#' @description Fits and compares several of the most supported models for the species (or PD, or FD) -area relationship.
+#' @param comm Either a vector with the diversity values per site, or a sites x species matrix.
+#' @param tree An hclust or phylo object (used only to fit the PD or FD-area relationships, requires comm to be a sites x species matrix).
+#' @param area A vector with the area per site.
+#' @details Larger areas (often islands) usually carry more species. Several formulas were proposed in the past to describe this relationship (Arrhenius 1920, 1921; Gleason 1922).
+#' Recently, the same approach began to be used for other measures of diversity, namely phylogenetic (PD) and functional (FD) diversity (Whittaker et al. 2014).
+#' The function compares some of the most commonly used and theoretically or empirically suported models.
+#' The relationships for PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
+#' @return A matrix with the different model parameters and explanatory power.
+#' @references Arrhenius, O. (1920) Distribution of the species over the area. Meddelanden fran Vetenskapsakadmiens Nobelinstitut, 4: 1-6.
+#' @references Arrhenius, O. (1921) Species and area. Journal of Ecology, 9: 95-99.
+#' @references Gleason, H.A. (1922) On the relation between species and area. Ecology, 3: 158-162.
+#' @references Whittaker, R.J., Rigal, F., Borges, P.A.V., Cardoso, P., Terzopoulou, S., Casanoves, F., Pla, L., Guilhaumon, F., Ladle, R. & Triantis, K.A. (2014) Functional biogeography of oceanic islands and the scaling of functional diversity in the Azores. Proceedings of the National Academy of Sciences USA, 111: 13709-13714.
+#' @examples div <- c(1,2,3,4,4)
+#' comm <- matrix(c(2,0,0,0,3,1,0,0,2,4,5,0,1,3,2,5,1,1,1,1), nrow = 5, ncol = 4, byrow = TRUE)
+#' tree <- hclust(dist(c(1:4), method="euclidean"), method="average")
+#' area <- c(10,40,80,160,160)
+#' sar(div,,area)
+#' sar(comm,,area)
+#' sar(comm,tree,area)
+#' @export
+sar <- function(comm, tree, area){
+	if(is.vector(comm)){
+		div = comm
+	} else if (missing(tree)){
+		div = alpha(comm)
+	} else {
+		div = alpha(comm, tree)
+	}
+	results <- matrix(NA, 4, 7)
+	colnames(results) <- c("c", "z", "r2", "AIC", "\U0394 AIC", "AICc", "\U0394 AICc")
+	rownames(results) <- c("Linear", "Exponential", "Exponential (origin)", "Power")
+	k <- c(3,3,2,3)
+	model <- list()
+	model[[1]] <- try(nls(div ~ c + z*area, start = data.frame(c = 0, z = 1)))
+	model[[2]] <- try(nls(div ~ c + z*log(area), start = data.frame(c = 0, z = 1)))
+	model[[3]] <- try(nls(div ~ z*log(area), start = data.frame(z = 1)))
+	model[[4]] <- try(nls(div ~ c + area^z, start = data.frame(c = 0, z = 1)))
+	for(m in 1:length(model)){
+		if(m != 3){
+			results[m,1] <- coef(summary(model[[m]]))[1,1]
+			results[m,2] <- coef(summary(model[[m]]))[2,1]
+		} else {
+			results[m,2] <- coef(summary(model[[m]]))[1,1]
+		}
+		pred <- predict(model[[m]], area=area)
+		results[m,3] <- r2(pred, div)
+		results[m,4] <- AIC(pred, div, k[m])
+		results[m,6] <- AICc(pred, div, k[m])
+	}
+	for(m in 1:length(model)){
+		results[m,5] <- results[m,4] - min(results[,4])
+		results[m,7] <- results[m,6] - min(results[,6])
+	}
+	return(results)
+}	
+
+#' General dynamic model of oceanic island biogeography (GDM).
+#' @description Fits and compares several of the most supported models for the GDM (using TD, PD or FD).
+#' @param comm Either a vector with the diversity values per island, or an island x species matrix.
+#' @param tree An hclust or phylo object (used only to fit the PD or FD GDM, requires comm to be a sites x species matrix).
+#' @param area A vector with the area of islands.
+#' @param time A vector with the age of islands. If not given, the species-area relationship is returned instead.
+#' @details The general dynamic model of oceanic island biogeography was proposed to account for diversity patterns within and across oceanic archipelagos as a function of area and age of the islands (Whittaker et al. 2008).
+#' Several different equations have been found to describe the GDM, extending the different SAR models with the addition of a polynomial term using island age and its square (TT2), depicting the island ontogeny.
+#' The first to be proposed was an extension of the exponential model (Whittaker et al. 2008), the power model extensions following shortly after (Fattorini 2009; Steinbauer et al. 2013), as was the linear model (Cardoso et al. subm.).
+#' The relationships for PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
+#' @return A matrix with the different model parameters and explanatory power.
+#' @references Cardoso, P., Borges, P.A.V., Carvalho, J.C., Rigal, F., Gabriel, R., Cascalho, J. & Correia, L. (subm.) Automated discovery of relationships, models and principles in ecology. Pre-print available from bioRxiv doi: http://dx.doi.org/10.1101/027839
+#' @references Fattorini, S. (2009) On the general dynamic model of oceanic island biogeography. Journal of Biogeography, 36: 1100-1110.
+#' @references Steinbauer, M.J, Klara, D., Field, R., Reineking, B. & Beierkuhnlein, C. (2013) Re-evaluating the general dynamic theory of oceanic island biogeography. Frontiers of Biogeography, 5: 185-194.
+#' @references Whittaker, R.J., Triantis, K.A. & Ladle, R.J. (2008) A general dynamic theory of oceanic island biogeography. Journal of Biogeography, 35: 977-994.
+#' @examples div <- c(1,3,5,8,10)
+#' comm <- matrix(c(2,0,0,0,3,1,0,0,2,4,5,0,1,3,2,5,1,1,1,1), nrow = 5, ncol = 4, byrow = TRUE)
+#' tree <- hclust(dist(c(1:4), method="euclidean"), method="average")
+#' area <- c(10,40,80,160,160)
+#' time <- c(1,2,3,4,5)
+#' gdm(div,,area,time)
+#' gdm(comm,tree,area,time)
+#' gdm(div,,area)
+#' @export
+gdm <- function(comm, tree, area, time){
+	if(missing(time))
+		return(sar(comm,tree,area))
+	if(is.vector(comm)){
+		div = comm
+	} else if (missing(tree)){
+		div = alpha(comm)
+	} else {
+		div = alpha(comm, tree)
+	}
+	results <- matrix(NA, 4, 9)
+	colnames(results) <- c("c", "z", "x", "y", "r2", "AIC", "\U0394 AIC", "AICc", "\U0394 AICc")
+	rownames(results) <- c("Linear", "Exponential", "Power (area)", "Power (area, time)")
+	k <- 5
+	model <- list()
+	model[[1]] <- try(nls(div ~ c + z*area + x*time + y*time^2, start = data.frame(c=0, z=1, x=1, y=0)))
+	model[[2]] <- try(nls(div ~ c + z*log(area) + x*time + y*time^2, start = data.frame(c=0, z=1, x=1, y=0)))
+	model[[3]] <- try(nls(div ~ exp(c + z*log(area) + x*time + y*time^2), start = data.frame(c=0, z=1, x=1, y=0)))
+	model[[4]] <- try(nls(div ~ exp(c + z*log(area) + x*log(time) + y*log(time)^2), start = data.frame(c=0, z=1, x=1, y=0)))
+	for(m in 1:length(model)){
+		results[m,1] <- coef(summary(model[[m]]))[1,1]
+		results[m,2] <- coef(summary(model[[m]]))[2,1]
+		results[m,3] <- coef(summary(model[[m]]))[3,1]
+		results[m,4] <- coef(summary(model[[m]]))[4,1]
+		pred <- predict(model[[m]], area=area, time=time)
+		results[m,5] <- r2(pred, div)
+		results[m,6] <- AIC(pred, div, k)
+		results[m,8] <- AICc(pred, div, k)
+	}
+	for(m in 1:length(model)){
+		results[m,7] <- results[m,6] - min(results[,6])
+		results[m,9] <- results[m,8] - min(results[,8])
+	}
+	return(results)
+}	
+
+#' Interspecific abundance-occupancy relationship (IAOR).
+#' @description Fits and compares several of the most supported models for the IAOR.
+#' @param comm A sites x species matrix with abundance values.
+#' @details Locally abundant species tend to be widespread while locally rare species tend to be narrowly distributed.
+#' That is, for a given species assemblage, there is a positive interspecific abundance-occupancy relationship (Brown 1984).
+#' This function compares some of the most commonly used and theoretically or empirically suported models (Nachman 1981; He & Gaston 2000; Cardoso et al. subm.).
+#' @return A matrix with the different model parameters and explanatory power.
+#' @references Brown, J.H. (1984) On the relationship between abundance and distribution of species. American Naturalist, 124: 255-279.
+#' @references Cardoso, P., Borges, P.A.V., Carvalho, J.C., Rigal, F., Gabriel, R., Cascalho, J. & Correia, L. (subm.) Automated discovery of relationships, models and principles in ecology. Pre-print available from bioRxiv doi: http://dx.doi.org/10.1101/027839
+#' @references He, F.L. & Gaston, K.J. (2000) Estimating species abundance from occurrence. American Naturalist, 156: 553-559.
+#' @references Nachman, G. (1981) A mathematical model of the functional relationship between density and spatial distribution of a population. Journal of Animal Ecology, 50: 453-460.
+#' @examples comm <- matrix(c(4,3,2,1,5,4,3,2,3,2,1,0,6,3,0,0,0,0,0,0), nrow = 5, ncol = 4, byrow = TRUE)
+#' iaor(comm)
+#' @export
+iaor <- function(comm){
+  results <- matrix(NA, 4, 7)
+  colnames(results) <- c("a", "b", "r2", "AIC", "\U0394 AIC", "AICc", "\U0394 AICc")
+  rownames(results) <- c("Linear", "Exponential", "Negative Binomial", "SR")
+  k <- c(3,3,2,2)
+  abund <- colMeans(comm)                   #mean abundance per species (including sites with 0 individuals)
+  occup <- colMeans(ifelse(comm>0,1,0))     #proportion occupancy per species
+
+  model <- list()
+  model[[1]] <- try(nls(logit(occup) ~ a+b*log(abund), start = data.frame(a = 1, b = 1))) #linear
+  model[[2]] <- try(nls(occup ~ 1-exp(a*abund^b), start = data.frame(a = -1, b = 1))) #exponential
+  model[[3]] <- try(nls(occup ~ 1-(1+(abund/a))^(0-a), start = data.frame(a = 0))) #negative binomial
+  model[[4]] <- try(nls(occup ~ abund/(a+abund), start = data.frame(a = 0))) #SR = Clench with asymptote 1
+  for(m in 1:length(model)){
+    if(m < 3){
+      results[m,1] <- coef(summary(model[[m]]))[1,1]
+      results[m,2] <- coef(summary(model[[m]]))[2,1]
+    } else {
+      results[m,1] <- coef(summary(model[[m]]))[1,1]
+    }
+    pred <- predict(model[[m]], abund=abund)
+    if(m==1) pred = revLogit(pred)
+    results[m,3] <- r2(pred, occup)
+    results[m,4] <- AIC(pred, occup, k[m])
+    results[m,6] <- AICc(pred, occup, k[m])
+  }
+  for(m in 1:length(model)){
+    results[m,5] <- results[m,4] - min(results[,4])
+    results[m,7] <- results[m,6] - min(results[,6])
+  }
+  return(results)
 }
 
 #' Simulation of species abundance distributions (SAD).
