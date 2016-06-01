@@ -2,24 +2,24 @@
 % Please edit documentation in R/BAT.R
 \name{dispersion}
 \alias{dispersion}
-\title{Phylogenetic/functional dispersion of individuals or species.}
+\title{Phylogenetic/functional dispersion of species or individuals.}
 \usage{
-dispersion(comm, tree, abund = TRUE, relative = FALSE)
+dispersion(comm, tree, abund = FALSE, relative = FALSE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data.}
 
 \item{tree}{An hclust or phylo object.}
 
-\item{abund}{A boolean (T/F) indicating whether dissimilarity should be calculated per individual (T) or species (F). If not specified, default is TRUE.}
+\item{abund}{A boolean (T/F) indicating whether dispersion should be calculated per individual (T) or species (F). If not specified, default is FALSE.}
 
-\item{relative}{A boolean (T/F) indicating whether dissimilarity should be relative to the maximum distance between any two species in the tree.}
+\item{relative}{A boolean (T/F) indicating whether dispersion should be relative to the maximum distance between any two species in the tree.}
 }
 \value{
 A vector of values per site.
 }
 \description{
-Average dissimilarity between any two individuals or species randomly chosen in a community with replacement.
+Average dissimilarity between any two species or individuals randomly chosen in a community with replacement.
 }
 \details{
 If abundance data is used and a tree is given, dispersion is the quadratic entropy of Rao (1982).
@@ -31,8 +31,8 @@ comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRU
 tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 dispersion(comm)
 dispersion(comm, tree)
-dispersion(comm, tree, abund = FALSE)
-dispersion(comm, tree, abund = FALSE, relative = TRUE)
+dispersion(comm, tree, abund = TRUE)
+dispersion(comm, tree, abund = TRUE, relative = TRUE)
 }
 \references{
 Rao, C.R. (1982) Diversity and dissimilarity coefficients: a unified approach. Theoretical Population Biology, 21: 24-43.

@@ -2,16 +2,16 @@
 % Please edit documentation in R/BAT.R
 \name{contribution}
 \alias{contribution}
-\title{Contribution of individuals or species to total PD or FD.}
+\title{Contribution of species or individuals to total PD or FD.}
 \usage{
-contribution(comm, tree, abund = TRUE, relative = FALSE)
+contribution(comm, tree, abund = FALSE, relative = FALSE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data.}
 
 \item{tree}{An hclust or phylo object.}
 
-\item{abund}{A boolean (T/F) indicating whether contribution should be calculated per individual (T) or species (F). If not specified, default is TRUE.}
+\item{abund}{A boolean (T/F) indicating whether contribution should be calculated per individual (T) or species (F). If not specified, default is FALSE.}
 
 \item{relative}{A boolean (T/F) indicating whether contribution should be relative to total PD or FD (proportional contribution per individual or species). If False, the sum of contributions for each site is equal to total PD/FD, if True it is 1.}
 }
@@ -19,7 +19,7 @@ contribution(comm, tree, abund = TRUE, relative = FALSE)
 A matrix of sites x species values.
 }
 \description{
-Contribution of each individual or species to the total PD or FD of a number of communities.
+Contribution of each species or individuals to the total PD or FD of a number of communities.
 }
 \details{
 Contribution is equivalent to the evolutionary distinctiveness index (ED) of Isaac et al. (2007) if done by species and to the abundance weighted evolutionary distinctiveness (AED) of Cadotte et al. (2010) if done by individual.
@@ -29,7 +29,7 @@ comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRU
 tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 contribution(comm, tree)
 contribution(comm, tree, FALSE)
-contribution(comm, tree, abund = FALSE, relative = TRUE)
+contribution(comm, tree, abund = TRUE, relative = TRUE)
 }
 \references{
 Isaac, N.J.B., Turvey, S.T., Collen, B., Waterman, C. & Baillie, J.E.M. (2007) Mammals on the EDGE: conservation priorities based on threat and phylogeny. PLoS One, 2: e296.

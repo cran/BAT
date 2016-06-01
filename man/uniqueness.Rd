@@ -2,24 +2,24 @@
 % Please edit documentation in R/BAT.R
 \name{uniqueness}
 \alias{uniqueness}
-\title{Phylogenetic/functional uniqueness of individuals or species.}
+\title{Phylogenetic/functional uniqueness of species or individuals.}
 \usage{
-uniqueness(comm, tree, abund = TRUE, relative = FALSE)
+uniqueness(comm, tree, abund = FALSE, relative = FALSE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data.}
 
 \item{tree}{An hclust or phylo object.}
 
-\item{abund}{A boolean (T/F) indicating whether dissimilarity should be calculated per individual (T) or species (F). If not specified, default is TRUE.}
+\item{abund}{A boolean (T/F) indicating whether uniqueness should be calculated per individual (T) or species (F). If not specified, default is FALSE.}
 
-\item{relative}{A boolean (T/F) indicating whether dissimilarity should be relative to the maximum distance between any two species in the tree.}
+\item{relative}{A boolean (T/F) indicating whether uniqueness should be relative to the maximum distance between any two species in the tree.}
 }
 \value{
 A matrix of sites x species values.
 }
 \description{
-Average dissimilarity between an individual or species and all others in a community with replacement.
+Average dissimilarity between a species or individual and all others in a community with replacement.
 }
 \details{
 Uniqueness is the originality measure of Pavoine et al. (2005).
@@ -28,8 +28,8 @@ Uniqueness is the originality measure of Pavoine et al. (2005).
 comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRUE)
 tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 uniqueness(comm, tree)
-uniqueness(comm, tree, abund = FALSE)
-uniqueness(comm, tree, abund = FALSE, relative = TRUE)
+uniqueness(comm, tree, abund = TRUE)
+uniqueness(comm, tree, abund = TRUE, relative = TRUE)
 }
 \references{
 Pavoine, S., Ollier, S. & Dufour, A.-B. (2005) Is the originality of a species measurable? Ecology Letters, 8: 579-586.
