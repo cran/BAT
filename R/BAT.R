@@ -1,16 +1,14 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 1.5.1 (2016-06-01)
+#####Version 1.5.2 (2016-07-15)
 #####By Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6, 232-236.
-#####Changed from v1.5.0:
-#####Tweaked function optim.spatial by first standardizing values of all layers to [0,1]
-#####functions alpha.*, contribution, distincteness and uniqueness now allow analysis with a single community (vector)
-#####default for abundance in community data is now FALSE in all functions using it
+#####Changed from v1.5.1:
+#####Tweaked function alpha.accum
 
 #####BAT Stats:
 #####library("cranlogs")
-#####day <- cran_downloads(package = "BAT", from = "2014-08-19", to = "2015-10-19")
+#####day <- cran_downloads(package = "BAT", from = "2014-08-19", to = "2016-07-14")
 #####group <- matrix(day$count, 140, byrow=T)
 #####plot(rowSums(group), type = "n")
 #####lines(rowSums(group))
@@ -392,8 +390,10 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 	#####nonparametric (TD/PD/FD with non-parametric estimators)
 	switch(func, nonparametric = {
 		resultsArray <- array(0, dim = c(nrow(comm), 19, runs))
-		if(target > -2)
-			smse <- matrix(0, runs, 19)
+		if(target > -2){
+		  smse <- matrix(0, runs, 19)
+		  smsew <-  smse
+		}
 		if (prog) pb <- txtProgressBar(0, runs, style = 3)
 		for (r in 1:runs){
 			comm <- comm[sample(nrow(comm)),, drop=FALSE]			#shuffle rows (sampling units)
@@ -434,6 +434,8 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 				s <- accuracy(runData, truediv)
 				smse[r,3] <- s[1,1]
 				smse[r,8:19] <- s[1,-1]
+				smsew[r,3] <- s[2,1]
+				smsew[r,8:19] <- s[2,-1]
 			}
 			if (prog) setTxtProgressBar(pb, r)
 		}
@@ -453,8 +455,10 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 					results[i,j] <- median(v)
 			}
 		}
-		if(exists("smse"))						##calculate accuracy
+		if(exists("smse")){						##calculate accuracy
 			smse <- colMeans(smse)
+			smsew <- colMeans(smsew)
+		}
 
 		#####completeness (PD/FD with TD completeness correction)
 	}, completeness = {
@@ -537,9 +541,10 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 	})
 	colnames(results) <- c("Sampl", "Ind", "Obs", "S1", "S2", "Q1", "Q2", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
 	if(exists("smse")){
-		smse <- matrix(smse,1,length(smse))
+		smse <- rbind(smse, smsew)
 		colnames(smse) <- colnames(results)
-		smse[,c(1:2,4:7)] <- NA
+		rownames(smse) <- c("Raw", "Weighted")
+		smse <- smse[,-c(1:2,4:7)]
 		return(list(results, smse))
 	}	else {
 		return(results)
