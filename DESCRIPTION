@@ -1,7 +1,7 @@
 Package: BAT
 Title: Biodiversity Assessment Tools
-Version: 1.5.2
-Date: 2016-07-15
+Version: 1.5.3
+Date: 2016-08-13
 Author: Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 Maintainer: Pedro Cardoso <pedro.cardoso@helsinki.fi>
 Description: Includes algorithms to assess alpha and beta
@@ -15,6 +15,6 @@ License: GPL-3
 LazyData: true
 RoxygenNote: 5.0.1
 NeedsCompilation: no
-Packaged: 2016-07-15 10:51:41 UTC; pcardoso
+Packaged: 2016-08-13 18:07:11 UTC; pcardoso
 Repository: CRAN
-Date/Publication: 2016-07-15 14:07:08
+Date/Publication: 2016-08-13 22:46:26
