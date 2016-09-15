@@ -1,10 +1,10 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 1.5.3 (2016-08-13)
+#####Version 1.5.4 (2016-09-14)
 #####By Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6, 232-236.
-#####Changed from v1.5.2:
-#####All functions using both comm and tree now match species names in both
+#####Changed from v1.5.3:
+#####Added small tweaks to properly read phylo objects from package ape
 
 #####BAT Stats:
 #####library("cranlogs")
@@ -284,9 +284,14 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
   	comm <- matrix(comm, nrow = 1)
   comm <- as.matrix(comm)
   if (!missing(tree)){
-    if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$labels, colnames(comm))]
-		tree <- xTree(tree)
+  	if (class(tree) == "phylo"){
+  		if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+  			comm <- comm[,match(tree$tip.label, colnames(comm))]
+  	} else {
+  		if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+  			comm <- comm[,match(tree$labels, colnames(comm))]
+  	}
+    tree <- xTree(tree)
   }
 
   nComm <- nrow(comm)
@@ -382,11 +387,16 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 		comm <- matrix(comm, nrow = 1)
 	comm <- as.matrix(comm)
 	if (!missing(tree)){
-	  if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-	    comm <- comm[,match(tree$labels, colnames(comm))]
-	  tree <- xTree(tree)
+		if (class(tree) == "phylo"){
+			if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+				comm <- comm[,match(tree$tip.label, colnames(comm))]
+		} else {
+			if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+				comm <- comm[,match(tree$labels, colnames(comm))]
+		}
+		tree <- xTree(tree)
 	}
-	
+
 	#####function options:
 	#####nonparametric (TD/PD/FD with non-parametric estimators)
 	#####completeness (PD/FD with TD completeness correction)
@@ -613,12 +623,17 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
 
 	#####nonparametric (TD/PD/FD with non-parametric estimators)
 	switch(func, nonparametric = {
-	  if (!missing(tree)){
-	    if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-	      comm <- comm[,match(tree$labels, colnames(comm))]
-	    tree <- xTree(tree)
-	  }
-	  results <- matrix(0,0,10)
+		if (!missing(tree)){
+			if (class(tree) == "phylo"){
+				if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+					comm <- comm[,match(tree$tip.label, colnames(comm))]
+			} else {
+				if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+					comm <- comm[,match(tree$labels, colnames(comm))]
+			}
+			tree <- xTree(tree)
+		}
+		results <- matrix(0,0,10)
 		for (s in 1:nrow(comm)){
 			data <- comm[s,,drop = FALSE]
 			obs <- sobs(data, tree)
@@ -691,9 +706,14 @@ beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 
 
   comm <- as.matrix(comm)
   if (!missing(tree)){
-    if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$labels, colnames(comm))]
-    tree <- xTree(tree)
+  	if (class(tree) == "phylo"){
+  		if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+  			comm <- comm[,match(tree$tip.label, colnames(comm))]
+  	} else {
+  		if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+  			comm <- comm[,match(tree$labels, colnames(comm))]
+  	}
+  	tree <- xTree(tree)
   }
   nComm <- nrow(comm)
 
@@ -778,11 +798,16 @@ beta.accum <- function(comm1, comm2, tree, abund = FALSE, func = "jaccard", runs
   comm1 <- as.matrix(comm1)
   comm2 <- as.matrix(comm2)
   if (!missing(tree)){
-    if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$labels, colnames(comm))]
-    tree <- xTree(tree)
+  	if (class(tree) == "phylo"){
+  		if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+  			comm <- comm[,match(tree$tip.label, colnames(comm))]
+  	} else {
+  		if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+  			comm <- comm[,match(tree$labels, colnames(comm))]
+  	}
+  	tree <- xTree(tree)
   }
-  
+
 	nSamples <- nrow(comm1)
 	results <- matrix(0,nSamples, 4)
 	colnames(results) <- c("Sampl", "Btotal", "Brepl", "Brich")
@@ -873,17 +898,20 @@ contribution <- function(comm, tree, abund = FALSE, relative = FALSE){
 		comm <- matrix(comm, nrow = 1)
 	if(!abund)
 		comm <- ifelse(comm > 0, 1, 0)
-  if(missing(tree))
-    tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
   if (!missing(tree)){
-    if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$labels, colnames(comm))]
+  	if (class(tree) == "phylo"){
+  		nEdges <- length(tree$edge.length)
+  		if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+  			comm <- comm[,match(tree$tip.label, colnames(comm))]
+  	} else {
+  		nEdges <- length(tree$merge)
+  		if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+  			comm <- comm[,match(tree$labels, colnames(comm))]
+  	}
+  } else {
+  	tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
   }
-  
-  if(class(tree) == "hclust")
-    nEdges <- length(tree$merge)
-  else
-    nEdges <- length(tree$edge.length)
+
   comm <- as.matrix(comm)
 	contrib <- matrix(0,nrow(comm),ncol(comm))
 
@@ -1193,12 +1221,17 @@ optim.alpha <- function(comm, tree, methods, base, runs = 1000, prog = TRUE){
 optim.alpha.stats <- function(comm, tree, methods, samples, runs = 1000){
 
 	##preliminary stats
-  if (!missing(tree)){
-    if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$labels, colnames(comm))]
-    tree <- xTree(tree)
-  }
-  if(length(dim(comm)) == 3)					##number of sites
+	if (!missing(tree)){
+		if (class(tree) == "phylo"){
+			if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+				comm <- comm[,match(tree$tip.label, colnames(comm))]
+		} else {
+			if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+				comm <- comm[,match(tree$labels, colnames(comm))]
+		}
+		tree <- xTree(tree)
+	}
+	if(length(dim(comm)) == 3)					##number of sites
 		nSites <- dim(comm)[3]
 	else
 		nSites <- 1
@@ -1448,10 +1481,16 @@ sar <- function(comm, tree, area){
 	} else {
 		div = alpha(comm, tree)
 	}
-  if (!missing(tree)){
-    if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$labels, colnames(comm))]
-  }
+	if (!missing(tree)){
+		if (class(tree) == "phylo"){
+			if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+				comm <- comm[,match(tree$tip.label, colnames(comm))]
+		} else {
+			if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+				comm <- comm[,match(tree$labels, colnames(comm))]
+		}
+		tree <- xTree(tree)
+	}
 	results <- matrix(NA, 6, 7)
 	colnames(results) <- c("c", "z", "r2", "AIC", "\U0394 AIC", "AICc", "\U0394 AICc")
 	rownames(results) <- c("Linear", "Linear (origin)", "Exponential", "Exponential (origin)", "Power", "Power (origin)")
@@ -1516,11 +1555,17 @@ gdm <- function(comm, tree, area, time){
 	} else {
 		div = alpha(comm, tree)
 	}
-  if (!missing(tree)){
-    if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$labels, colnames(comm))]
-  }
-  
+	if (!missing(tree)){
+		if (class(tree) == "phylo"){
+			if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+				comm <- comm[,match(tree$tip.label, colnames(comm))]
+		} else {
+			if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+				comm <- comm[,match(tree$labels, colnames(comm))]
+		}
+		tree <- xTree(tree)
+	}
+
 	results <- matrix(NA, 4, 9)
 	colnames(results) <- c("c", "z", "x", "y", "r2", "AIC", "\U0394 AIC", "AICc", "\U0394 AICc")
 	rownames(results) <- c("Linear", "Exponential", "Power (area)", "Power (area, time)")
