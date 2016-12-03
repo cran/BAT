@@ -24,7 +24,7 @@ If not specified, default is 0.}
 \item{runs}{Number of resampling runs for rarefaction. If not specified, default is 100.}
 }
 \value{
-Three distance matrices between sites, one per each of the three beta diversity measures (either "Obs" OR "Avg, Min, LowerCL, UpperCL and Max").
+Three distance matrices between sites, one per each of the three beta diversity measures (either "Obs" OR "Median, Min, LowerCL, UpperCL and Max").
 }
 \description{
 Beta diversity with possible rarefaction, multiple sites simultaneously.

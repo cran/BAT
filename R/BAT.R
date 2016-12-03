@@ -1,10 +1,11 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 1.5.4 (2016-09-14)
+#####Version 1.5.5 (2016-12-03)
 #####By Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6, 232-236.
-#####Changed from v1.5.3:
-#####Added small tweaks to properly read phylo objects from package ape
+#####Changed from v1.5.4:
+#####Uses median instead of mean in rarefaction of alpha and beta
+#####Corrected species names in data files
 
 #####BAT Stats:
 #####library("cranlogs")
@@ -267,7 +268,7 @@ raster.long <- function(layers){
 #' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
 #' The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001)
-#' @return A matrix of sites x diversity values (either "Obs" OR "Avg, Min, LowerCL, UpperCL and Max").
+#' @return A matrix of sites x diversity values (either "Obs" OR "Median, Min, LowerCL, UpperCL and Max").
 #' @references Faith, D.P. (1992) Conservation evaluation and phylogenetic diversity. Biological Conservation, 61, 1-10.
 #' @references Gotelli, N.J. & Colwell, R.K. (2001) Quantifying biodiversity: procedures and pitfalls in the measurement and comparison of species richness. Ecology Letters, 4, 379-391.
 #' @references Petchey, O.L. & Gaston, K.J. (2002) Functional diversity (FD), species richness and community composition. Ecology Letters, 5, 402-411.
@@ -312,10 +313,10 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 		for (r in 1:runs){
 			res <- c(res,sobs(rrarefy(comm[s,], raref), tree))
 		}
-		results[s,] <- c(mean(res), min(res), quantile(res, 0.025), quantile(res, 0.975), max(res))
+		results[s,] <- c(quantile(res, 0.5), min(res), quantile(res, 0.025), quantile(res, 0.975), max(res))
 	}
 	rownames(results) <- rownames(comm)
-	colnames(results) <- c("Avg", "Min", "LowerCL", "UpperCL", "Max")
+	colnames(results) <- c("Median", "Min", "LowerCL", "UpperCL", "Max")
 	return (results)
 }
 
@@ -689,7 +690,7 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
 #' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
 #' The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001)
-#' @return Three distance matrices between sites, one per each of the three beta diversity measures (either "Obs" OR "Avg, Min, LowerCL, UpperCL and Max").
+#' @return Three distance matrices between sites, one per each of the three beta diversity measures (either "Obs" OR "Median, Min, LowerCL, UpperCL and Max").
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 #' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
 #' @references Gotelli, N.J. & Colwell, R.K. (2001) Quantifying biodiversity: procedures and pitfalls in the measurement and comparison of species richness. Ecology Letters, 4, 379-391.
@@ -744,7 +745,7 @@ beta <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 
 				run[r,3] <- betaValues$Brich
 			}
 			for (b in 1:3){
-				results[j,i,b,1] <- mean(run[,b])
+				results[j,i,b,1] <- quantile(run[,b], 0.5)
 				results[j,i,b,2] <- min(run[,b])
 				results[j,i,b,3] <- quantile(run[,b], 0.025)
 				results[j,i,b,4] <- quantile(run[,b], 0.975)
@@ -1703,34 +1704,34 @@ sim.sad <- function(n, s, sad = "lognormal", sd = 1) {
 #' @param s number of species.
 #' @param sad The SAD distribution type (lognormal, uniform, broken stick or geometric). Default is lognormal.
 #' @param sd The standard deviation of lognormal distributions. Default is 1.
-#' @param dist The spatial distribution of individual species populations (aggregated, random, uniform or gradient). Default is aggregated.
+#' @param distribution The spatial distribution of individual species populations (aggregated, random, uniform or gradient). Default is aggregated.
 #' @param clust The clustering parameter (higher values create more clustered populations). Default is 1.
 #' @details The spatial distribution of individuals of given species may take a number of forms.
 #' Competitive exclusion may cause overdispersion, specific habitat needs or cooperation may cause aggregation and environmental gradients may cause abundance gradients.
 #' @return A matrix of individuals x (species, x coords and y coords).
 #' @examples par(mfrow = c(3 ,3))
-#' comm = sim.spatial(100, 9, dist = "uniform")
+#' comm = sim.spatial(100, 9, distribution = "uniform")
 #' for(i in 1:9){
 #' 	sp <- comm[comm[1] == paste("Sp", i, sep = ""), ]
 #' 	plot(sp$x, sp$y, main = paste("Sp", i), xlim = c(0,1), ylim = c(0,1))
 #' }
-#' comm = sim.spatial(1000, 9, sad = "lognormal", sd = 0.5, dist = "aggregated", clust = 2)
+#' comm = sim.spatial(1000, 9, sad = "lognormal", sd = 0.5, distribution = "aggregated", clust = 2)
 #' for(i in 1:9){
 #' 	sp <- comm[comm[1] == paste("Sp", i, sep=""), ]
 #' 	plot(sp$x, sp$y, main = paste("Sp", i), xlim = c(0,1), ylim = c(0,1))
 #' }
 #' @export
-sim.spatial <- function(n, s, sad = "lognormal", sd = 1, dist = "aggregated", clust = 1){
+sim.spatial <- function(n, s, sad = "lognormal", sd = 1, distribution = "aggregated", clust = 1){
 	repeat{
 		simsad <- sim.sad(n, s, sad, sd)
-		dist <- match.arg(dist, c("aggregated", "random", "uniform", "gradient"))
 
 		##aggregated distribution
-		switch(dist, aggregated = {
+		if(distribution == "aggregated"){
+			cat("a")
 			clust <- 1/(4*clust)
 			cluster <- vector("list", s)
 			for (i in 1:s)
-				cluster[[i]] = rThomas(1, clust, n, as.owin(c(0,1,0,1)))
+				cluster[[i]] = spatstat::rThomas(1, clust, n, as.owin(c(0,1,0,1)))
 			ppx <- NULL
 			ppy <- NULL
 			for (j in 1:s){
@@ -1741,23 +1742,23 @@ sim.spatial <- function(n, s, sad = "lognormal", sd = 1, dist = "aggregated", cl
 			comm <- data.frame(Spp = spp, x = ppx, y = ppy)
 
 			##random distribution
-		}, random = {
+		} else if (distribution == "random") {
 			rand <- runifpoint(n, as.owin(c(0,1,0,1)))
 			spp <- rep(as.character(simsad[,1]), simsad[,2])
 			comm <- data.frame(Spp = spp, x = rand$x, y = rand$y)
 
 			##uniform distribution
-		}, uniform = {
+		} else if (distribution == "uniform") {
 			rand <- rSSI(1/n, n, as.owin(c(0,1,0,1)))
 			spp <- rep(as.character(simsad[,1]), simsad[,2])
 			comm <- data.frame(Spp = spp, x = rand$x, y = rand$y)
 
 			##gradient distribution
-		}, gradient = {
+		} else if (distribution == "gradient") {
 			comm <- rpoint(n, function(x,y){x})
 			spp <- rep(as.character(simsad[,1]), simsad[,2])
 			comm <- data.frame(Spp = spp, x = comm$x, y = comm$y)
-		})
+		}
 		if(nrow(comm) == n && length(which(is.na(comm$x))) == 0){
 			break
 		}

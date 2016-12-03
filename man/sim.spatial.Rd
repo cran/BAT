@@ -4,7 +4,7 @@
 \alias{sim.spatial}
 \title{Simulation of species spatial distributions.}
 \usage{
-sim.spatial(n, s, sad = "lognormal", sd = 1, dist = "aggregated",
+sim.spatial(n, s, sad = "lognormal", sd = 1, distribution = "aggregated",
   clust = 1)
 }
 \arguments{
@@ -16,7 +16,7 @@ sim.spatial(n, s, sad = "lognormal", sd = 1, dist = "aggregated",
 
 \item{sd}{The standard deviation of lognormal distributions. Default is 1.}
 
-\item{dist}{The spatial distribution of individual species populations (aggregated, random, uniform or gradient). Default is aggregated.}
+\item{distribution}{The spatial distribution of individual species populations (aggregated, random, uniform or gradient). Default is aggregated.}
 
 \item{clust}{The clustering parameter (higher values create more clustered populations). Default is 1.}
 }
@@ -32,12 +32,12 @@ Competitive exclusion may cause overdispersion, specific habitat needs or cooper
 }
 \examples{
 par(mfrow = c(3 ,3))
-comm = sim.spatial(100, 9, dist = "uniform")
+comm = sim.spatial(100, 9, distribution = "uniform")
 for(i in 1:9){
 	sp <- comm[comm[1] == paste("Sp", i, sep = ""), ]
 	plot(sp$x, sp$y, main = paste("Sp", i), xlim = c(0,1), ylim = c(0,1))
 }
-comm = sim.spatial(1000, 9, sad = "lognormal", sd = 0.5, dist = "aggregated", clust = 2)
+comm = sim.spatial(1000, 9, sad = "lognormal", sd = 0.5, distribution = "aggregated", clust = 2)
 for(i in 1:9){
 	sp <- comm[comm[1] == paste("Sp", i, sep=""), ]
 	plot(sp$x, sp$y, main = paste("Sp", i), xlim = c(0,1), ylim = c(0,1))
