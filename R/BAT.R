@@ -1,11 +1,10 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 1.5.5 (2016-12-03)
+#####Version 1.5.6 (2017-06-27)
 #####By Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6, 232-236.
-#####Changed from v1.5.4:
-#####Uses median instead of mean in rarefaction of alpha and beta
-#####Corrected species names in data files
+#####Changed from v1.5.5:
+#####improved function sim.spatial
 
 #####BAT Stats:
 #####library("cranlogs")
@@ -75,6 +74,10 @@ logit <- function(x){
 
 revLogit <- function(x){
 	return(exp(x)/(1+exp(x)))
+}
+
+euclid <- function(x, y){
+	return(sqrt(sum((x - y) ^ 2)))
 }
 
 #####xTree function partly adapted from http://owenpetchey.staff.shef.ac.uk/Code/Code/calculatingfd_assets/Xtree.r
@@ -1705,7 +1708,7 @@ sim.sad <- function(n, s, sad = "lognormal", sd = 1) {
 #' @param sad The SAD distribution type (lognormal, uniform, broken stick or geometric). Default is lognormal.
 #' @param sd The standard deviation of lognormal distributions. Default is 1.
 #' @param distribution The spatial distribution of individual species populations (aggregated, random, uniform or gradient). Default is aggregated.
-#' @param clust The clustering parameter (higher values create more clustered populations). Default is 1.
+#' @param clust The clustering parameter if distribution is either aggregated or gradient (higher values create more clustered populations). Default is 1.
 #' @details The spatial distribution of individuals of given species may take a number of forms.
 #' Competitive exclusion may cause overdispersion, specific habitat needs or cooperation may cause aggregation and environmental gradients may cause abundance gradients.
 #' @return A matrix of individuals x (species, x coords and y coords).
@@ -1724,41 +1727,61 @@ sim.sad <- function(n, s, sad = "lognormal", sd = 1) {
 sim.spatial <- function(n, s, sad = "lognormal", sd = 1, distribution = "aggregated", clust = 1){
 	repeat{
 		simsad <- sim.sad(n, s, sad, sd)
+		coords <- matrix(ncol = 2)
+		for (j in 1:nrow(simsad)){	#species by species
+			spCoords <- matrix(c(runif(1),runif(1)), ncol=2)
+			if(simsad[j,2] > 1){
+				for(i in 2:simsad[j,2]){
+					repeat{
+						newcoords <- c(runif(1),runif(1))
 
-		##aggregated distribution
-		if(distribution == "aggregated"){
-			cat("a")
-			clust <- 1/(4*clust)
-			cluster <- vector("list", s)
-			for (i in 1:s)
-				cluster[[i]] = spatstat::rThomas(1, clust, n, as.owin(c(0,1,0,1)))
-			ppx <- NULL
-			ppy <- NULL
-			for (j in 1:s){
-				ppx <- c(ppx, cluster[[j]]$x[1:simsad[,2][j]])
-				ppy <- c(ppy, cluster[[j]]$y[1:simsad[,2][j]])
+						##aggregated distribution
+						if(distribution == "aggregated"){
+							mindist = 1
+							for(r in 1:nrow(spCoords)){
+								mindist <- min(mindist, euclid(newcoords, spCoords[r,]))
+							}
+							thres = abs(rnorm(1, sd = 1/clust))/10
+							if(mindist < thres){
+								spCoords <- rbind(spCoords, newcoords)
+								break
+							}
+						
+						##random distribution
+						} else if (distribution == "random"){
+							spCoords <- rbind(spCoords, newcoords)
+							break
+						
+						##uniform distribution
+						} else if (distribution == "uniform"){
+							mindist = 1
+							for(r in 1:nrow(spCoords)){
+								mindist <- min(mindist, euclid(newcoords, spCoords[r,]))
+							}
+							thres = runif(1)
+							if(mindist > thres){
+								spCoords <- rbind(spCoords, newcoords)
+								break
+							}
+						
+						##gradient distribution
+						} else if (distribution == "gradient") {
+							thres = runif(1)^(1/clust)
+							if(newcoords[2] > thres){
+								spCoords <- rbind(spCoords, newcoords)
+								break
+							}
+							
+
+							
+						} else return
+					}
+				}
 			}
-			spp <- rep(as.character(simsad[,1]), simsad[,2])
-			comm <- data.frame(Spp = spp, x = ppx, y = ppy)
-
-			##random distribution
-		} else if (distribution == "random") {
-			rand <- runifpoint(n, as.owin(c(0,1,0,1)))
-			spp <- rep(as.character(simsad[,1]), simsad[,2])
-			comm <- data.frame(Spp = spp, x = rand$x, y = rand$y)
-
-			##uniform distribution
-		} else if (distribution == "uniform") {
-			rand <- rSSI(1/n, n, as.owin(c(0,1,0,1)))
-			spp <- rep(as.character(simsad[,1]), simsad[,2])
-			comm <- data.frame(Spp = spp, x = rand$x, y = rand$y)
-
-			##gradient distribution
-		} else if (distribution == "gradient") {
-			comm <- rpoint(n, function(x,y){x})
-			spp <- rep(as.character(simsad[,1]), simsad[,2])
-			comm <- data.frame(Spp = spp, x = comm$x, y = comm$y)
+			coords <- rbind(coords, spCoords)
 		}
+		spp <- rep(as.character(simsad[,1]), simsad[,2])
+		comm <- data.frame(Spp = spp, x = coords[-1,1], y = coords[-1,2])
 		if(nrow(comm) == n && length(which(is.na(comm$x))) == 0){
 			break
 		}

@@ -28,4 +28,3 @@ plot(as.dendrogram(tree))
 tree <- sim.tree(100,1000)
 plot(as.dendrogram(tree))
 }
-

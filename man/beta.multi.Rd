@@ -58,4 +58,3 @@ Legendre, P. (2014) Interpreting the replacement and richness difference compone
 
 Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
 }
-

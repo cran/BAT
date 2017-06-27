@@ -13,4 +13,3 @@ A dataset containing the abundance of 338 spider species in each of 320 sampling
 Cardoso, P., Henriques, S.S., Gaspar, C., Crespo, L.C., Carvalho, R., Schmidt, J.B., Sousa, P. & Szuts, T. (2009) Species richness and composition assessment of spiders in a Mediterranean scrubland. Journal of Insect Conservation, 13: 45-55.
 }
 \keyword{datasets}
-

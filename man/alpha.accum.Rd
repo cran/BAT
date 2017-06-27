@@ -113,4 +113,3 @@ Petchey, O.L. & Gaston, K.J. (2006) Functional diversity: back to basics and loo
 
 Soberon, M.J. & Llorente, J. (1993) The use of species accumulation functions for the prediction of species richness. Conservation Biology, 7, 480-488.
 }
-

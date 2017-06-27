@@ -44,4 +44,3 @@ optim.alpha(comm,, methods = methods, base = c(0,0,1), runs = 100)
 \references{
 Cardoso, P. (2009) Standardization and optimization of arthropod inventories - the case of Iberian spiders. Biodiversity and Conservation, 18, 3949-3962.
 }
-

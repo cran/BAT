@@ -31,4 +31,3 @@ comm <- sim.spatial(1000, 10)
 sim.sample(comm)
 sim.sample(comm, cells = 10, samples = 5)
 }
-

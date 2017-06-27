@@ -58,4 +58,3 @@ Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of
 
 Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
 }
-

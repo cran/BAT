@@ -18,7 +18,7 @@ sim.spatial(n, s, sad = "lognormal", sd = 1, distribution = "aggregated",
 
 \item{distribution}{The spatial distribution of individual species populations (aggregated, random, uniform or gradient). Default is aggregated.}
 
-\item{clust}{The clustering parameter (higher values create more clustered populations). Default is 1.}
+\item{clust}{The clustering parameter if distribution is either aggregated or gradient (higher values create more clustered populations). Default is 1.}
 }
 \value{
 A matrix of individuals x (species, x coords and y coords).
@@ -43,4 +43,3 @@ for(i in 1:9){
 	plot(sp$x, sp$y, main = paste("Sp", i), xlim = c(0,1), ylim = c(0,1))
 }
 }
-

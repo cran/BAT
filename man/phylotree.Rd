@@ -13,4 +13,3 @@ A dataset representing an approximation to the phylogenetic tree for 338 species
 The tree is based on the linnean hierarchy, with different suborders separated by 1 unit, families by 0.75, genera by 0.5 and species by 0.25.
 }
 \keyword{datasets}
-

@@ -75,4 +75,3 @@ Petchey, O.L. & Gaston, K.J. (2002) Functional diversity (FD), species richness 
 
 Petchey, O.L. & Gaston, K.J. (2006) Functional diversity: back to basics and looking forward. Ecology Letters, 9, 741-758.
 }
-

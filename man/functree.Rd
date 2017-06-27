@@ -14,4 +14,3 @@ For each species were recorded: average size, type of web, type of hunting, sten
 Cardoso, P., Pekar, S., Jocque, R. & Coddington, J.A. (2011) Global patterns of guild composition and functional diversity of spiders. PLoS One, 6: e21710.
 }
 \keyword{datasets}
-

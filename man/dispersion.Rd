@@ -41,4 +41,3 @@ Simpson, E.H. (1949) Measurement of diversity. Nature 163: 688.
 
 Webb, C.O., Ackerly, D.D., McPeek, M.A. & Donoghue, M.J. (2002) Phylogenies and community ecology. Annual Review of Ecology and Systematics, 33: 475-505.
 }
-

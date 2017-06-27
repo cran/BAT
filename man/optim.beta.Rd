@@ -54,4 +54,3 @@ Cardoso, P., et al. (in prep.) Optimal inventorying and monitoring of taxon, phy
 
 Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
 }
-

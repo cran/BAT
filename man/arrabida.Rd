@@ -13,4 +13,3 @@ A dataset containing the abundance of 338 spider species in each of 320 sampling
 Cardoso, P., Gaspar, C., Pereira, L.C., Silva, I., Henriques, S.S., Silva, R.R. & Sousa, P. (2008) Assessing spider species richness and composition in Mediterranean cork oak forests. Acta Oecologica, 33: 114-127.
 }
 \keyword{datasets}
-

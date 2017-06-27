@@ -34,4 +34,3 @@ uniqueness(comm, tree, abund = TRUE, relative = TRUE)
 \references{
 Pavoine, S., Ollier, S. & Dufour, A.-B. (2005) Is the originality of a species measurable? Ecology Letters, 8: 579-586.
 }
-

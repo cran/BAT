@@ -38,4 +38,3 @@ tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 optim.alpha.stats(comm,,methods, c(1,1,1))
 optim.alpha.stats(comm, tree, methods = methods, samples = c(0,0,1), runs = 100)
 }
-

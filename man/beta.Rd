@@ -56,4 +56,3 @@ Gotelli, N.J. & Colwell, R.K. (2001) Quantifying biodiversity: procedures and pi
 
 Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
 }
-

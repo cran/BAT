@@ -25,4 +25,3 @@ sim.plot(comm)
 sim.plot(comm, sad = TRUE)
 sim.plot(comm, s = 9)
 }
-

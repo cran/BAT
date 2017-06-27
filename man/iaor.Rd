@@ -33,4 +33,3 @@ He, F.L. & Gaston, K.J. (2000) Estimating species abundance from occurrence. Ame
 
 Nachman, G. (1981) A mathematical model of the functional relationship between density and spatial distribution of a population. Journal of Animal Ecology, 50: 453-460.
 }
-

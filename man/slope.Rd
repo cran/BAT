@@ -31,4 +31,3 @@ slope(acc.beta)
 \references{
 Cardoso, P., Pekar, S., Jocque, R. & Coddington, J.A. (2011) Global patterns of guild composition and functional diversity of spiders. PLoS One, 6, e21710.
 }
-

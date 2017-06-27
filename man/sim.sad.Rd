@@ -33,4 +33,3 @@ hist(log(comm1$Freq))
 hist(log(comm2$Freq))
 hist(log(comm3$Freq))
 }
-
