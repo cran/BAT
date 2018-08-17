@@ -2,33 +2,34 @@
 % Please edit documentation in R/BAT.R
 \name{contribution}
 \alias{contribution}
-\title{Contribution of species or individuals to total PD or FD.}
+\title{Contribution of species or individuals to total phylogenetic/functional diversity.}
 \usage{
 contribution(comm, tree, abund = FALSE, relative = FALSE)
 }
 \arguments{
-\item{comm}{A sites x species matrix, with either abundance or incidence data.}
+\item{comm}{A sites x species matrix, with either abundance or incidence data. If missing, the contribution of all species to the full tree is calculated.}
 
-\item{tree}{An hclust or phylo object.}
+\item{tree}{An hclust or phylo object representing a phylogenetic or functional tree.}
 
-\item{abund}{A boolean (T/F) indicating whether contribution should be calculated per individual (T) or species (F). If not specified, default is FALSE.}
+\item{abund}{A boolean (T/F) indicating whether contribution should be calculated per individual (T) or species (F). If not specified, default is species.}
 
-\item{relative}{A boolean (T/F) indicating whether contribution should be relative to total PD or FD (proportional contribution per individual or species). If False, the sum of contributions for each site is equal to total PD/FD, if True it is 1.}
+\item{relative}{A boolean (T/F) indicating whether contribution should be relative to total PD or FD (proportional contribution per individual or species). If FALSE, the sum of contributions for each site is equal to total PD/FD, if TRUE it is 1.}
 }
 \value{
-A matrix of sites x species values.
+A matrix of sites x species values (or values per species if no comm is given).
 }
 \description{
-Contribution of each species or individuals to the total PD or FD of a number of communities.
+Contribution of each species or individual to the total PD or FD of a number of communities.
 }
 \details{
 Contribution is equivalent to the evolutionary distinctiveness index (ED) of Isaac et al. (2007) if done by species and to the abundance weighted evolutionary distinctiveness (AED) of Cadotte et al. (2010) if done by individual.
 }
 \examples{
-comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRUE)
+comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
 tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+contribution(tree = tree)
 contribution(comm, tree)
-contribution(comm, tree, FALSE)
+contribution(comm, tree, TRUE)
 contribution(comm, tree, abund = TRUE, relative = TRUE)
 }
 \references{

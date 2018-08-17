@@ -4,7 +4,8 @@
 \alias{beta}
 \title{Beta diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).}
 \usage{
-beta(comm, tree, abund = FALSE, func = "jaccard", raref = 0, runs = 100)
+beta(comm, tree, abund = FALSE, func = "jaccard", raref = 0,
+  runs = 100)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data.}

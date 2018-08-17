@@ -2,35 +2,37 @@
 % Please edit documentation in R/BAT.R
 \name{uniqueness}
 \alias{uniqueness}
-\title{Phylogenetic/functional uniqueness of species or individuals.}
+\title{Phylogenetic/functional uniqueness of species.}
 \usage{
-uniqueness(comm, tree, abund = FALSE, relative = FALSE)
+uniqueness(comm, tree, distance, relative = FALSE)
 }
 \arguments{
-\item{comm}{A sites x species matrix, with either abundance or incidence data.}
+\item{comm}{A sites x species matrix, with either abundance or incidence data. If missing, the uniqueness using the full tree or distance matrix is calculated.}
 
-\item{tree}{An hclust or phylo object.}
+\item{tree}{An hclust or phylo object representing a phylogenetic or functional tree. One of tree or distance must be provided.}
 
-\item{abund}{A boolean (T/F) indicating whether uniqueness should be calculated per individual (T) or species (F). If not specified, default is FALSE.}
+\item{distance}{A dist object representing the phylogenetic or functional distance between species.}
 
-\item{relative}{A boolean (T/F) indicating whether uniqueness should be relative to the maximum distance between any two species in the tree.}
+\item{relative}{A boolean (T/F) indicating whether uniqueness should be relative to the maximum distance between any two species in the tree or distance matrix.}
 }
 \value{
 A matrix of sites x species values.
 }
 \description{
-Average dissimilarity between a species or individual and all others in a community with replacement.
+Dissimilarity between each species and the single closest in a community.
 }
 \details{
-Uniqueness is the originality measure of Pavoine et al. (2005).
+This is equivalent to the originality measure of Mouillot et al. (2013).
 }
 \examples{
-comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRUE)
-tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
+distance <- dist(c(1:5), method="euclidean")
+tree <- hclust(distance, method="average")
+uniqueness(tree = tree)
+uniqueness(distance = distance)
 uniqueness(comm, tree)
-uniqueness(comm, tree, abund = TRUE)
-uniqueness(comm, tree, abund = TRUE, relative = TRUE)
+uniqueness(comm, tree, relative = TRUE)
 }
 \references{
-Pavoine, S., Ollier, S. & Dufour, A.-B. (2005) Is the originality of a species measurable? Ecology Letters, 8: 579-586.
+Mouillot, D., Graham, N.A., Villeger, S., Mason, N.W. & Bellwood, D.R. (2013) A functional approach reveals community responses to disturbances. Trends in Ecology and Evolution, 28: 167-177.
 }

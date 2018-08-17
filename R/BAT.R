@@ -1,20 +1,17 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 1.5.6 (2017-06-27)
+#####Version 1.6.0 (2018-08-17)
 #####By Pedro Cardoso, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6, 232-236.
-#####Changed from v1.5.5:
-#####improved function sim.spatial
-
-#####BAT Stats:
-#####library("cranlogs")
-#####day <- cran_downloads(package = "BAT", from = "2014-08-19", to = "2016-08-19")
-#####group <- matrix(day$count, 10, byrow=T)
-#####plot(rowSums(group), type = "n")
-#####lines(rowSums(group))
+#####Changed from v1.5.6:
+#####added function beta.volumes
+#####added function uniqueness
+#####added the use of matrices in dispersion and originality
+#####added NA values in dispersion, originality and contribution when species not present in community
 
 #####required packages
 library("graphics")
+library("hypervolume")
 library("nls2")
 library("raster")
 library("spatstat")
@@ -22,6 +19,7 @@ library("stats")
 library("utils")
 library("vegan")
 #' @import graphics
+#' @import hypervolume
 #' @import nls2
 #' @import spatstat
 #' @import stats
@@ -881,25 +879,79 @@ beta.multi <- function(comm, tree, abund = FALSE, func = "jaccard", raref = 0, r
 	return(results)
 }
 
-#' Contribution of species or individuals to total PD or FD.
-#' @description Contribution of each species or individuals to the total PD or FD of a number of communities.
-#' @param comm A sites x species matrix, with either abundance or incidence data.
-#' @param tree An hclust or phylo object.
-#' @param abund A boolean (T/F) indicating whether contribution should be calculated per individual (T) or species (F). If not specified, default is FALSE.
-#' @param relative A boolean (T/F) indicating whether contribution should be relative to total PD or FD (proportional contribution per individual or species). If False, the sum of contributions for each site is equal to total PD/FD, if True it is 1.
+#' Beta diversity partitioning using functional hypervolumes.
+#' @description Pairwise beta diversity partitioning into replacement and net difference in ampitude components of hypervolumes.
+#' @param hvlist a list of hypervolumes (one for each species or community), constructed with the hypervolume package.
+#' @param n number of points to be considered for the estimation algorithm (10000 at least, but better 100000).
+#' @details Computes a pairwise decomposition of the overall differentiation among hypervolumes into two components:
+#' the replacement (shifts) of space between hypervolumes and net differences between the amount of space enclosed by each hypervolume.
+#' @return A list with all relevant statistics including pairwise replacement and net difference in ampitude components of hypervolumes.
+#' @references Carvalho, J.C. & Cardoso, P. (2018). Decomposing the causes for niche and functional differentiation between species and communities using hypervolumes. Submitted.
+#' @export
+beta.volumes <- function (hvlist, n = 10000) {
+
+	# pairs of hypervolumes
+	commpair = combn (names(hvlist), m = 2)
+	
+	# Intersection, union and unique components 2-by-2
+	hvpair = vector("list", ncol (commpair))
+	names (hvpair) = paste (commpair[1,], "vs",commpair[2,])
+	
+	for (i in 1:ncol(commpair)) {
+		hvpair[[i]] = hypervolume_set(hvlist[[commpair[1,i]]], hvlist[[commpair[2,i]]], num.points.max = n, check.memory=FALSE) 
+	}
+	
+	# empty matrices to save results
+	hvstat = matrix (0, nrow = length(hvpair), ncol = 4)
+	hvpartD = matrix (0, nrow = length(hvpair), ncol = 4)
+	
+	for (i in 1:length(hvpair)){
+		# set operations (see eq. 1-5, Carvalho & Cardoso, 2018)
+		hvstat[i,1] = hvpair[[i]]@HVList$Union@Volume # A U B
+		hvstat[i,2] = hvpair[[i]]@HVList$Intersection@Volume # A @ B
+		hvstat[i,3] = hvpair[[i]]@HVList$Unique_1@Volume # A \ B
+		hvstat[i,4] = hvpair[[i]]@HVList$Unique_2@Volume # B \ A
+		
+		# indices: (see eq. 6-7, Carvalho & Cardoso, 2018)
+		hvpartD[i,1] = hvstat[i,2] / hvstat[i,1] # overlap
+		hvpartD[i,2] = (hvstat[i,3] +  hvstat[i,4])/ hvstat[i,1] # Dtotal: total differentiation
+		hvpartD[i,3] = 2*min(hvstat[i,3], hvstat[i,4]) / hvstat[i,1] # Drepl: differentiation due to the replacement of space
+		hvpartD[i,4] = abs(hvstat[i,3]- hvstat[i,4]) / hvstat[i,1] # Ddiff: differentiation due to differences in amplitude
+	}
+	
+	# column names
+	colnames (hvstat) = c("union", "intersection", "Unique1", "Unique2")
+	colnames (hvpartD) = c("Hoverlap", "HDtotal", "HDrepl", "HDdiff") # eq. 6-7 (Carvalho & Cardoso, 2018)
+	
+	# output
+	return(list(hvpairs = t(commpair), hvstat = hvstat, hvpartD = hvpartD))
+}
+
+
+#' Contribution of species or individuals to total phylogenetic/functional diversity.
+#' @description Contribution of each species or individual to the total PD or FD of a number of communities.
+#' @param comm A sites x species matrix, with either abundance or incidence data. If missing, the contribution of all species to the full tree is calculated.
+#' @param tree An hclust or phylo object representing a phylogenetic or functional tree.
+#' @param abund A boolean (T/F) indicating whether contribution should be calculated per individual (T) or species (F). If not specified, default is species.
+#' @param relative A boolean (T/F) indicating whether contribution should be relative to total PD or FD (proportional contribution per individual or species). If FALSE, the sum of contributions for each site is equal to total PD/FD, if TRUE it is 1.
 #' @details Contribution is equivalent to the evolutionary distinctiveness index (ED) of Isaac et al. (2007) if done by species and to the abundance weighted evolutionary distinctiveness (AED) of Cadotte et al. (2010) if done by individual.
-#' @return A matrix of sites x species values.
+#' @return A matrix of sites x species values (or values per species if no comm is given).
 #' @references Isaac, N.J.B., Turvey, S.T., Collen, B., Waterman, C. & Baillie, J.E.M. (2007) Mammals on the EDGE: conservation priorities based on threat and phylogeny. PLoS One, 2: e296.
 #' @references Cadotte, M.W., Davies, T.J., Regetz, J., Kembel, S.W., Cleland, E. & Oakley, T.H. (2010) Phylogenetic diversity metrics for ecological communities: integrating species richness, abundance and evolutionary history. Ecology Letters, 13: 96-105.
-#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRUE)
+#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
 #' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' contribution(tree = tree)
 #' contribution(comm, tree)
-#' contribution(comm, tree, FALSE)
+#' contribution(comm, tree, TRUE)
 #' contribution(comm, tree, abund = TRUE, relative = TRUE)
 #' @export
 contribution <- function(comm, tree, abund = FALSE, relative = FALSE){
+	if(missing(comm))
+		comm = rep(1, length(tree$order))
 	if(is.vector(comm))
 		comm <- matrix(comm, nrow = 1)
+	comm <- as.matrix(comm)
+
 	if(!abund)
 		comm <- ifelse(comm > 0, 1, 0)
   if (!missing(tree)){
@@ -916,107 +968,181 @@ contribution <- function(comm, tree, abund = FALSE, relative = FALSE){
   	tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
   }
 
-  comm <- as.matrix(comm)
 	contrib <- matrix(0,nrow(comm),ncol(comm))
-
   for (i in 1:nrow(comm)){											#cycle through all sites/samples
 		dataSample <- prep(comm[i,], xTree(tree), TRUE)
 		valueBranch <- dataSample$lenBranch / dataSample$sampleBranch
 		valueBranch <- ifelse(valueBranch == Inf, 0, valueBranch)
 		for (j in 1:ncol(comm)){										#cycle through all species
 			for (k in 1:nEdges){	            				#cycle through all branches
-				contrib[i,j] <- contrib[i,j] + dataSample$speciesBranch[j,k] * valueBranch[k] * comm[i,j]
+				contrib[i,j] <- contrib[i,j] + (dataSample$speciesBranch[j,k] * valueBranch[k] * comm[i,j])
 			}
 		}
-	}
-  if(abund){
-    contrib <- contrib/comm                      #so that the contribution per individual is given if it is the case
-    contrib <- ifelse(contrib == "NaN", 0, contrib)
   }
-  if(relative)
-    contrib <- apply(contrib, 2, function(x) x / alpha(comm,tree))
-	return(contrib)
+  contrib <- contrib/comm                      #so that the contribution per individual is given if it is the case
+  contrib <- ifelse(contrib == "NaN", NA, contrib)
+  if(relative){
+  	for(r in 1:nrow(comm))
+  		contrib[r,] <- contrib[r,] / c(alpha(comm[r,],tree))
+  }
+  return(contrib)
 }
 
 #' Phylogenetic/functional dispersion of species or individuals.
-#' @description Average dissimilarity between any two species or individuals randomly chosen in a community with replacement.
-#' @param comm A sites x species matrix, with either abundance or incidence data.
-#' @param tree An hclust or phylo object.
-#' @param abund A boolean (T/F) indicating whether dispersion should be calculated per individual (T) or species (F). If not specified, default is FALSE.
-#' @param relative A boolean (T/F) indicating whether dispersion should be relative to the maximum distance between any two species in the tree.
+#' @description Average dissimilarity between any two species or individuals randomly chosen in a community.
+#' @param comm A sites x species matrix, with either abundance or incidence data. If missing, the dispersion using the full tree or distance matrix is calculated.
+#' @param tree An hclust or phylo object representing a phylogenetic or functional tree. One of tree or distance must be provided.
+#' @param distance A dist object representing the phylogenetic or functional distance between species.
+#' @param abund A boolean (T/F) indicating whether dispersion should be calculated using individuals (T) or species (F). If not specified, default is species.
+#' @param relative A boolean (T/F) indicating whether dispersion should be relative to the maximum distance between any two species in the tree or distance matrix.
 #' @details If abundance data is used and a tree is given, dispersion is the quadratic entropy of Rao (1982).
-#' If abundance data is not used but a tree is given, dispersion is the phylogenetic dispersion measure of Webb et al. (2002) although with replacement.
+#' If abundance data is not used but a tree is given, dispersion is the phylogenetic dispersion measure of Webb et al. (2002).
 #' If abundance data is used but no tree is given, dispersion is 1 - Simpson's index (Simpson 1949).
-#' @return A vector of values per site.
+#' @return A vector of values per site (or a single value if no comm is given).
 #' @references Rao, C.R. (1982) Diversity and dissimilarity coefficients: a unified approach. Theoretical Population Biology, 21: 24-43.
 #' @references Simpson, E.H. (1949) Measurement of diversity. Nature 163: 688.
 #' @references Webb, C.O., Ackerly, D.D., McPeek, M.A. & Donoghue, M.J. (2002) Phylogenies and community ecology. Annual Review of Ecology and Systematics, 33: 475-505.
-#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRUE)
-#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
-#' dispersion(comm)
+#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
+#' distance <- dist(c(1:5), method="euclidean")
+#' tree <- hclust(distance, method="average")
+#' dispersion(tree = tree)
+#' dispersion(distance = distance)
 #' dispersion(comm, tree)
 #' dispersion(comm, tree, abund = TRUE)
 #' dispersion(comm, tree, abund = TRUE, relative = TRUE)
 #' @export
-dispersion <- function(comm, tree, abund = FALSE, relative = FALSE){
+dispersion <- function(comm, tree, distance, abund = FALSE, relative = FALSE){
+	if(missing(comm)){
+		if(!missing(distance))
+			comm = rep(1, attributes(distance)[1])
+		if(!missing(tree))
+			comm = rep(1, length(tree$order))
+	}
 	if(is.vector(comm))
 		comm <- matrix(comm, nrow = 1)
-	if(!abund)
-		comm <- ifelse(comm > 0, 1, 0)
-	if(missing(tree))
-		tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
-  if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-    comm <- comm[,match(tree$labels, colnames(comm))]
 
-	disp <- rep(0,nrow(comm))
-
-  unique <- uniqueness(comm, tree, abund, relative)
-  for (i in 1:nrow(comm)){  						                         #cycle through all sites/samples
-  	present <- which(comm[i,]>0)                                 #which species exist in this site
-  	proportion <- comm[i,present]/sum(comm[i,])                  #proportion incidence/abundance of species in this site
-    disp[i] <- sum(unique[i,present]*proportion)
+	original <- originality(comm, tree, distance, abund, relative)
+  disp <- rep(0,nrow(comm))
+  
+  for (r in 1:nrow(comm)){  						                         #cycle through all sites/samples
+  	present <- which(comm[r,]>0)                                 #which species exist in this site
+  	proportion <- comm[r,present]/sum(comm[r,present])           #proportion incidence/abundance of species in this site
+    disp[r] <- sum(original[r,present]*proportion)
   }
+
   return(disp)
 }
 
-#' Phylogenetic/functional uniqueness of species or individuals.
-#' @description Average dissimilarity between a species or individual and all others in a community with replacement.
-#' @param comm A sites x species matrix, with either abundance or incidence data.
-#' @param tree An hclust or phylo object.
-#' @param abund A boolean (T/F) indicating whether uniqueness should be calculated per individual (T) or species (F). If not specified, default is FALSE.
-#' @param relative A boolean (T/F) indicating whether uniqueness should be relative to the maximum distance between any two species in the tree.
-#' @details Uniqueness is the originality measure of Pavoine et al. (2005).
+#' Phylogenetic/functional originality of species or individuals.
+#' @description Average dissimilarity between a species or individual and all others in a community.
+#' @param comm A sites x species matrix, with either abundance or incidence data. If missing, the originality using the full tree or distance matrix is calculated.
+#' @param tree An hclust or phylo object representing a phylogenetic or functional tree. One of tree or distance must be provided.
+#' @param distance A dist object representing the phylogenetic or functional distance between species.
+#' @param abund A boolean (T/F) indicating whether originality should be calculated per individual (T) or species (F). If not specified, default is species.
+#' @param relative A boolean (T/F) indicating whether originality should be relative to the maximum distance between any two species in the tree or distance matrix.
+#' @details This is the originality measure of Pavoine et al. (2005) without replacement.
 #' @return A matrix of sites x species values.
 #' @references Pavoine, S., Ollier, S. & Dufour, A.-B. (2005) Is the originality of a species measurable? Ecology Letters, 8: 579-586.
-#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRUE)
-#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
-#' uniqueness(comm, tree)
-#' uniqueness(comm, tree, abund = TRUE)
-#' uniqueness(comm, tree, abund = TRUE, relative = TRUE)
+#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
+#' distance <- dist(c(1:5), method="euclidean")
+#' tree <- hclust(distance, method="average")
+#' originality(tree = tree)
+#' originality(distance = distance)
+#' originality(comm, tree)
+#' originality(comm, tree, abund = TRUE)
+#' originality(comm, tree, abund = TRUE, relative = TRUE)
 #' @export
-uniqueness <- function(comm, tree, abund = FALSE, relative = FALSE){
+originality <- function(comm, tree, distance, abund = FALSE, relative = FALSE){
+	if(missing(comm)){
+		if(!missing(distance))
+			comm = rep(1, attributes(distance)[1])
+		if(!missing(tree))
+			comm = rep(1, length(tree$order))
+	}
 	if(is.vector(comm))
 		comm <- matrix(comm, nrow = 1)
-  if(!abund)
-    comm <- ifelse(comm > 0, 1, 0)
-  if(missing(tree))
-    tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
-  if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-    comm <- comm[,match(tree$labels, colnames(comm))]
+	
+	if(!missing(tree)){
+		if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+			comm <- comm[,match(tree$labels, colnames(comm))]
+		distance <- cophenetic(tree)			     								#cophenetic distances of species
+	}else if(missing(distance)){
+		return(warning("Need one of tree or distance!"))
+	}
+	distance <- as.matrix(distance)													#convert distance to matrix
+  if(!abund){
+  	comm <- ifelse(comm > 0, 1, 0)
+  	for(i in 1:nrow(distance))
+  		distance[i,i] = NA
+  }
 
-  comm <- as.matrix(comm)
-  unique <- matrix(0,nrow(comm),ncol(comm))
-
-  for (i in 1:nrow(comm)){    					                         #cycle through all sites/samples
-    present <- which(comm[i,]>0)                                 #which species exist in this site
-    nSpp <- length(present)                                      #how many species are present in this site
-    proportion <- comm[i,present]/sum(comm[i,])                  #proportion incidence/abundance of species in this site
-    distance <- as.matrix(cophenetic(tree))[present,present]     #cophenetic distances of species in this site
-    for (r in 1:nSpp)
-      unique[i,present[r]] <- sum(sum(distance[r,] * proportion))
+  original <- matrix(NA,nrow(comm),ncol(comm))
+  for (r in 1:nrow(comm)){    					                  #cycle through all sites/samples
+    present <- which(comm[r,]>0)                          #which species exist in this site
+    nSpp <- length(present)                               #how many species are present in this site
+    proportion <- comm[r,present]/sum(comm[r,present])                  #proportion incidence/abundance of species in this site
+    for (c in present){
+    	original[r,c] <- sum(distance[present,c] * proportion, na.rm=T)
+    	if(!abund)
+    		original[r,c] <- original[r,c] * nSpp / (nSpp-1) #correct not to take distance to self into account
+    }
   }
   if(relative)
-    unique <- unique / max(cophenetic(tree))
+    original <- original / max(distance, na.rm=T)
+	return(original)
+}
+
+#' Phylogenetic/functional uniqueness of species.
+#' @description Dissimilarity between each species and the single closest in a community.
+#' @param comm A sites x species matrix, with either abundance or incidence data. If missing, the uniqueness using the full tree or distance matrix is calculated.
+#' @param tree An hclust or phylo object representing a phylogenetic or functional tree. One of tree or distance must be provided.
+#' @param distance A dist object representing the phylogenetic or functional distance between species.
+#' @param relative A boolean (T/F) indicating whether uniqueness should be relative to the maximum distance between any two species in the tree or distance matrix.
+#' @details This is equivalent to the originality measure of Mouillot et al. (2013).
+#' @return A matrix of sites x species values.
+#' @references Mouillot, D., Graham, N.A., Villeger, S., Mason, N.W. & Bellwood, D.R. (2013) A functional approach reveals community responses to disturbances. Trends in Ecology and Evolution, 28: 167-177.
+#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
+#' distance <- dist(c(1:5), method="euclidean")
+#' tree <- hclust(distance, method="average")
+#' uniqueness(tree = tree)
+#' uniqueness(distance = distance)
+#' uniqueness(comm, tree)
+#' uniqueness(comm, tree, relative = TRUE)
+#' @export
+uniqueness <- function(comm, tree, distance, relative = FALSE){
+	if(missing(comm)){
+		if(!missing(distance))
+			comm = rep(1, attributes(distance)[1])
+		if(!missing(tree))
+			comm = rep(1, length(tree$order))
+	}
+	if(is.vector(comm))
+		comm <- matrix(comm, nrow = 1)
+
+	if(!missing(tree)){
+		if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+			comm <- comm[,match(tree$labels, colnames(comm))]
+		distance <- cophenetic(tree)			     								#cophenetic distances of species
+	}else if(missing(distance)){
+		return(warning("Need one of tree or distance!"))
+	}
+	distance <- as.matrix(distance)													#convert distance to matrix
+
+	comm <- ifelse(comm > 0, 1, 0)
+	for(i in 1:nrow(distance))
+		distance[i,i] = NA
+	
+	unique <- matrix(NA,nrow(comm),ncol(comm))
+	
+	for (r in 1:nrow(comm)){    					                  #cycle through all sites/samples
+		present <- which(comm[r,]>0)                          #which species exist in this site
+		nSpp <- length(present)                               #how many species are present in this site
+		for (c in present){
+			unique[r,c] <- min(distance[present,c], na.rm=T)
+		}
+	}
+	if(relative)
+		unique <- unique / max(distance, na.rm=T)
 	return(unique)
 }
 

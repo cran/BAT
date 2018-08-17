@@ -4,8 +4,8 @@
 \alias{alpha.accum}
 \title{Alpha diversity accumulation curves (observed and estimated).}
 \usage{
-alpha.accum(comm, tree, func = "nonparametric", target = -2, runs = 100,
-  prog = TRUE)
+alpha.accum(comm, tree, func = "nonparametric", target = -2,
+  runs = 100, prog = TRUE)
 }
 \arguments{
 \item{comm}{A sampling units x species matrix, with either abundance or incidence data.}
