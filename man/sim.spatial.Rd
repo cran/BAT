@@ -4,8 +4,14 @@
 \alias{sim.spatial}
 \title{Simulation of species spatial distributions.}
 \usage{
-sim.spatial(n, s, sad = "lognormal", sd = 1,
-  distribution = "aggregated", clust = 1)
+sim.spatial(
+  n,
+  s,
+  sad = "lognormal",
+  sd = 1,
+  distribution = "aggregated",
+  clust = 1
+)
 }
 \arguments{
 \item{n}{total number of individuals.}

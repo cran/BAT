@@ -4,8 +4,15 @@
 \alias{beta.accum}
 \title{Beta diversity accumulation curves.}
 \usage{
-beta.accum(comm1, comm2, tree, abund = FALSE, func = "jaccard",
-  runs = 100, prog = TRUE)
+beta.accum(
+  comm1,
+  comm2,
+  tree,
+  abund = TRUE,
+  func = "jaccard",
+  runs = 100,
+  prog = TRUE
+)
 }
 \arguments{
 \item{comm1}{A sampling units x species matrix for the first site, with either abundance or incidence data.}
@@ -14,7 +21,7 @@ beta.accum(comm1, comm2, tree, abund = FALSE, func = "jaccard",
 
 \item{tree}{An hclust or phylo object (used only for Phylogenetic (PD) or Functional (FD) Diversity, not for Taxon Diversity (TD)).}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis. If not specified, default is FALSE.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.}
 
 \item{func}{Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used. If not specified, default is jaccard.}
 
@@ -46,8 +53,8 @@ tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 beta.accum(comm1, comm2)
 beta.accum(comm1, comm2, func = "Soerensen")
 beta.accum(comm1, comm2, tree)
-beta.accum(comm1, comm2, abund = TRUE)
-beta.accum(comm1, comm2, tree, TRUE)
+beta.accum(comm1, comm2, abund = FALSE)
+beta.accum(comm1, comm2, tree, FALSE)
 }
 \references{
 Cardoso, P., Borges, P.A.V. & Veech, J.A. (2009) Testing the performance of beta diversity measures based on incidence data: the robustness to undersampling. Diversity and Distributions, 15, 1081-1090.

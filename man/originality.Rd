@@ -4,7 +4,7 @@
 \alias{originality}
 \title{Phylogenetic/functional originality of species or individuals.}
 \usage{
-originality(comm, tree, distance, abund = FALSE, relative = FALSE)
+originality(comm, tree, distance, abund = TRUE, relative = TRUE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data. If missing, the originality using the full tree or distance matrix is calculated.}
@@ -13,7 +13,7 @@ originality(comm, tree, distance, abund = FALSE, relative = FALSE)
 
 \item{distance}{A dist object representing the phylogenetic or functional distance between species.}
 
-\item{abund}{A boolean (T/F) indicating whether originality should be calculated per individual (T) or species (F). If not specified, default is species.}
+\item{abund}{A boolean (T/F) indicating whether originality should be calculated per individual (T) or species (F).}
 
 \item{relative}{A boolean (T/F) indicating whether originality should be relative to the maximum distance between any two species in the tree or distance matrix.}
 }
@@ -33,8 +33,8 @@ tree <- hclust(distance, method="average")
 originality(tree = tree)
 originality(distance = distance)
 originality(comm, tree)
-originality(comm, tree, abund = TRUE)
-originality(comm, tree, abund = TRUE, relative = TRUE)
+originality(comm, tree, abund = FALSE)
+originality(comm, tree, abund = FALSE, relative = FALSE)
 }
 \references{
 Pavoine, S., Ollier, S. & Dufour, A.-B. (2005) Is the originality of a species measurable? Ecology Letters, 8: 579-586.

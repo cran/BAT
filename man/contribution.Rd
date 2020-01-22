@@ -4,14 +4,14 @@
 \alias{contribution}
 \title{Contribution of species or individuals to total phylogenetic/functional diversity.}
 \usage{
-contribution(comm, tree, abund = FALSE, relative = FALSE)
+contribution(comm, tree, abund = TRUE, relative = TRUE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data. If missing, the contribution of all species to the full tree is calculated.}
 
 \item{tree}{An hclust or phylo object representing a phylogenetic or functional tree.}
 
-\item{abund}{A boolean (T/F) indicating whether contribution should be calculated per individual (T) or species (F). If not specified, default is species.}
+\item{abund}{A boolean (T/F) indicating whether contribution should be calculated per individual (T) or species (F).}
 
 \item{relative}{A boolean (T/F) indicating whether contribution should be relative to total PD or FD (proportional contribution per individual or species). If FALSE, the sum of contributions for each site is equal to total PD/FD, if TRUE it is 1.}
 }
@@ -29,8 +29,8 @@ comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRU
 tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 contribution(tree = tree)
 contribution(comm, tree)
-contribution(comm, tree, TRUE)
-contribution(comm, tree, abund = TRUE, relative = TRUE)
+contribution(comm, tree, FALSE)
+contribution(comm, tree, abund = FALSE, relative = FALSE)
 }
 \references{
 Isaac, N.J.B., Turvey, S.T., Collen, B., Waterman, C. & Baillie, J.E.M. (2007) Mammals on the EDGE: conservation priorities based on threat and phylogeny. PLoS One, 2: e296.

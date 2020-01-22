@@ -4,8 +4,7 @@
 \alias{optim.beta}
 \title{Optimization of beta diversity sampling protocols.}
 \usage{
-optim.beta(comm, tree, methods, base, abund = FALSE, runs = 1000,
-  prog = TRUE)
+optim.beta(comm, tree, methods, base, abund = TRUE, runs = 1000, prog = TRUE)
 }
 \arguments{
 \item{comm}{A samples x species x sites array, with either abundance or incidence data.}
@@ -43,7 +42,7 @@ colnames(comm) <- c("sp1","sp2","sp3")
 methods <- c("Met1","Met2","Met2","Met3")
 tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 optim.beta(comm, methods = methods, runs = 100)
-optim.beta(comm, tree, methods = methods, abund = TRUE, base = c(0,0,1), runs = 100)
+optim.beta(comm, tree, methods = methods, abund = FALSE, base = c(0,0,1), runs = 100)
 }
 \references{
 Cardoso, P. (2009) Standardization and optimization of arthropod inventories - the case of Iberian spiders. Biodiversity and Conservation, 18, 3949-3962.

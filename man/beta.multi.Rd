@@ -4,15 +4,14 @@
 \alias{beta.multi}
 \title{Beta diversity among multiple communities.}
 \usage{
-beta.multi(comm, tree, abund = FALSE, func = "jaccard", raref = 0,
-  runs = 100)
+beta.multi(comm, tree, abund = TRUE, func = "jaccard", raref = 0, runs = 100)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data.}
 
 \item{tree}{An hclust or phylo object (used only for Phylogenetic (PD) or Functional (FD) Diversity, not for Taxon Diversity (TD)).}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.  If not specified, default is FALSE.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.}
 
 \item{func}{Indicates whether the Jaccard or Soerensen family of beta diversity measures should be used. If not specified, default is jaccard.}
 
@@ -47,7 +46,7 @@ beta.multi(comm)
 beta.multi(comm, func = "Soerensen")
 beta.multi(comm, tree)
 beta.multi(comm, raref = 1)
-beta.multi(comm, tree, TRUE, "s", raref = 2)
+beta.multi(comm, tree, FALSE, "s", raref = 2)
 }
 \references{
 Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.

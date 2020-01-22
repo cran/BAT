@@ -4,7 +4,7 @@
 \alias{uniqueness}
 \title{Phylogenetic/functional uniqueness of species.}
 \usage{
-uniqueness(comm, tree, distance, relative = FALSE)
+uniqueness(comm, tree, distance, relative = TRUE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data. If missing, the uniqueness using the full tree or distance matrix is calculated.}
@@ -31,7 +31,6 @@ tree <- hclust(distance, method="average")
 uniqueness(tree = tree)
 uniqueness(distance = distance)
 uniqueness(comm, tree)
-uniqueness(comm, tree, relative = TRUE)
 }
 \references{
 Mouillot, D., Graham, N.A., Villeger, S., Mason, N.W. & Bellwood, D.R. (2013) A functional approach reveals community responses to disturbances. Trends in Ecology and Evolution, 28: 167-177.
