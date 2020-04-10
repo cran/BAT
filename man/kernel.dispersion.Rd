@@ -2,29 +2,43 @@
 % Please edit documentation in R/BAT.R
 \name{kernel.dispersion}
 \alias{kernel.dispersion}
-\title{Functional dispersion of a kernel density hypervolume representing a given community.}
+\title{Functional dispersion of a n-dimensional hypervolume representing a given community.}
 \usage{
-kernel.dispersion(comm, trait, method = "box", abund = FALSE, frac = 0.1)
+kernel.dispersion(
+  comm,
+  trait,
+  method = "gaussian",
+  func = "divergence",
+  abund = FALSE,
+  frac = 0.1,
+  ...
+)
 }
 \arguments{
-\item{comm}{A hypervolume object or a list of hypervolume objects (one for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community.}
+\item{comm}{A 'Hypervolume' object or a 'HypervolumeList' object (one for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community.}
 
 \item{trait}{A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.}
 
-\item{method}{Method for constructing the hypervolume. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume package for details. Must be provided only if 'comm' is a sites x species matrix.}
+\item{method}{Method for constructing the 'Hypervolume'. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis. If not specified, default is FALSE. Ignored if a Hypervolume or HypervolumeList is provided as input data.}
+\item{func}{Function for calculating dispersion. One of 'divergence' or 'dissimilarity'.}
+
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a Hypervolume or HypervolumeList is provided as input data.}
 
 \item{frac}{A value between 0.01 and 1, indicating the fraction of random points to be used. Default is 0.1.}
+
+\item{...}{further arguments to be passed for other methods in hypervolume package.}
 }
 \value{
 A vector of dispersion values for each site.
 }
 \description{
-Average dissimilarity between any two random points within the boundaries of the kernel density hypervolume.
+Average distance to centroid or dissimilarity between random points within the boundaries of the kernel density hypervolume.
 }
 \details{
-Increase frac for less deviation in the estimation.
+This function calculates either the average distance between stochastic points within the kernel density hypervolume and the centroid of these points (divergence; Laliberte & Legendre, 2010; see also Carmona et al., 2019) or the average distance between all points (dissimilarity, see also function BAT::dispersion).
+The number of stochastic points is controlled by the 'frac' parameter (increase this number for less deviation in the estimation).
+If abundance data of species in the community are provided as input data (abund = TRUE), each species trait is weighted by replicating it by the abundance in the estimation of the hypervolume.
 }
 \examples{
 comm <- rbind(c(0,3,2,1), c(1,5,6,2), c(0,0,2,1))
@@ -36,11 +50,15 @@ rownames(trait) = c("Sp_1", "Sp_2", "Sp_3", "Sp_4")
 colnames(trait) = c("Trait_1", "Trait_2", "Trait_3")
 
 #Example with community and trait matrices as input data
-#kernel.dispersion(comm = comm, trait = trait, method = "box")
+#kernel.dispersion(comm = comm, trait = trait)
 
-#Example with hypervolume as input data
-#kernel.dispersion(hypervolume_box(trait))
+#Example with hypervolume as input data and the dissimilarity method
+#kernel.dispersion(hypervolume_gaussian(trait), func = 'dissimilarity')
 }
 \references{
-Mammola, S., & Cardoso, P. (Submitted). New functions for calculating functional diversity metrics using kernel density n-dimensional hypervolumes.
+Carmona, C.P., de Bello, F., Mason, N.W.H. & Leps, J. (2019) Trait probability density (TPD): measuring functional diversity across scales based on TPD with R. Ecology 100: e02876.
+
+Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. bioRxiv, https://doi.org/10.1101/2020.01.25.919373
+
+Laliberte, E. & Legendre, P. (2010) A distance-based framework for measuring functional diversity from multiple traits. Ecology 91: 299-305.
 }

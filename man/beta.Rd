@@ -4,16 +4,16 @@
 \alias{beta}
 \title{Beta diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).}
 \usage{
-beta(comm, tree, abund = TRUE, func = "jaccard", raref = 0, runs = 100)
+beta(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 100)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data.}
 
 \item{tree}{An hclust or phylo object (used only for PD or FD).}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.}
-
 \item{func}{Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is Jaccard.}
+
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.}
 
 \item{raref}{An integer specifying the number of individuals for rarefaction (individual based).
 If raref < 1 no rarefaction is made.
@@ -45,7 +45,7 @@ beta(comm)
 beta(comm, func = "Soerensen")
 beta(comm, tree)
 beta(comm, raref = 1)
-beta(comm, tree, abund = FALSE, "s", raref = 2)
+beta(comm, tree, "s", abund = FALSE, raref = 2)
 }
 \references{
 Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.

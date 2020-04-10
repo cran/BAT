@@ -11,7 +11,7 @@ contribution(comm, tree, abund = TRUE, relative = TRUE)
 
 \item{tree}{An hclust or phylo object representing a phylogenetic or functional tree.}
 
-\item{abund}{A boolean (T/F) indicating whether contribution should be calculated per individual (T) or species (F).}
+\item{abund}{A boolean (T/F) indicating whether contribution should be weighted by abundance of each species.}
 
 \item{relative}{A boolean (T/F) indicating whether contribution should be relative to total PD or FD (proportional contribution per individual or species). If FALSE, the sum of contributions for each site is equal to total PD/FD, if TRUE it is 1.}
 }

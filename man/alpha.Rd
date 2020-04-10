@@ -23,7 +23,7 @@ If not specified, default is 0.}
 A matrix of sites x diversity values (either "Obs" OR "Median, Min, LowerCL, UpperCL and Max").
 }
 \description{
-Observed alpha diversity with possible rarefaction, multiple sites simultaneously.
+Observed richness with possible rarefaction, multiple sites simultaneously.
 }
 \details{
 TD is equivalent to species richness. Calculations of PD and FD are based on Faith (1992) and Petchey & Gaston (2002, 2006), which measure PD and FD of a community as the total branch length of a tree linking all species represented in such community.

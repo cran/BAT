@@ -4,7 +4,9 @@
 \name{arrabida}
 \alias{arrabida}
 \title{Sample data of spiders in Arrabida (Portugal)}
-\format{A data frame with 320 sampling units (rows) and 338 species (variables).}
+\format{
+A data frame with 320 sampling units (rows) and 338 species (variables).
+}
 \usage{
 data(arrabida)
 }

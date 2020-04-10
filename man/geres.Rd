@@ -4,7 +4,9 @@
 \name{geres}
 \alias{geres}
 \title{Sample data of spiders in Geres (Portugal)}
-\format{A data frame with 320 sampling untis (rows) and 338 species (variables).}
+\format{
+A data frame with 320 sampling untis (rows) and 338 species (variables).
+}
 \usage{
 data(geres)
 }

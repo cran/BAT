@@ -15,7 +15,7 @@ optim.beta(comm, tree, methods, base, abund = TRUE, runs = 1000, prog = TRUE)
 
 \item{base}{Allows defining a base mandatory protocol from which to build upon (complementarity analysis). It should be a vector with length = number of methods.}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis.}
 
 \item{runs}{Number of random permutations to be made to the sample order. Default is 1000.}
 

@@ -4,7 +4,14 @@
 \alias{raster.evenness}
 \title{Maps of phylogenetic/functional evenness of species or individuals.}
 \usage{
-raster.evenness(layers, tree, distance, abund = TRUE)
+raster.evenness(
+  layers,
+  tree,
+  distance,
+  method = "expected",
+  func = "camargo",
+  abund = TRUE
+)
 }
 \arguments{
 \item{layers}{A Raster* object of species distributions (typically a multi-layer type: RasterStack or RasterBrick).}
@@ -12,6 +19,10 @@ raster.evenness(layers, tree, distance, abund = TRUE)
 \item{tree}{An hclust or phylo object representing a phylogenetic or functional tree. One of tree or distance must be provided.}
 
 \item{distance}{A dist object representing the phylogenetic or functional distance between species.}
+
+\item{method}{Calculate dispersion using "expected" values (default) or values based on "contribution" of species to the tree.}
+
+\item{func}{Calculate dispersion using "Camargo" (default) or "Bulla" index.}
 
 \item{abund}{A boolean (T/F) indicating whether evenness should be calculated using abundance data.}
 }

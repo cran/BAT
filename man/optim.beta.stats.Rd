@@ -15,7 +15,7 @@ optim.beta.stats(comm, tree, methods, samples, abund = TRUE, runs = 1000)
 
 \item{samples}{The combination of samples per method we want to test. It should be a vector with length = number of methods.}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis.}
 
 \item{runs}{Number of random permutations to be made to the sample order. Default is 1000.}
 }

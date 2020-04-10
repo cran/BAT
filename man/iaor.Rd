@@ -27,7 +27,7 @@ iaor(comm)
 \references{
 Brown, J.H. (1984) On the relationship between abundance and distribution of species. American Naturalist, 124: 255-279.
 
-Cardoso, P., Borges, P.A.V., Carvalho, J.C., Rigal, F., Gabriel, R., Cascalho, J. & Correia, L. (subm.) Automated discovery of relationships, models and principles in ecology. Pre-print available from bioRxiv doi: http://dx.doi.org/10.1101/027839
+Cardoso, P., Borges, P.A.V., Carvalho, J.C., Rigal, F., Gabriel, R., Mammola, S., Cascalho, J. & Correia, L. (subm.) Automated discovery of relationships, models and principles in ecology. Pre-print available from bioRxiv doi: http://dx.doi.org/10.1101/027839
 
 He, F.L. & Gaston, K.J. (2000) Estimating species abundance from occurrence. American Naturalist, 156: 553-559.
 

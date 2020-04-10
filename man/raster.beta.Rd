@@ -4,18 +4,18 @@
 \alias{raster.beta}
 \title{Maps of beta diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).}
 \usage{
-raster.beta(layers, tree, abund = FALSE, func = "jaccard", neighbour = 8)
+raster.beta(layers, tree, func = "jaccard", neighbour = 8, abund = FALSE)
 }
 \arguments{
 \item{layers}{A Raster* object of species distributions (typically a multi-layer type: RasterStack or RasterBrick).}
 
 \item{tree}{An hclust or phylo object (used only for PD or FD).}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis.}
-
 \item{func}{Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used. If not specified, default is Jaccard.}
 
 \item{neighbour}{Either 8 (default) or 4 cells considered to calculate beta diversiy of each focal cell.}
+
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis.}
 }
 \value{
 A raster.stack object representing Btotal, Brepl and Brich in space.

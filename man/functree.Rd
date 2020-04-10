@@ -4,7 +4,9 @@
 \name{functree}
 \alias{functree}
 \title{Functional tree for 338 species of spiders}
-\format{An hclust object with 338 species.}
+\format{
+An hclust object with 338 species.
+}
 \usage{
 data(functree)
 }

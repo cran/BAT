@@ -4,7 +4,9 @@
 \name{guadiana}
 \alias{guadiana}
 \title{Sample data of spiders in Guadiana (Portugal)}
-\format{A data frame with 192 sampling units (rows) and 338 species (variables).}
+\format{
+A data frame with 192 sampling units (rows) and 338 species (variables).
+}
 \usage{
 data(guadiana)
 }

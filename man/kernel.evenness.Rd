@@ -2,44 +2,52 @@
 % Please edit documentation in R/BAT.R
 \name{kernel.evenness}
 \alias{kernel.evenness}
-\title{Functional evenness of species or individuals in a kernel density hypervolume representing a given community.}
+\title{Functional evenness of a n-dimensional hypervolume representing a given community.}
 \usage{
-kernel.evenness(comm, trait, method = "box", abund = FALSE)
+kernel.evenness(comm, trait, method = "gaussian", abund = FALSE, ...)
 }
 \arguments{
-\item{comm}{A hypervolume object or a list of hypervolume objects (one for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community.}
+\item{comm}{A 'Hypervolume' object or a 'HypervolumeList' object (one for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community.}
 
 \item{trait}{A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.}
 
-\item{method}{Method for constructing the hypervolume. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume package for details. Must be provided only if 'comm' is a sites x species matrix.}
+\item{method}{Method for constructing the 'Hypervolume' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used or converted to incidence before analysis. If not specified, default is FALSE. Ignored if a Hypervolume or HypervolumeList is provided as input data.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a Hypervolume or HypervolumeList is provided as input data.}
+
+\item{...}{further arguments to be passed for other methods in hypervolume package.}
 }
 \value{
 A vector of evenness values for each site.
 }
 \description{
-Functional evenness of a community, measuring the regularity of functional elements distribution within the total functional space.
+Functional evenness of a community, measuring the regularity of stochastic points distribution within the total functional space.
 }
 \details{
-Evenness is calculated as the overlap between the observed hypervolume and an imaginary hypervolume where traits and abundances are evenly distributed within the range of their values (Carmona et al., 2016).
+This function measures the functional evenness (Mason et al., 2005) of a n-dimensional hypervolume, namely the regularity of stochastic points distribution within the total trait space (Mammola & Cardoso, 2020).
+Evenness is calculated as the overlap between the observed hypervolume and a theoretical hypervolume where traits and abundances are evenly distributed within the range of their values (Carmona et al., 2016, 2019).
+If abundance data of species in the community are provided as input data (abund = TRUE), each species trait is weighted by replicating it by the abundance in the estimation of the hypervolume.
 }
 \examples{
 comm <- rbind(c(0,3,2,1), c(1,5,6,2), c(0,0,2,1))
-rownames(comm) = c("Community_1","Community_2","Community_3")
-colnames(comm) = c("Sp_1","Sp_2","Sp_3","Sp_4")
+rownames(comm) <- c("Community_1","Community_2","Community_3")
+colnames(comm) <- c("Sp_1","Sp_2","Sp_3","Sp_4")
 trait <- cbind(c(2.2,4.4,6.1,8.3),c(0.5,1,0.5,0.4),c(0.7,1.2,0.5,0.4))
-rownames(trait) = c("Sp_1","Sp_2","Sp_3","Sp_4")
-colnames(trait) = c("Trait_1","Trait_2","Trait_3")
+rownames(trait) <- c("Sp_1","Sp_2","Sp_3","Sp_4")
+colnames(trait) <- c("Trait_1","Trait_2","Trait_3")
 
 #Example with community and trait matrices as input data
-#kernel.evenness(comm = comm, trait = trait, method = "box")
+#kernel.evenness(comm = comm, trait = trait)
 
 #Example with hypervolume as input data
-#kernel.evenness(hypervolume_box(trait))
+#kernel.evenness(hypervolume_gaussian(trait))
 }
 \references{
-Mammola, S., & Cardoso, P. (Submitted). New functions for calculating functional diversity metrics using kernel density n-dimensional hypervolumes.
+Carmona, C.P., de Bello, F., Mason, N.W.H. & Leps, J. (2016) Traits without borders: integrating functional diversity across scales. Trends in Ecology and Evolution 31: 382-394.
 
-Carmona, C. P., de Bello, F., Mason, N. W.H., Lepš, J. (2016). Traits without borders: Integrating functional diversity across scales. Trends in Ecology and Evolution 31: 382-394.
+Carmona, C.P., de Bello, F., Mason, N.W.H. & Leps, J. (2019) Trait probability density (TPD): measuring functional diversity across scales based on TPD with R. Ecology 100: e02876.
+
+Mason, N.W.H., Mouillot, D., Lee, W.G. & Wilson, J.B. (2005) Functional richness, functional evenness and functional divergence: the primary components of functional diversity. Oikos 111: 112-118.
+
+Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. bioRxiv, https://doi.org/10.1101/2020.01.25.919373
 }
