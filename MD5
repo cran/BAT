@@ -1,6 +1,6 @@
-9bb721015b5b108fe5aeaa3c60df504d *DESCRIPTION
-34ac24bb053cc22fd33fd24929de9d60 *NAMESPACE
-5cc360a31ef3a8b87e69e14a17befdda *R/BAT.R
+f8d2ae5a934e525f7db4259c21805882 *DESCRIPTION
+1545a26e23a251164905feb8d3fbed61 *NAMESPACE
+cf919019046e39bc12fada5384b10a61 *R/BAT.R
 dcaed1578113ec8d3e2f349487e7fffc *data/arrabida.rda
 dd86dc6c6bea68a3b8ff605352919747 *data/functree.rda
 8beb17284bf3e4069b3dd1105cf8f269 *data/geres.rda
@@ -15,6 +15,7 @@ ea38ff271114e67c70898f75f5aa78a4 *man/arrabida.Rd
 c3c604034c5e6b83605d75a05f43f177 *man/beta.accum.Rd
 378e72772aea18ac0758af97a95b049f *man/beta.multi.Rd
 47aec3356fe02b3337327f027125f621 *man/contribution.Rd
+edc99ecc91b807db225bcdde5ee10260 *man/cwm.Rd
 4af9d876d61d1794dbbc020f2110d3b5 *man/dispersion.Rd
 38308e8041ba49b9de7a756612368d13 *man/evenness.Rd
 5d5b7be3c63641ceb032a86e39646d0e *man/functree.Rd
@@ -30,10 +31,10 @@ cd6ea5f62fd4b6a19e8a139f6c1c58ed *man/kernel.evenness.Rd
 f5e4e2343c68766c6c791e7bed9b0cda *man/kernel.originality.Rd
 529dbe24110821ef364ad04d86311133 *man/kernel.similarity.Rd
 bd80085f96feaa1210f8d5adc5874749 *man/linnean.Rd
-cb682bf7e508547045055108c2270130 *man/optim.alpha.Rd
-886bc943f714d88f452d5cebf3c090d6 *man/optim.alpha.stats.Rd
-3fadb8d4a104fdbe9bf20bfec8d97982 *man/optim.beta.Rd
-096e1ef7efae60fbbee653451a68e2f1 *man/optim.beta.stats.Rd
+7d53e10ba6b6c816c40b8a719d31d9e3 *man/optim.alpha.Rd
+fdf984f194fd3e7dc89bc7b74dc6fdb3 *man/optim.alpha.stats.Rd
+eaaed213e629b34b539875dc9172822e *man/optim.beta.Rd
+54c3996048d41f63c1c4d85b992e64e7 *man/optim.beta.stats.Rd
 bc4c411a214eb8c2753455a53a0f7b17 *man/optim.spatial.Rd
 7067381159b23a66a14582ba571fee9f *man/originality.Rd
 ad0dc6bdd64100eb68e87f43564fc4b0 *man/phylotree.Rd

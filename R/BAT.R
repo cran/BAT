@@ -1,16 +1,12 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.0.1 (2020-04-10)
+#####Version 2.1.0 (2020-08-12)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6, 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. bioRxiv, https://doi.org/10.1101/2020.01.25.919373
-#####Changed from v2.0.0:
-#####added Camargo index and the option to use species contribution to evenness with trees
-#####added dispersion calculated with centroid
-#####contribution can now be weighted by abundance
-#####all kernel.* functions now allow to pass additional arguments from the hypervolume package
-#####all kernel.* functions are now verbose, showing progression in calculations
-#####help files of all kernel.* functions have been expanded
+#####Changed from v2.0.1:
+#####added function cwm
+#####minor improvements in error handling throughout
 
 #####required packages
 library("graphics")
@@ -43,6 +39,34 @@ prep <- function(comm, xtree, abund = TRUE){
 	BA <- comm%*%A 												## matrix samples X branches
 	if (!abund)	BA = ifelse(BA >= 1, 1, 0)
 	return (list(lenBranch = len, sampleBranch = BA, speciesBranch = A, minBranch = minBranch))
+}
+
+clean <- function(comm, tree = NA){
+  if(is.vector(comm))
+    comm <- matrix(comm, nrow = 1)
+  comm <- as.matrix(comm)
+  if (!missing(tree)){
+    comm = reorderComm(comm, tree)
+    tree <- xTree(tree)
+  }
+  return(list(comm, tree))
+}
+
+reorderComm <- function(comm, tree = NULL){
+  if (class(tree) == "phylo"){
+    if(!is.null(tree$tip.label) && !is.null(colnames(comm))){ ##if both tree and comm have species names match and reorder species (columns) in comm
+      comm <- comm[,match(tree$tip.label, colnames(comm))]
+      if (tree$tip.label != colnames(comm))
+        warning("Species names of comm and tree do not match!")
+    }
+  } else {
+    if(!is.null(tree$labels) && !is.null(colnames(comm))){ ##if both tree and comm have species names match and reorder species (columns) in comm
+      comm <- comm[,match(tree$labels, colnames(comm))]
+      if (tree$labels != colnames(comm))
+        warning("Species names of comm and tree do not match!")
+    }
+  }
+  return(comm)
 }
 
 rarefaction <- function(comm){
@@ -278,9 +302,9 @@ list.hypervolumes = function(comm, trait, method = method, abund = FALSE, ... ) 
     rownames(trait) = paste(rep("Sp",nrow(trait)),1:nrow(trait),sep='')
   
   #check if there are communities with no species
-  comm2 = comm[rowSums(comm) > 0,]
+  comm2 = comm[rowSums(comm) > 1,]
   if(nrow(comm2) != nrow(comm))
-    warning(paste("In the site x species matrix (comm), one or more rows contain no species.\n  These rows have been removed prior to hypervolume estimation.")) 
+    warning(paste("In the site x species matrix (comm), one or more rows contain 0 or 1 species.\n  These rows have been removed prior to hypervolume estimation.")) 
   comm <- comm2
   nComm <- nrow(comm)
   
@@ -375,21 +399,15 @@ name.hypervolumes = function(hvlist){
 #' alpha(comm, tree, 2, 100)
 #' @export
 alpha <- function(comm, tree, raref = 0, runs = 100){
-
-  if(is.vector(comm))
-  	comm <- matrix(comm, nrow = 1)
-  comm <- as.matrix(comm)
-  if (!missing(tree)){
-  	if (class(tree) == "phylo"){
-  		if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-  			comm <- comm[,match(tree$tip.label, colnames(comm))]
-  	} else {
-  		if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-  			comm <- comm[,match(tree$labels, colnames(comm))]
-  	}
-    tree <- xTree(tree)
+  
+  #first organize the data
+  if(!missing(tree)){
+    cleanData = clean(comm, tree)
+    comm = cleanData[[1]]
+    tree = cleanData[[2]]
   }
-
+  
+  #now let's go for what matters
   nComm <- nrow(comm)
 	if(raref < 1){						# no rarefaction if 0 or negative
 		results <- matrix(0, nComm, 1)
@@ -479,21 +497,14 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 #' @export
 alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 100, prog = TRUE){
 
-	if(is.vector(comm))
-		comm <- matrix(comm, nrow = 1)
-	comm <- as.matrix(comm)
-	if (!missing(tree)){
-		if (class(tree) == "phylo"){
-			if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-				comm <- comm[,match(tree$tip.label, colnames(comm))]
-		} else {
-			if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-				comm <- comm[,match(tree$labels, colnames(comm))]
-		}
-		tree <- xTree(tree)
-	}
+  #first organize the data
+  if(!missing(tree)){
+    cleanData = clean(comm, tree)
+    comm = cleanData[[1]]
+    tree = cleanData[[2]]
+  }
 
-	#####function options:
+  #####function options:
 	#####nonparametric (TD/PD/FD with non-parametric estimators)
 	#####completeness (PD/FD with TD completeness correction)
 	#####curve (TD/PD/FD with curve fitting)
@@ -706,9 +717,6 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 #' @export
 alpha.estimate <- function(comm, tree, func = "nonparametric"){
 
-	if(is.vector(comm))
-		comm <- matrix(comm, nrow = 1)
-	comm <- as.matrix(comm)
 	if (max(comm) == 1)
 		stop("No estimates are possible without abundance or incidence frequency data")
 
@@ -719,17 +727,15 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
 
 	#####nonparametric (TD/PD/FD with non-parametric estimators)
 	switch(func, nonparametric = {
-		if (!missing(tree)){
-			if (class(tree) == "phylo"){
-				if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-					comm <- comm[,match(tree$tip.label, colnames(comm))]
-			} else {
-				if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-					comm <- comm[,match(tree$labels, colnames(comm))]
-			}
-			tree <- xTree(tree)
-		}
-		results <- matrix(0,0,10)
+	  #first organize the data
+	  if(!missing(tree)){
+	    cleanData = clean(comm, tree)
+	    comm = cleanData[[1]]
+	    tree = cleanData[[2]]
+	  }
+	  
+	  #now let's go for what matters
+	  results <- matrix(0,0,10)
 		for (s in 1:nrow(comm)){
 			data <- comm[s,,drop = FALSE]
 			obs <- sobs(data, tree)
@@ -748,6 +754,9 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
 
 		#####completeness (PD/FD with TD completeness correction)
 	}, completeness = {
+	  if(is.vector(comm))
+	    comm <- matrix(comm, nrow = 1)
+	  comm <- as.matrix(comm)
 		if (missing(tree))
 			stop("Completeness option not available without a tree...")
 		results <- alpha.estimate(comm, tree, "nonparametric")
@@ -800,17 +809,14 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
 #' @export
 beta <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 100){
 
-  comm <- as.matrix(comm)
-  if (!missing(tree)){
-  	if (class(tree) == "phylo"){
-  		if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-  			comm <- comm[,match(tree$tip.label, colnames(comm))]
-  	} else {
-  		if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-  			comm <- comm[,match(tree$labels, colnames(comm))]
-  	}
-  	tree <- xTree(tree)
+  #first organize the data
+  if(!missing(tree)){
+    cleanData = clean(comm, tree)
+    comm = cleanData[[1]]
+    tree = cleanData[[2]]
   }
+  
+  #now let's go for what matters
   nComm <- nrow(comm)
 
 	if(raref < 1){						# no rarefaction if 0 or negative
@@ -893,17 +899,17 @@ beta.accum <- function(comm1, comm2, tree, func = "jaccard", abund = TRUE, runs 
 		stop("Both communities should have multiple and the same number of sampling units")
   comm1 <- as.matrix(comm1)
   comm2 <- as.matrix(comm2)
-  if (!missing(tree)){
-  	if (class(tree) == "phylo"){
-  		if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-  			comm <- comm[,match(tree$tip.label, colnames(comm))]
-  	} else {
-  		if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-  			comm <- comm[,match(tree$labels, colnames(comm))]
-  	}
-  	tree <- xTree(tree)
+  
+  #first organize the data
+  if(!missing(tree)){
+    cleanData = clean(comm1, tree)
+    comm1 = cleanData[[1]]
+    cleanData = clean(comm2, tree)
+    comm2 = cleanData[[1]]
+    tree = cleanData[[2]]
   }
-
+  
+  #now let's go for what matters
 	nSamples <- nrow(comm1)
 	results <- matrix(0,nSamples, 4)
 	colnames(results) <- c("Sampl", "Btotal", "Brepl", "Brich")
@@ -1003,9 +1009,8 @@ originality <- function(comm, tree, distance, abund = TRUE, relative = TRUE){
 		comm <- matrix(comm, nrow = 1)
 	
 	if(!missing(tree)){
-		if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-			comm <- comm[,match(tree$labels, colnames(comm))]
-		distance <- cophenetic(tree)			     								#cophenetic distances of species
+	  comm = reorderComm(comm, tree)
+	  distance <- cophenetic(tree)			     								#cophenetic distances of species
 	}else if(missing(distance)){
 		return(warning("Need one of tree or distance!"))
 	}
@@ -1059,9 +1064,8 @@ uniqueness <- function(comm, tree, distance, relative = TRUE){
 		comm <- matrix(comm, nrow = 1)
 	
 	if(!missing(tree)){
-		if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-			comm <- comm[,match(tree$labels, colnames(comm))]
-		distance <- cophenetic(tree)			     								#cophenetic distances of species
+	  comm = reorderComm(comm, tree)
+	  distance <- cophenetic(tree)			     								#cophenetic distances of species
 	}else if(missing(distance)){
 		return(warning("Need one of tree or distance!"))
 	}
@@ -1233,13 +1237,7 @@ evenness <- function(comm, tree, distance, method = "expected", func = "camargo"
 	comm[is.na(comm)] = 0
 	
 	if(!missing(tree)){
-		if(class(tree) == "phylo"){
-			if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-				comm <- comm[,match(tree$tip.label, colnames(comm))]
-		} else {
-			if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-				comm <- comm[,match(tree$labels, colnames(comm))]
-		}
+	  comm = reorderComm(comm, tree)
 	} else if (!missing(distance)){
 			tree = hclust(distance, method = "average")
 	} else {
@@ -1839,6 +1837,37 @@ kernel.similarity <- function(comm, trait, method = 'gaussian', abund = FALSE, r
   }
 }
 
+#' Community Weighted Mean.
+#' @description Average value of each of a series of traits in multiple communities.
+#' @param comm A sites x species matrix, with incidence or abundance data about the species in the community.
+#' @param trait A species x traits matrix, with trait values for each species in comm.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.
+#' @details Community weighted mean is used to compare communities in terms of their "typical" trait values.
+#' @return A sites x trait matrix with mean value per site.
+#' @examples comm <- matrix(c(2,5,0,0,0,1,1,0,0,0,0,1,2,0,0,0,0,0,10,1), nrow = 4, ncol = 5, byrow = TRUE)
+#' rownames(comm) = c("Site1","Site2","Site3","Site4")
+#' colnames(comm) = c("Sp1","Sp2","Sp3","Sp4","Sp5")
+#' trait <- matrix(c(1,1,0,0,0,0,2,1,0,0,0,0,2,1,0,0,0,0,2,1), nrow = 5, ncol = 4, byrow = TRUE)
+#' rownames(trait) = colnames(comm)
+#' colnames(trait) = c("Trait1","Trait2","Trait3","Trait4")
+#' cwm(comm, trait)
+#' cwm(comm, trait, FALSE)
+#' @export
+cwm <- function(comm, trait, abund = TRUE){
+  if(!abund)
+      comm[comm > 1] = 1
+  nSites = nrow(comm)
+  nTraits = ncol(trait)
+  nSp = rowSums(comm)
+  results = matrix(NA, nrow = nSites, ncol = nTraits)
+  rownames(results) = rownames(comm)
+  colnames(results) = colnames(trait)
+  for (s in 1:nSites)
+    for (t in 1:nTraits)
+      results[s, t] = sum(comm[s,] * trait[,t]) / nSp[s]
+  return(results)
+}
+
 #' Scaled mean squared error of accumulation curves.
 #' @description Accuracy (scaled mean squared error) of accumulation curves compared with a known true diversity value (target).
 #' @param accum A matrix resulting from the alpha.accum or beta.accum functions (sampling units x diversity values).
@@ -1974,32 +2003,34 @@ slope <- function(accum){
 #' optim.alpha(comm, tree, methods)
 #' optim.alpha(comm,, methods = methods, base = c(0,0,1), runs = 100)
 #' @export
-optim.alpha <- function(comm, tree, methods, base, runs = 1000, prog = TRUE){
+optim.alpha <- function(comm, tree, methods, base, runs = 0, prog = TRUE){
 
 	##preliminary stats
 	methods <- as.vector(t(methods))
-	nSamples <- length(methods)							##number of samples
+	nSamples <- length(methods)							          ##number of samples
 	metUnique <- as.vector(t(unique(methods)))				##list of methods
-	metNum <- length(metUnique)							##number of methods
-	if (missing(base))										##if no samples to start with for complementarity analysis
+	metNum <- length(metUnique)							          ##number of methods
+	if (missing(base))										            ##if no samples to start with for complementarity analysis
 		samples <- rep(0,metNum)
 	else
 		samples <- base
-	nMiss <- nSamples - sum(samples)				##number of samples missing
-	nSamplesMet <- rep(0,metNum)						##samples per method
+	nMiss <- nSamples - sum(samples)          				##number of samples missing
+	nSamplesMet <- rep(0,metNum)						          ##samples per method
 	for (m in 1:metNum)
 		nSamplesMet[m] <- sum(methods == metUnique[m])
 
 	##accumulation process
-	if (prog) pb <- txtProgressBar(max = nMiss+1, style = 3)
-	div <- rep(0,nMiss+1)										##diversity along the optimal accumulation curve
+	if (prog)
+	  pb <- txtProgressBar(max = nMiss + 1, style = 3)
+	div <- rep(0, nMiss + 1)									      	##diversity along the optimal accumulation curve
 	if (sum(samples) > 0)
 		div[1] <- optim.alpha.stats(comm, tree, methods, samples, runs)
-	if (prog) setTxtProgressBar(pb, 1)
+	if (prog)
+	  setTxtProgressBar(pb, 1)
 	for (s in 2:(nMiss+1)){
 		samples <- rbind (samples, rep(0,metNum))
 		samples[s,] <- samples[s-1,]
-		metValue <- rep(0, metNum)										#diversity when adding each method
+		metValue <- rep(0, metNum)										  #diversity when adding each method
 		for (m in 1:metNum){
 			if (samples[s,m] < nSamplesMet[m]){
 				samples[s,m] <- samples[s,m] + 1
@@ -2010,7 +2041,7 @@ optim.alpha <- function(comm, tree, methods, base, runs = 1000, prog = TRUE){
 		div[s] <- max(metValue)
 		best <- which(metValue == div[s])
 		if (length(best) > 1)
-			best = best[sample(1:length(best),1)]						#if tie, choose one of the best methods randomly
+			best = best[sample(1:length(best),1)]					#if tie, choose one of the best methods randomly
 		samples[s, best] <- samples[s, best] + 1
 		if (prog) setTxtProgressBar(pb, s)
 	}
@@ -2041,47 +2072,41 @@ optim.alpha <- function(comm, tree, methods, base, runs = 1000, prog = TRUE){
 #' optim.alpha.stats(comm,,methods, c(1,1,1))
 #' optim.alpha.stats(comm, tree, methods = methods, samples = c(0,0,1), runs = 100)
 #' @export
-optim.alpha.stats <- function(comm, tree, methods, samples, runs = 1000){
+optim.alpha.stats <- function(comm, tree, methods, samples, runs = 0){
 
 	##preliminary stats
 	if (!missing(tree)){
-		if (class(tree) == "phylo"){
-			if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-				comm <- comm[,match(tree$tip.label, colnames(comm))]
-		} else {
-			if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-				comm <- comm[,match(tree$labels, colnames(comm))]
-		}
-		tree <- xTree(tree)
+	  comm = reorderComm(comm, tree)
+	  tree <- xTree(tree)
 	}
-	if(length(dim(comm)) == 3)					##number of sites
+	if(length(dim(comm)) == 3)					                          ##number of sites
 		nSites <- dim(comm)[3]
 	else
 		nSites <- 1
 	methods <- as.vector(t(methods))
-	metUnique <- as.vector(t(unique(methods)))				##list of methods
-	metNum <- length(metUnique)					##number of methods
-	div <- 0														##average diversity obtained using this particular combination of samples per method
+	metUnique <- as.vector(t(unique(methods)))				            ##list of methods
+	metNum <- length(metUnique)					                          ##number of methods
+	div <- 0														                          ##average diversity obtained using this particular combination of samples per method
 
 	for (i in 1:nSites){
 		if (nSites > 1){
 			site <- as.matrix(comm[,,i])
-			true <- sobs(site, tree) 				##true diversity of each site
+			true <- sobs(site, tree) 			                          	##true diversity of each site
 		} else {
 			site <- as.matrix(comm)
 			true <- 1
 		}
-
-		for (r in 1:runs){
-			addSample <- rep(0, ncol(comm))
-			for (m in 1:metNum){
-				if (samples[m] > 0){
-					filterList <- site[which(methods == metUnique[m]),,drop=F]						##filter by method m
-					filterList <- filterList[sample(nrow(filterList),samples[m]),,drop=F]	##randomly select rows
-					addSample <- rbind(addSample, filterList)															##add random samples
-				}
-			}
-			div <- div + sobs(addSample, tree) / runs / nSites / true
+	  
+    for (r in 1:runs){
+		 	addSample <- rep(0, ncol(comm))
+		 	for (m in 1:metNum){
+		 		if (samples[m] > 0){
+		 			filterList <- site[which(methods == metUnique[m]),,drop=F]						##filter by method m
+		 			filterList <- filterList[sample(nrow(filterList),samples[m]),,drop=F]	##randomly select rows
+		 			addSample <- rbind(addSample, filterList)															##add random samples
+		 		}
+		 	}
+		 	div <- div + sobs(addSample, tree) / runs / nSites / true
 		}
 	}
 	return(div)
@@ -2115,20 +2140,20 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 1000){
 #' optim.beta(comm, methods = methods, runs = 100)
 #' optim.beta(comm, tree, methods = methods, abund = FALSE, base = c(0,0,1), runs = 100)
 #' @export
-optim.beta <- function(comm, tree, methods, base, abund = TRUE, runs = 1000, prog = TRUE){
+optim.beta <- function(comm, tree, methods, base, abund = TRUE, runs = 0, prog = TRUE){
 
 	##preliminary stats
 	methods <- as.vector(t(methods))
-	nSamples <- length(methods)							##number of samples
+	nSamples <- length(methods)							          ##number of samples
 	metUnique <- as.vector(t(unique(methods)))				##list of methods
-	metNum <- length(metUnique)							##number of methods
+	metNum <- length(metUnique)						          	##number of methods
 
-	if (missing(base))										##if no samples to start with
+	if (missing(base))										            ##if no samples to start with
 		samples <- rep(0,metNum)
 	else
 		samples <- base
-	nMiss <- nSamples - sum(samples)				##number of samples missing
-	nSamplesMet <- rep (0, metNum)					##samples per method
+	nMiss <- nSamples - sum(samples)				          ##number of samples missing
+	nSamplesMet <- rep (0, metNum)					          ##samples per method
 	for (m in 1:metNum)
 		nSamplesMet[m] <- sum(methods == metUnique[m])
 
@@ -2142,7 +2167,7 @@ optim.beta <- function(comm, tree, methods, base, abund = TRUE, runs = 1000, pro
 	for (s in 2:(nMiss+1)){
 	  samples <- rbind (samples, rep(0,metNum))
 		samples[s,] <- samples[s-1,]
-		metValue <- rep(1, metNum)										#absolute difference when adding each method
+		metValue <- rep(1, metNum)										  #absolute difference when adding each method
 		for (m in 1:metNum){
 			if (samples[s,m] < nSamplesMet[m]){
 				samples[s,m] <- samples[s,m] + 1
@@ -2153,7 +2178,7 @@ optim.beta <- function(comm, tree, methods, base, abund = TRUE, runs = 1000, pro
 		diff[s] <- min(metValue)
 		best <- which(metValue == diff[s])
 		if (length(best) > 1)
-			best = best[sample(1:length(best),1)]						#if tie, choose one of the best methods randomly
+			best = best[sample(1:length(best),1)]					#if tie, choose one of the best methods randomly
 		samples[s, best] <- samples[s, best] + 1
 		if (prog) setTxtProgressBar(pb, s)
 	}
@@ -2186,10 +2211,10 @@ optim.beta <- function(comm, tree, methods, base, abund = TRUE, runs = 1000, pro
 #' optim.beta.stats(comm,,methods, c(1,1,1))
 #' optim.beta.stats(comm, tree, methods = methods, samples = c(0,0,1), runs = 100)
 #' @export
-optim.beta.stats <- function(comm, tree, methods, samples, abund = TRUE, runs = 1000){
+optim.beta.stats <- function(comm, tree, methods, samples, abund = TRUE, runs = 0){
 
 	##preliminary stats
-	if(length(dim(comm)) == 3){					##number of sites
+	if(length(dim(comm)) == 3){					              ##number of sites
 		nSites <- dim(comm)[3]
 	}else{
 		message("Need sample data from at least two sites to perform analyses.")
@@ -2197,12 +2222,12 @@ optim.beta.stats <- function(comm, tree, methods, samples, abund = TRUE, runs = 
 	}
 	methods <- as.vector(t(methods))
 	metUnique <- as.vector(t(unique(methods)))				##list of methods
-	metNum <- length(metUnique)					##number of methods
-	diff <- 0														##average absolute difference between observed and true diversity obtained using this particular combination of samples per method
-
-  if(!missing(tree) && !is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-    comm <- comm[,match(tree$labels, colnames(comm))]
-
+	metNum <- length(metUnique)					              ##number of methods
+	diff <- 0													              	##average absolute difference between observed and true diversity obtained using this particular combination of samples per method
+  
+	if(!missing(tree))
+  	comm = reorderComm(comm, tree)
+	
 	##calculate true beta values
 	sumComm <- matrix(0, nrow = nSites, ncol = ncol(comm))
 	for (i in 1:nSites){
@@ -2506,14 +2531,8 @@ sar <- function(comm, tree, area){
 		div = alpha(comm, tree)
 	}
 	if (!missing(tree)){
-		if (class(tree) == "phylo"){
-			if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-				comm <- comm[,match(tree$tip.label, colnames(comm))]
-		} else {
-			if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-				comm <- comm[,match(tree$labels, colnames(comm))]
-		}
-		tree <- xTree(tree)
+	  comm = reorderComm(comm, tree)
+	  tree <- xTree(tree)
 	}
 	results <- matrix(NA, 6, 7)
 	colnames(results) <- c("c", "z", "r2", "AIC", "\U0394 AIC", "AICc", "\U0394 AICc")
@@ -2580,14 +2599,8 @@ gdm <- function(comm, tree, area, time){
 		div = alpha(comm, tree)
 	}
 	if (!missing(tree)){
-		if (class(tree) == "phylo"){
-			if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-				comm <- comm[,match(tree$tip.label, colnames(comm))]
-		} else {
-			if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-				comm <- comm[,match(tree$labels, colnames(comm))]
-		}
-		tree <- xTree(tree)
+	  comm = reorderComm(comm, tree)
+	  tree <- xTree(tree)
 	}
 
 	results <- matrix(NA, 4, 9)

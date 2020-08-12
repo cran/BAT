@@ -4,7 +4,7 @@
 \alias{optim.beta}
 \title{Optimization of beta diversity sampling protocols.}
 \usage{
-optim.beta(comm, tree, methods, base, abund = TRUE, runs = 1000, prog = TRUE)
+optim.beta(comm, tree, methods, base, abund = TRUE, runs = 0, prog = TRUE)
 }
 \arguments{
 \item{comm}{A samples x species x sites array, with either abundance or incidence data.}

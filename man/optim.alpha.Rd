@@ -4,7 +4,7 @@
 \alias{optim.alpha}
 \title{Optimization of alpha diversity sampling protocols.}
 \usage{
-optim.alpha(comm, tree, methods, base, runs = 1000, prog = TRUE)
+optim.alpha(comm, tree, methods, base, runs = 0, prog = TRUE)
 }
 \arguments{
 \item{comm}{A samples x species x sites array, with either abundance or incidence data.}

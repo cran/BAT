@@ -4,7 +4,7 @@
 \alias{optim.beta.stats}
 \title{Efficiency statistics for beta-sampling.}
 \usage{
-optim.beta.stats(comm, tree, methods, samples, abund = TRUE, runs = 1000)
+optim.beta.stats(comm, tree, methods, samples, abund = TRUE, runs = 0)
 }
 \arguments{
 \item{comm}{A samples x species x sites array, with either abundance or incidence data.}

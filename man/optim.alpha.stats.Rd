@@ -4,7 +4,7 @@
 \alias{optim.alpha.stats}
 \title{Efficiency statistics for alpha-sampling.}
 \usage{
-optim.alpha.stats(comm, tree, methods, samples, runs = 1000)
+optim.alpha.stats(comm, tree, methods, samples, runs = 0)
 }
 \arguments{
 \item{comm}{A samples x species x sites array, with either abundance or incidence data.}
