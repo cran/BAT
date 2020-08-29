@@ -2217,8 +2217,7 @@ optim.beta.stats <- function(comm, tree, methods, samples, abund = TRUE, runs = 
 	if(length(dim(comm)) == 3){					              ##number of sites
 		nSites <- dim(comm)[3]
 	}else{
-		message("Need sample data from at least two sites to perform analyses.")
-		return(0)
+		return(message("Need sample data from at least two sites to perform analyses."))
 	}
 	methods <- as.vector(t(methods))
 	metUnique <- as.vector(t(unique(methods)))				##list of methods
@@ -2842,7 +2841,9 @@ sim.spatial <- function(n, s, sad = "lognormal", sd = 1, distribution = "aggrega
 							
 
 							
-						} else return
+						} else {
+						  return(message("distribution not recognized"))
+						} 
 					}
 				}
 			}
