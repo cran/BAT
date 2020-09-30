@@ -38,7 +38,7 @@ gdm(comm,tree,area,time)
 gdm(div,,area)
 }
 \references{
-Cardoso, P., Borges, P.A.V., Carvalho, J.C., Rigal, F., Gabriel, R., Cascalho, J. & Correia, L. (subm.) Automated discovery of relationships, models and principles in ecology. Pre-print available from bioRxiv doi: http://dx.doi.org/10.1101/027839
+Cardoso, P., Branco, V.V., Borges, P.A.V., Carvalho, J.C., Rigal, F., Gabriel, R., Mammola, S., Cascalho, J. & Correia, L. (subm.) Automated discovery of relationships, models and principles in ecology. Pre-print available from bioRxiv doi: http://dx.doi.org/10.1101/027839
 
 Fattorini, S. (2009) On the general dynamic model of oceanic island biogeography. Journal of Biogeography, 36: 1100-1110.
 

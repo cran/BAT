@@ -65,7 +65,7 @@ colnames(trait) <- c("Trait_1","Trait_2","Trait_3")
 
 }
 \references{
-Carvalho, J.C. & Cardoso, P. (2018) Decomposing the causes for niche differentiation between species using hypervolumes. bioRxiv, https://doi.org/10.1101/485920
+Carvalho, J.C. & Cardoso, P. (2018) Decomposing the causes for niche differentiation between species using hypervolumes. Frontiers in Ecology and Evolution, 8: 243.
 
-Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. bioRxiv, https://doi.org/10.1101/2020.01.25.919373
+Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
 }

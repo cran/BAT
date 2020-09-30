@@ -1,12 +1,12 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.1.0 (2020-08-12)
+#####Version 2.2.0 (2020-09-30)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
-#####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6, 232-236.
-#####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. bioRxiv, https://doi.org/10.1101/2020.01.25.919373
-#####Changed from v2.0.1:
-#####added function cwm
-#####minor improvements in error handling throughout
+#####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
+#####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
+#####Changed from v2.1.1:
+#####added functions cwd and cwe
+#####updated references
 
 #####required packages
 library("graphics")
@@ -1316,7 +1316,7 @@ evenness <- function(comm, tree, distance, method = "expected", func = "camargo"
 #' @return A vector of alpha diversity values for each site. If return.hv is set to TRUE, the function also returns the list of hypervolumes used to compute alpha diversity.
 #' @references Blonder, B., Lamanna, C., Violle, C. & Enquist, B.J. (2014) The n-dimensional hypervolume. Global Ecology and Biogeography, 23: 595-609.
 #' @references Blonder, B., Morrow, C.B., Maitner, B., Harris, D.J., Lamanna, C., Violle, C., ... & Kerkhoff, A.J. (2018) New approaches for delineating n-dimensional hypervolumes. Methods in Ecology and Evolution, 9: 305-319.
-#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. bioRxiv, https://doi.org/10.1101/2020.01.25.919373
+#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
 #' @examples comm <- rbind(c(0,3,2,1), c(1,5,6,2), c(0,0,2,1))
 #'rownames(comm) <- c("Community_1","Community_2","Community_3")
 #'colnames(comm) <- c("Sp_1","Sp_2","Sp_3","Sp_4")
@@ -1383,8 +1383,8 @@ kernel.alpha <- function(comm, trait, method = "gaussian", abund = FALSE, return
 #' See Carvalho & Cardoso (2018) and Mammola & Cardoso (2020) for the full formulas of beta diversity used here.
 #' If abundance data of species in the community are provided as input data (abund = TRUE), each species trait is weighted by replicating it by the abundance in the estimation of the hypervolume.
 #' @return Three pairwise distance matrices, one per each of the three beta diversity components. If return.hv is set to TRUE, the function also returns the list of hypervolumes used to compute the distance matrices.
-#' @references Carvalho, J.C. & Cardoso, P. (2018) Decomposing the causes for niche differentiation between species using hypervolumes. bioRxiv, https://doi.org/10.1101/485920
-#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. bioRxiv, https://doi.org/10.1101/2020.01.25.919373
+#' @references Carvalho, J.C. & Cardoso, P. (2018) Decomposing the causes for niche differentiation between species using hypervolumes. Frontiers in Ecology and Evolution, 8: 243.
+#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
 #' @examples comm <- rbind(c(0,3,2,1), c(1,5,6,2), c(0,0,2,1))
 #'rownames(comm) <- c("Community_1","Community_2","Community_3")
 #'colnames(comm) <- c("Sp_1","Sp_2","Sp_3","Sp_4")
@@ -1471,7 +1471,7 @@ kernel.beta = function(comm, trait, method = "gaussian", func = "jaccard", abund
 #' If abundance data of species in the community are provided as input data (abund = TRUE), each species trait is weighted by replicating it by the abundance in the estimation of the hypervolume.
 #' @return A matrix with the originality values of each species or individual in each site.
 #' @references Carmona, C.P., de Bello, F., Sasaki, T., Uchida, K. & Partel, M. (2017) Towards a common toolbox for rarity: A response to Violle et al. Trends in Ecology and Evolution, 32: 889-891. 
-#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. bioRxiv, https://doi.org/10.1101/2020.01.25.919373
+#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
 #' @references Pavoine, S., Ollier, S. & Dufour, A.-B. (2005) Is the originality of a species measurable? Ecology Letters, 8: 579-586.
 #' @references Violle, C., Thuiller, W., Mouquet, N., Munoz, F., Kraft, N.J.B., Cadotte, M.W., ... & Mouillot, D. (2017) Functional rarity: the ecology of outliers. Trends in Ecology and Evolution, 32: 356-367.
 #' @examples comm <- rbind(c(0,3,2,1), c(1,5,6,2), c(0,0,2,1))
@@ -1550,7 +1550,7 @@ kernel.originality = function(comm, trait, method = 'gaussian', abund = FALSE, f
 #' If abundance data are provided (abund = TRUE), the contribution of each observation is divided by its abundance value, thus representing the contribution of each individual.
 #' @return A matrix with the contribution values of each species or individual for each site.
 #' @references Carmona, C.P., de Bello, F., Sasaki, T., Uchida, K. & Partel, M. (2017) Towards a common toolbox for rarity: A response to Violle et al. Trends in Ecology and Evolution, 32(12): 889-891. 
-#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. bioRxiv, https://doi.org/10.1101/2020.01.25.919373
+#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
 #' @references Violle, C., Thuiller, W., Mouquet, N., Munoz, F., Kraft, N.J.B., Cadotte, M.W., ... & Mouillot, D. (2017) Functional rarity: The ecology of outliers. Trends in Ecology and Evolution, 32: 356-367.
 #' @examples comm <- rbind(c(0,3,2,1), c(1,5,6,2), c(0,0,2,1))
 #'rownames(comm) <- c("Community_1", "Community_2", "Community_3")
@@ -1625,8 +1625,8 @@ kernel.contribution = function(comm, trait, method = "gaussian", abund = FALSE, 
 #' The number of stochastic points is controlled by the 'frac' parameter (increase this number for less deviation in the estimation).
 #' If abundance data of species in the community are provided as input data (abund = TRUE), each species trait is weighted by replicating it by the abundance in the estimation of the hypervolume.
 #' @return A vector of dispersion values for each site.
-#' @references Carmona, C.P., de Bello, F., Mason, N.W.H. & Leps, J. (2019) Trait probability density (TPD): measuring functional diversity across scales based on TPD with R. Ecology 100: e02876.
-#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. bioRxiv, https://doi.org/10.1101/2020.01.25.919373
+#' @references Carmona, C.P., de Bello, F., Mason, N.W.H. & Leps, J. (2019) Trait probability density (TPD): measuring functional diversity across scales based on TPD with R. Ecology, 100: e02876.
+#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
 #' @references Laliberte, E. & Legendre, P. (2010) A distance-based framework for measuring functional diversity from multiple traits. Ecology 91: 299-305.
 #' @examples comm <- rbind(c(0,3,2,1), c(1,5,6,2), c(0,0,2,1))
 #'rownames(comm) = c("Community_1", "Community_2", "Community_3")
@@ -1696,10 +1696,10 @@ kernel.dispersion = function(comm, trait, method = 'gaussian', func = 'divergenc
 #' Evenness is calculated as the overlap between the observed hypervolume and a theoretical hypervolume where traits and abundances are evenly distributed within the range of their values (Carmona et al., 2016, 2019).
 #' If abundance data of species in the community are provided as input data (abund = TRUE), each species trait is weighted by replicating it by the abundance in the estimation of the hypervolume.
 #' @return A vector of evenness values for each site.
-#' @references Carmona, C.P., de Bello, F., Mason, N.W.H. & Leps, J. (2016) Traits without borders: integrating functional diversity across scales. Trends in Ecology and Evolution 31: 382-394.
-#' @references Carmona, C.P., de Bello, F., Mason, N.W.H. & Leps, J. (2019) Trait probability density (TPD): measuring functional diversity across scales based on TPD with R. Ecology 100: e02876.
-#' @references Mason, N.W.H., Mouillot, D., Lee, W.G. & Wilson, J.B. (2005) Functional richness, functional evenness and functional divergence: the primary components of functional diversity. Oikos 111: 112-118.
-#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. bioRxiv, https://doi.org/10.1101/2020.01.25.919373
+#' @references Carmona, C.P., de Bello, F., Mason, N.W.H. & Leps, J. (2016) Traits without borders: integrating functional diversity across scales. Trends in Ecology and Evolution, 31: 382-394.
+#' @references Carmona, C.P., de Bello, F., Mason, N.W.H. & Leps, J. (2019) Trait probability density (TPD): measuring functional diversity across scales based on TPD with R. Ecology, 100: e02876.
+#' @references Mason, N.W.H., Mouillot, D., Lee, W.G. & Wilson, J.B. (2005) Functional richness, functional evenness and functional divergence: the primary components of functional diversity. Oikos, 111: 112-118.
+#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
 #' @examples comm <- rbind(c(0,3,2,1), c(1,5,6,2), c(0,0,2,1))
 #'rownames(comm) <- c("Community_1","Community_2","Community_3")
 #'colnames(comm) <- c("Sp_1","Sp_2","Sp_3","Sp_4")
@@ -1773,7 +1773,7 @@ kernel.evenness = function(comm, trait, method = "gaussian", abund = FALSE, ...)
 #' @references Blonder, B., Lamanna, C., Violle, C. & Enquist, B.J. (2014) The n-dimensional hypervolume. Global Ecology and Biogeography, 23: 595-609.
 #' @references Blonder, B., Morrow, C.B., Maitner, B., Harris, D.J., Lamanna, C., Violle, C., ... & Kerkhoff, A.J. (2018) New approaches for delineating n-dimensional hypervolumes. Methods in Ecology and Evolution, 9: 305-319.
 #' @references Mammola, S. (2019) Assessing similarity of n-dimensional hypervolumes: Which metric to use?. Journal of Biogeography, 46: 2012-2023.
-#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. bioRxiv, https://doi.org/10.1101/2020.01.25.919373
+#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
 #' @examples comm <- rbind(c(0,3,2,1), c(1,5,6,2), c(0,0,2,1))
 #'trait <- cbind(c(2.2,4.4,6.1,8.3),c(0.5,1,0.5,0.4),c(0.7,1.2,0.5,0.4))
 #' 
@@ -1843,7 +1843,7 @@ kernel.similarity <- function(comm, trait, method = 'gaussian', abund = FALSE, r
 #' @param trait A species x traits matrix, with trait values for each species in comm.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.
 #' @details Community weighted mean is used to compare communities in terms of their "typical" trait values.
-#' @return A sites x trait matrix with mean value per site.
+#' @return A sites x trait matrix with mean value per site and trait.
 #' @examples comm <- matrix(c(2,5,0,0,0,1,1,0,0,0,0,1,2,0,0,0,0,0,10,1), nrow = 4, ncol = 5, byrow = TRUE)
 #' rownames(comm) = c("Site1","Site2","Site3","Site4")
 #' colnames(comm) = c("Sp1","Sp2","Sp3","Sp4","Sp5")
@@ -1865,6 +1865,141 @@ cwm <- function(comm, trait, abund = TRUE){
   for (s in 1:nSites)
     for (t in 1:nTraits)
       results[s, t] = sum(comm[s,] * trait[,t]) / nSp[s]
+  return(results)
+}
+
+#' Community Weighted Dispersion.
+#' @description Standard deviation value of each of a series of traits in multiple communities.
+#' @param comm A sites x species matrix, with incidence or abundance data about the species in the community.
+#' @param trait A species x traits matrix, with trait values for each species in comm.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.
+#' @details Community weighted dispersion is used to compare communities in terms of their dispersion of trait values around a mean, reflecting individual trait variability or diversity.
+#' @return A sites x trait matrix with sd value per site and trait.
+#' @examples comm <- matrix(c(2,5,0,0,0,1,1,0,0,0,0,1,2,0,0,0,0,0,10,1), nrow = 4, ncol = 5, byrow = TRUE)
+#' rownames(comm) = c("Site1","Site2","Site3","Site4")
+#' colnames(comm) = c("Sp1","Sp2","Sp3","Sp4","Sp5")
+#' trait <- matrix(c(1,1,0,0,0,0,2,1,0,0,0,0,2,1,0,0,0,0,2,1), nrow = 5, ncol = 4, byrow = TRUE)
+#' rownames(trait) = colnames(comm)
+#' colnames(trait) = c("Trait1","Trait2","Trait3","Trait4")
+#' cwd(comm, trait)
+#' cwd(comm, trait, FALSE)
+#' @export
+cwd <- function(comm, trait, abund = TRUE){
+  if(!abund)
+    comm[comm > 1] = 1
+  nSites = nrow(comm)
+  nTraits = ncol(trait)
+  nSp = rowSums(comm)     
+  results = matrix(NA, nrow = nSites, ncol = nTraits)
+  rownames(results) = rownames(comm)
+  colnames(results) = colnames(trait)
+  cwmean = cwm(comm, trait, abund)
+  for (s in 1:nSites)
+    for (t in 1:nTraits)
+      results[s, t] = (sum(comm[s,] * (trait[,t] - cwmean[s,t])^2) / nSp[s])^0.5
+  return(results)
+}
+
+#' Community Weighted Evenness.
+#' @description Evenness value of each of a series of traits in multiple communities.
+#' @param comm A sites x species matrix, with incidence or abundance data about the species in the community.
+#' @param trait A species x traits matrix, with trait values for each species in comm.
+#' @param func Calculate evenness using Camargo (1993, default) or Bulla (1994) index.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.
+#' @details Community weighted evenness is used to compare communities in terms of their evenness of trait values, reflecting trait abundance and distances between values.
+#' @return A sites x trait matrix with evenness value per site and trait.
+#' @references Bulla, L. (1994) An index of evenness and its associated diversity measure. Oikos, 70: 167-171.
+#' @references Camargo, J.A. (1993) Must dominance increase with the number of subordinate species in competitive interactions? Journal of Theoretical Biology, 161: 537-542.
+#' @examples comm <- matrix(c(1,1,1,1,0,1,1,0,0,0,0,1,2,0,0,0,0,0,10,1), nrow = 4, ncol = 5, byrow = TRUE)
+#' rownames(comm) = c("Site1","Site2","Site3","Site4")
+#' colnames(comm) = c("Sp1","Sp2","Sp3","Sp4","Sp5")
+#' trait <- matrix(c(4,1,3,4,2,2,2,1,3,3,2,0,1,4,0,0,5,5,2,1), nrow = 5, ncol = 4, byrow = TRUE)
+#' rownames(trait) = colnames(comm)
+#' colnames(trait) = c("Trait1","Trait2","Trait3","Trait4")
+#' cwe(comm, trait)
+#' cwe(comm, trait, abund = FALSE)
+#' cwe(comm, trait, "bulla")
+#' @export
+cwe <- function(comm, trait, func = "camargo", abund = TRUE){
+  if(!abund)
+    comm[comm > 1] = 1
+  nSites = nrow(comm)
+  nTraits = ncol(trait)
+  results = matrix(NA, nrow = nSites, ncol = nTraits)
+  rownames(results) = rownames(comm)
+  colnames(results) = colnames(trait)
+  
+  for (s in 1:nSites){
+    for (t in 1:nTraits){
+      
+      #clean stuff for this run
+      thisComm = comm[s,comm[s,] > 0]			                   #filter comm
+      thisTrait = trait[comm[s,] > 0,t]                      #filter trait values
+      thisComm = thisComm[order(thisTrait)]                  #order comm by trait values
+      thisTrait = thisTrait[order(thisTrait)]                #order trait by trait values
+      
+      #if any trait values are similar, merge in same "functional species"
+      i = 1
+      while(i < length(thisTrait)){
+        if(thisTrait[i] == thisTrait[i+1]){
+          thisComm[i+1] = thisComm[i] + thisComm[i+1]
+          thisComm = thisComm[-i]
+          thisTrait = thisTrait[-i]
+        } else {
+          i = i + 1
+        }
+      }
+      
+      #if only 1 functional category skip, as evenness does not make sense
+      nDist = length(thisComm) - 1                           #number of links
+      if(nDist == 0) next
+
+      #if only 2 categories use regular evenness without the functional part
+      if(nDist == 1){
+        #calculate the observed values as proportional abundance per species
+        thisObs = thisComm / sum(thisComm)
+        if(func == "bulla"){
+          thisExp = 1 / length(thisComm)
+          results[s,t] = (sum(apply(cbind(thisObs, rep(thisExp, length(thisObs))), 1, min)) - thisExp) / (1 - thisExp)
+        } else if(func == "camargo"){
+          results[s,t] = 1 - (abs(thisObs[1] - thisObs[2]))
+        }
+        next
+      }
+
+      #if more than 2 categories proceed with the functional part
+
+      #calculate distances between trait values
+      disTraits = c()                                        
+      for(i in 1:nDist)
+        disTraits[i] = thisTrait[i+1] - thisTrait[i]
+
+      #calculate the observed values as proportional abundance per species / distance
+      thisObs = c()
+      for(i in 1:nDist)											   #cycle through all distances of this site/sample
+        thisObs[i] = mean(thisComm[c(i, i+1)]) / disTraits[i]
+      thisObs = thisObs / sum(thisObs)         #sum all observations to 1
+      
+      if(func == "bulla"){
+        ##calculate the expected values as average length of distances between observations
+        thisExp = 1 / nDist
+        #calculate evenness as the sum of minimum values between observed and expected with correction from Bulla, 1994
+        results[s,t] = (sum(apply(cbind(thisObs, rep(thisExp, length(thisObs))), 1, min)) - thisExp) / (1 - thisExp)
+      } else if(func == "camargo"){
+        results[s,t] = 0
+        for(j in 1:(nDist - 1)){
+          for(k in (j + 1):nDist){
+            results[s,t] = results[s,t] + abs(thisObs[j] - thisObs[k])
+          }
+        }
+        results[s,t] = 1 - (results[s,t] / (nDist * (nDist - 1) / 2))
+
+      } else {
+        stop(sprintf("Function %s not recognized.", func))
+      }
+    }
+  }
+
   return(results)
 }
 
@@ -2574,7 +2709,7 @@ sar <- function(comm, tree, area){
 #' The first to be proposed was an extension of the exponential model (Whittaker et al. 2008), the power model extensions following shortly after (Fattorini 2009; Steinbauer et al. 2013), as was the linear model (Cardoso et al. subm.).
 #' The relationships for PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
 #' @return A matrix with the different model parameters and explanatory power.
-#' @references Cardoso, P., Borges, P.A.V., Carvalho, J.C., Rigal, F., Gabriel, R., Cascalho, J. & Correia, L. (subm.) Automated discovery of relationships, models and principles in ecology. Pre-print available from bioRxiv doi: http://dx.doi.org/10.1101/027839
+#' @references Cardoso, P., Branco, V.V., Borges, P.A.V., Carvalho, J.C., Rigal, F., Gabriel, R., Mammola, S., Cascalho, J. & Correia, L. (subm.) Automated discovery of relationships, models and principles in ecology. Pre-print available from bioRxiv doi: http://dx.doi.org/10.1101/027839
 #' @references Fattorini, S. (2009) On the general dynamic model of oceanic island biogeography. Journal of Biogeography, 36: 1100-1110.
 #' @references Steinbauer, M.J, Klara, D., Field, R., Reineking, B. & Beierkuhnlein, C. (2013) Re-evaluating the general dynamic theory of oceanic island biogeography. Frontiers of Biogeography, 5: 185-194.
 #' @references Whittaker, R.J., Triantis, K.A. & Ladle, R.J. (2008) A general dynamic theory of oceanic island biogeography. Journal of Biogeography, 35: 977-994.
@@ -2636,7 +2771,7 @@ gdm <- function(comm, tree, area, time){
 #' This function compares some of the most commonly used and theoretically or empirically suported models (Nachman 1981; He & Gaston 2000; Cardoso et al. subm.).
 #' @return A matrix with the different model parameters and explanatory power.
 #' @references Brown, J.H. (1984) On the relationship between abundance and distribution of species. American Naturalist, 124: 255-279.
-#' @references Cardoso, P., Borges, P.A.V., Carvalho, J.C., Rigal, F., Gabriel, R., Mammola, S., Cascalho, J. & Correia, L. (subm.) Automated discovery of relationships, models and principles in ecology. Pre-print available from bioRxiv doi: http://dx.doi.org/10.1101/027839
+#' @references Cardoso, P., Branco, V.V., Borges, P.A.V., Carvalho, J.C., Rigal, F., Gabriel, R., Mammola, S., Cascalho, J. & Correia, L. (subm.) Automated discovery of relationships, models and principles in ecology. Pre-print available from bioRxiv doi: http://dx.doi.org/10.1101/027839
 #' @references He, F.L. & Gaston, K.J. (2000) Estimating species abundance from occurrence. American Naturalist, 156: 553-559.
 #' @references Nachman, G. (1981) A mathematical model of the functional relationship between density and spatial distribution of a population. Journal of Animal Ecology, 50: 453-460.
 #' @examples comm <- matrix(c(4,3,2,1,5,4,3,2,3,2,1,0,6,3,0,0,0,0,0,0), nrow = 5, ncol = 4, byrow = TRUE)
