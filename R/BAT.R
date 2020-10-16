@@ -1,12 +1,14 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.2.0 (2020-09-30)
+#####Version 2.2.1 (2020-10-16)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.1.1:
-#####added functions cwd and cwe
-#####updated references
+#####Changed from v2.2.0:
+#####dummify variables in cw*
+#####changed gdm function
+#####corrected alpha.accum function
+
 
 #####required packages
 library("graphics")
@@ -280,6 +282,14 @@ raster.long <- function(layers){
 	return(long)
 }
 
+##dummify variables
+dummy <- function(trait){
+  traitNames = row.names(trait)
+  trait = dummify(trait)
+  row.names(trait) = traitNames
+  return(trait)
+}
+
 ##create list of hypervolumes
 list.hypervolumes = function(comm, trait, method = method, abund = FALSE, ... ) {
   
@@ -522,6 +532,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 			comm <- comm[sample(nrow(comm)),, drop=FALSE]			#shuffle rows (sampling units)
 			data <- matrix(0,1,ncol(comm))
 			runData <- matrix(0,nrow(comm),19)
+			colnames(data) = colnames(comm)
 			for (q in 1:nrow(comm)){
 				data <- rbind(data, comm[q,])
 				n <- sum(rowSums(data))
@@ -1854,6 +1865,7 @@ kernel.similarity <- function(comm, trait, method = 'gaussian', abund = FALSE, r
 #' cwm(comm, trait, FALSE)
 #' @export
 cwm <- function(comm, trait, abund = TRUE){
+  trait = dummy(trait)
   if(!abund)
       comm[comm > 1] = 1
   nSites = nrow(comm)
@@ -1885,6 +1897,7 @@ cwm <- function(comm, trait, abund = TRUE){
 #' cwd(comm, trait, FALSE)
 #' @export
 cwd <- function(comm, trait, abund = TRUE){
+  trait = dummy(trait)
   if(!abund)
     comm[comm > 1] = 1
   nSites = nrow(comm)
@@ -1921,6 +1934,7 @@ cwd <- function(comm, trait, abund = TRUE){
 #' cwe(comm, trait, "bulla")
 #' @export
 cwe <- function(comm, trait, func = "camargo", abund = TRUE){
+  trait = dummy(trait)
   if(!abund)
     comm[comm > 1] = 1
   nSites = nrow(comm)
@@ -2742,10 +2756,10 @@ gdm <- function(comm, tree, area, time){
 	rownames(results) <- c("Linear", "Exponential", "Power (area)", "Power (area, time)")
 	k <- 5
 	model <- list()
-	model[[1]] <- try(nls(div ~ c + z*area + x*time + y*time^2, start = data.frame(c=0, z=1, x=1, y=0)))
-	model[[2]] <- try(nls(div ~ c + z*log(area) + x*time + y*time^2, start = data.frame(c=0, z=1, x=1, y=0)))
-	model[[3]] <- try(nls(div ~ exp(c + z*log(area) + x*time + y*time^2), start = data.frame(c=0, z=1, x=1, y=0)))
-	model[[4]] <- try(nls(div ~ exp(c + z*log(area) + x*log(time) + y*log(time)^2), start = data.frame(c=0, z=1, x=1, y=0)))
+	model[[1]] <- try(nls(div ~ c + z*area + x*time + y*time^2, start = data.frame(c=1, z=1, x=1, y=0)))
+	model[[2]] <- try(nls(div ~ c + z*log(area) + x*time + y*time^2, start = data.frame(c=1, z=1, x=1, y=0)))
+	model[[3]] <- try(nls(div ~ exp(log(c) + z*log(area) + x*time + y*time^2), start = data.frame(c=1, z=1, x=1, y=0)))
+	model[[4]] <- try(nls(div ~ exp(log(c) + z*log(area) + x*log(time) + y*log(time)^2), start = data.frame(c=1, z=1, x=1, y=0)))
 	for(m in 1:length(model)){
 		results[m,1] <- coef(summary(model[[m]]))[1,1]
 		results[m,2] <- coef(summary(model[[m]]))[2,1]
