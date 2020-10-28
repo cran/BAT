@@ -4,7 +4,7 @@
 \alias{kernel.contribution}
 \title{Contribution of each observation (species or individuals) to the n-dimensional hypervolume representing a given species or community.}
 \usage{
-kernel.contribution(comm, trait, method = "gaussian", abund = FALSE, ...)
+kernel.contribution(comm, trait, method = "gaussian", abund = TRUE, ...)
 }
 \arguments{
 \item{comm}{A 'Hypervolume' object constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community. Note that the use of 'HypervolumeList' object is not implemented for this function yet.}
@@ -13,7 +13,7 @@ kernel.contribution(comm, trait, method = "gaussian", abund = FALSE, ...)
 
 \item{method}{Method for constructing the 'Hypervolume' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a Hypervolume is provided as input data.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE. Ignored if a Hypervolume is provided as input data.}
 
 \item{...}{further arguments to be passed for other methods in hypervolume package.}
 }

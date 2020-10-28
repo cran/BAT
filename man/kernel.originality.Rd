@@ -8,7 +8,7 @@ kernel.originality(
   comm,
   trait,
   method = "gaussian",
-  abund = FALSE,
+  abund = TRUE,
   frac = 0.1,
   relative = FALSE,
   ...
@@ -21,7 +21,7 @@ kernel.originality(
 
 \item{method}{Method for constructing the 'Hypervolume' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a Hypervolume is provided as input data.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE. Ignored if a Hypervolume is provided as input data.}
 
 \item{frac}{A value between 0.01 and 1, indicating the fraction of random points to be used in the estimation of originality. Default is 0.1.}
 

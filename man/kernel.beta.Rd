@@ -9,7 +9,7 @@ kernel.beta(
   trait,
   method = "gaussian",
   func = "jaccard",
-  abund = FALSE,
+  abund = TRUE,
   return.hv = FALSE,
   ...
 )
@@ -23,7 +23,7 @@ kernel.beta(
 
 \item{func}{Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is Jaccard.}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a HypervolumeList is provided as input data.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE. Ignored if a HypervolumeList is provided as input data.}
 
 \item{return.hv}{Boolean indicating whether the hypervolume objects used to calculate beta diversity should be returned (default is FALSE).}
 

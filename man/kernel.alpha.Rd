@@ -8,7 +8,7 @@ kernel.alpha(
   comm,
   trait,
   method = "gaussian",
-  abund = FALSE,
+  abund = TRUE,
   return.hv = FALSE,
   ...
 )
@@ -20,7 +20,7 @@ kernel.alpha(
 
 \item{method}{Method for constructing the 'Hypervolume' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a 'Hypervolume' or 'HypervolumeList' is provided as input data.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE. Ignored if a 'Hypervolume' or 'HypervolumeList' is provided as input data.}
 
 \item{return.hv}{Boolean indicating whether the 'Hypervolume' objects used to calculate alpha diversity should be returned (default is FALSE).}
 

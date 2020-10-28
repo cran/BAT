@@ -1,16 +1,17 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.2.1 (2020-10-16)
+#####Version 2.3.0 (2020-10-28)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.2.0:
-#####dummify variables in cw*
-#####changed gdm function
-#####corrected alpha.accum function
-
+#####Changed from v2.2.1:
+#####added functions beta.evenness and kernel.beta.evenness
+#####added functions hull.alpha, hull.beta, hull.contribution
+#####corrected gdm function
+#####corrected help file of evenness function
 
 #####required packages
+library("geometry")
 library("graphics")
 library("hypervolume")
 library("nls2")
@@ -19,6 +20,7 @@ library("spatstat")
 library("stats")
 library("utils")
 library("vegan")
+#' @import geometry
 #' @import graphics
 #' @import hypervolume
 #' @import nls2
@@ -290,6 +292,60 @@ dummy <- function(trait){
   return(trait)
 }
 
+##create list of convex hulls
+list.hull = function(comm, trait){
+  
+  #check for missing data
+  if (ncol(comm) != nrow(trait))
+    stop("Number of species in comm and trait matrices are different")
+  if (any(is.na(comm)) || any(is.na(trait)))
+    stop("The function cannot be computed with missing values. Please remove observations with missing values.")
+  
+  #convert data if needed
+  if (class(comm)[1] == "data.frame")
+    comm <- as.matrix(comm)
+  if(class(trait)[1] == "data.frame")
+    trait = as.matrix(trait)
+  
+  #rename species in comm and trait if species names are missing
+  if(is.null(colnames(comm)))
+    colnames(comm) = paste(rep("Sp",ncol(comm)),1:ncol(comm),sep='')
+  if(is.null(rownames(trait)))
+    rownames(trait) = paste(rep("Sp",nrow(trait)),1:nrow(trait),sep='')
+  
+  #check if there are communities with less then 5 species and remove them
+  comm2 = comm[rowSums(ifelse(comm>0,1,0)) >= 5,]
+  if(nrow(comm2) != nrow(comm))
+    warning(paste("In the site x species matrix (comm), one or more rows does not contain enough species for convex hull delineation.\n  These rows have been removed prior to convex hull estimation.")) 
+  
+  if(nrow(comm2) == 0)
+    stop(paste("There are no communities with enough species for convex hull delineation")) 
+  
+  comm <- comm2
+  nComm <- nrow(comm)
+  
+  hull_list <- list()
+  
+  #build the convex hull
+  for (s in 1:nComm) {
+    subComm <- trait[comm[s,]>0,]
+    hull_list[[s]] <- geometry::convhulln(subComm,options = "FA")
+    cat(paste("\nConvex hull ",as.character(s)," out of ",as.character(nComm)," has been constructed.",sep=''))
+    Sys.sleep(0.2)
+  }
+  
+  #add names to Convex hull list
+  if(!is.null(rownames(comm))){
+    names(hull_list) <- paste(rep("Hull_",nComm), as.character(1:nComm),sep='')
+    message("\nConvex hulls have been named with rownames of the site x species matrix")
+  }	else {
+    names(hull_list) <- rownames(comm)
+  }
+  
+  return(hull_list)
+  
+}
+
 ##create list of hypervolumes
 list.hypervolumes = function(comm, trait, method = method, abund = FALSE, ... ) {
   
@@ -300,9 +356,9 @@ list.hypervolumes = function(comm, trait, method = method, abund = FALSE, ... ) 
     stop("The function cannot be computed with missing values. Please remove observations with missing values.")
   
   #convert data if needed
-  if (class(comm) == "data.frame")
+  if (class(comm)[1] == "data.frame")
     comm <- as.matrix(comm)
-  if(class(trait) == "data.frame")
+  if (class(trait)[1] == "data.frame")
     trait = as.matrix(trait)
   
   #rename species in comm and trait if species names are missing
@@ -990,6 +1046,31 @@ beta.multi <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, ru
 	return(results)
 }
 
+#' Beta diversity evenness (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).
+#' @description Difference of evenness between pairs of sites.
+#' @param comm A sites x species matrix, with either abundance or incidence data.
+#' @param tree An hclust or phylo object representing a phylogenetic or functional tree.
+#' @param distance A dist or matrix object representing the phylogenetic or functional distance between species. If both tree and distance are missing, taxonomic evenness is calculated.
+#' @param method Calculate evenness using "expected" values (default) or values based on "contribution" of species to the tree.
+#' @param func Calculate evenness using "Camargo" (default) or "Bulla" index.
+#' @param abund A boolean (T/F) indicating whether evenness should be calculated using abundance data.
+#' @details This measure is simply the pairwise difference of evenness calculated based on the index of Camargo (1993) or Bulla (1994) using the values of both species abundances and edge lengths in the tree (if PD/FD).
+#' @details If no tree or distance is provided the result is the original index.
+#' @return Distance matrix between sites.
+#' @references Bulla, L. (1994) An index of evenness and its associated diversity measure. Oikos, 70: 167-171.
+#' @references Camargo, J.A. (1993) Must dominance increase with the number of subordinate species in competitive interactions? Journal of Theoretical Biology, 161: 537-542.
+#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
+#' distance <- dist(c(1:5), method = "euclidean")
+#' tree <- hclust(distance, method = "average")
+#' beta.evenness(comm)
+#' beta.evenness(comm, tree)
+#' beta.evenness(comm, tree, method = "contribution")
+#' beta.evenness(comm, tree, abund = FALSE)
+#' @export
+beta.evenness <- function(comm, tree, distance, method = "expected", func = "camargo", abund = TRUE){
+  return(dist(evenness(comm, tree, distance, method, func, abund)))
+}
+
 #' Phylogenetic/functional originality of species or individuals.
 #' @description Average dissimilarity between a species or individual and all others in a community.
 #' @param comm A sites x species matrix, with either abundance or incidence data. If missing, the originality using the full tree or distance matrix is calculated.
@@ -1216,15 +1297,15 @@ dispersion <- function(comm, tree, distance, func = "originality", abund = TRUE,
 	return(disp)
 }
 
-#' Phylogenetic/functional evenness of species or individuals.
-#' @description Regularity of distance and abundance between two species in a community.
+#' Taxonomic/phylogenetic/functional evenness of species or individuals.
+#' @description Regularity of abundances and distances (if PD/FD) between species in a community.
 #' @param comm A sites x species matrix, with either abundance or incidence data. If missing, the evenness using the full tree or distance matrix is calculated.
-#' @param tree An hclust or phylo object representing a phylogenetic or functional tree. One of tree or distance must be provided.
-#' @param distance A dist or matrix object representing the phylogenetic or functional distance between species.
-#' @param method Calculate dispersion using "expected" values (default) or values based on "contribution" of species to the tree.
-#' @param func Calculate dispersion using "Camargo" (default) or "Bulla" index.
+#' @param tree An hclust or phylo object representing a phylogenetic or functional tree.
+#' @param distance A dist or matrix object representing the phylogenetic or functional distance between species. If both tree and distance are missing, taxonomic evenness is calculated.
+#' @param method Calculate evenness using "expected" values (default) or values based on "contribution" of species to the tree.
+#' @param func Calculate evenness using "Camargo" (default) or "Bulla" index.
 #' @param abund A boolean (T/F) indicating whether evenness should be calculated using abundance data.
-#' @details Evenness is calculated based on the index of Camargo (1993) or Bulla (1994) using the values of both edge lengths in the tree and their abundance.
+#' @details Evenness is calculated based on the index of Camargo (1993) or Bulla (1994) using the values of both species abundances and edge lengths in the tree (if PD/FD).
 #' @details If no tree or distance is provided the result is the original index.
 #' @return A vector of values per site (or a single value if no comm is given).
 #' @references Bulla, L. (1994) An index of evenness and its associated diversity measure. Oikos, 70: 167-171.
@@ -1312,12 +1393,196 @@ evenness <- function(comm, tree, distance, method = "expected", func = "camargo"
 	return(evenness)
 }
 
+#' Alpha diversity using convex hulls.
+#' @description Estimation of functional richness of one or multiple sites, based on convex hull.
+#' @param comm A "convhulln" object or a sites x species matrix, with incidence data about the species in the community.
+#' @param trait A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.
+#' @param return.hull Boolean indicating whether the generated 'convhulln' objects used to calculate alpha diversity should be returned (default is FALSE).
+#' @details Estimates the functional richness (alpha FD) of one or more communities using convex hull. Note that a minimum of 4 observations for each community are needed to generate the convex hull. 
+#' Functional richness is expressed as the total volume of the convex hull. 
+#' @return A vector of alpha diversity values for each site. If return.hull is set to TRUE, the function also returns the list of convex hulls used to compute alpha diversity.
+#' @examples comm <- rbind(c(1,1,1,1,1), c(1,1,1,1,1), c(0,0,1,1,1),c(0,0,1,1,1))
+#'rownames(comm) = c("Community_1","Community_2","Community_3","Community_4")
+#'colnames(comm) = c("Sp_1","Sp_2","Sp_3","Sp_4", "Sp_5")
+#'
+#'trait <- cbind(c(2.2,4.4,6.1,8.3,3),c(0.5,1,0.5,0.4,4),c(0.7,1.2,0.5,0.4,5),c(0.7,2.2,0.5,0.3,6))
+#'rownames(trait) = c("Sp_1","Sp_2","Sp_3","Sp_4","Sp_5")
+#'colnames(trait) = c("Trait_1","Trait_2","Trait_3","Trait_4")
+#'
+#'#example with convex hull as imput
+#'hull.alpha(geometry::convhulln(trait,options = "FA"))
+#'
+#'#example with comm and trait as imput
+#'hull.alpha(comm = comm, trait = trait, return.hull = FALSE)
+#'
+#'alpha_hull <- hull.alpha(comm = comm, trait = trait, return.hull = TRUE)
+#'alpha_hull[[1]] #alpha diversity
+#'alpha_hull[[2]] #list of convex hulls
+#'@export
+hull.alpha <- function(comm, trait, return.hull = FALSE){
+  
+  #check if right data is provided
+  if (!(class(comm)[1] %in% c("convhulln", "data.frame", "matrix")))
+    stop("A convhulln or a sites x species matrix or data.frame is needed as input data.")
+  
+  #convert data if needed
+  if (class(comm)[1] == "convhulln")
+    return(comm$vol)
+  else
+    hull_list <- list.hull(comm = comm, trait = trait)
+  
+  #calculate alpha values and give them a name
+  alphaValues <- c()
+  for (i in 1:length(hull_list))
+    alphaValues <- append(alphaValues, hull_list[[i]]$vol)
+  
+  names(alphaValues) <- names(hull_list)
+  
+  #return alpha values
+  if(return.hull)
+    return(list(alphaValues, hull_list))
+  else
+    return(alphaValues)
+}
+
+#' Beta diversity partitioning using convex hulls.
+#' @description Pairwise beta diversity partitioning into replacement and net difference in amplitude components of convex hulls.
+#' @param comm A list of "convhulln" objects or a sites x species matrix, with incidence data about the species in the community.
+#' @param trait A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.
+#' @param func Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is Jaccard.
+#' @param return.hull Boolean indicating whether the convex hull objects used to calculate beta diversity should be returned (default is FALSE).
+#' @details Computes a pairwise decomposition of the overall differentiation among kernel hypervolumes into two components: the replacement (shifts) of space between hypervolumes and net differences between the amount of space enclosed by each hypervolume.
+#' The beta diversity measures used here follow the FD partitioning framework used for kernel density hypervolumes, where Btotal = Breplacement + Brichness. Beta diversity ranges from 0 (when hypervolumes are identical) to 1 (when hypervolumes are fully dissimilar).
+#' See Carvalho & Cardoso (2020) and Mammola & Cardoso (2020) for the full formulas of beta diversity used here.
+#' @return Three pairwise distance matrices, one per each of the three beta diversity components. If return.hull is set to TRUE, the function also returns the list of convex hulls used to compute the distance matrices.
+#' @references Carvalho, J.C. & Cardoso, P. (2020) Decomposing the causes for niche differentiation between species using hypervolumes. Frontiers in Ecology and Evolution. https://doi.org/10.3389/fevo.2020.00243
+#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution. https://doi.org/10.1111/2041-210X.13424
+#' @examples comm <- rbind(c(1,1,1,1,1), c(1,1,1,1,1), c(0,0,1,1,1),c(0,0,1,1,1))
+#'rownames(comm) = c("Community_1","Community_2","Community_3","Community_4")
+#'colnames(comm) = c("Sp_1","Sp_2","Sp_3","Sp_4", "Sp_5")
+#'
+#'trait <- cbind(c(2.2,4.4,6.1,8.3,3),c(0.5,1,0.5,0.4,4),c(0.7,1.2,0.5,0.4,5),c(0.7,2.2,0.5,0.3,6))
+#'rownames(trait) = c("Sp_1","Sp_2","Sp_3","Sp_4","Sp_5")
+#'colnames(trait) = c("Trait_1","Trait_2","Trait_3","Trait_4")
+#'
+#'hull.beta(comm = comm, trait = trait, return.hull = FALSE)
+#'@export
+hull.beta <- function(comm, trait, func = "jaccard", return.hull = FALSE) { 
+  
+  #check if right data is provided
+  if (!(class(comm)[1] %in% c("list", "data.frame", "matrix")))
+    stop("A list of convhulln or a sites x species matrix or data.frame is needed as input data.")
+  
+  #convert data if needed
+  if (class(comm)[1] == "list") { 
+    
+    #check that they really provided a list of convex hulls
+    if (class(comm[[1]])[1] != "convhulln") 
+      stop("A list of convhulln is needed as input data.")
+    
+    hull_list <- comm
+    
+    #renamed convex hull if needed
+    if(!is.null(rownames(hull_list))){
+      names(hull_list) <- paste(rep("Hull_",length(hull_list)), as.character(1:length(hull_list)),sep='')
+      message("\nConvex hulls have been named according to their position in the list")
+    }
+  } 
+  
+  else{ hull_list <- list.hull(comm = comm, trait = trait) }
+  
+  #create matrices to store results
+  nComm <- length(hull_list)
+  Btotal <- matrix(NA, nrow = nComm, ncol = nComm)
+  Brepl  <- matrix(NA, nrow = nComm, ncol = nComm)
+  Bdiff  <- matrix(NA, nrow = nComm, ncol = nComm)
+  
+  for (i in 1:nComm){
+    
+    for(j in i:nComm){
+      
+      intersection <- intersectn(hull_list[[i]]$p, hull_list[[j]]$p,options = "FA")$ch$vol
+      unique1  <- hull_list[[i]]$vol - intersection
+      unique2  <- hull_list[[j]]$vol - intersection
+      union <- unique1 + unique2 + intersection
+      if(tolower(substr(func, 1, 1)) == "s")
+        union <- 2 * union - unique1 - unique2
+      Btotal[j,i] <- (unique1 + unique2) / union
+      Brepl[j,i]  <- 2 * min(unique1, unique2) / union 
+      Bdiff[j,i]  <- abs(unique1 - unique2) / union 
+    }
+  }
+  
+  #tidy up things
+  rownames(Btotal) <- colnames(Btotal) <- rownames(Brepl) <- colnames(Brepl) <- rownames(Bdiff) <- colnames(Bdiff) <- names(hull_list)
+  betaValues <- list(Btotal = round(as.dist(Btotal),3), Brepl = round(as.dist(Brepl),3), Bdiff = round(as.dist(Bdiff),3))
+  
+  #return beta values
+  if(return.hull)
+    return(list(betaValues, hull_list))
+  else
+    return(betaValues)
+}
+
+#' Contribution of each observation (individuals or species) to the convex hull representing a given species or community.
+#' @description Contribution of each species or individual to the total volume of one or more convex hulls.
+#' @param comm A "convhulln" object or a sites x species matrix, with incidence data about the species in the community.
+#' @param trait A matrix of traits for each species/individuals in comm (a species/individual for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.
+#' @details The contribution of each observation (species or individual) to the total volume of a convex hull, calculated as the difference in volume between the total convex hull and a second hypervolume lacking this specific observation (i.e., leave-one-out approach; Mammola & Cardoso, 2020). 
+#' @return A matrix with the contribution values of each species or individual for each site.
+#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution. https://doi.org/10.1111/2041-210X.13424
+#' @examples comm <- rbind(c(1,1,1,1,1,1), c(1,1,1,1,1,1), c(1,1,1,1,1,1),c(1,1,1,1,1,1))
+#'rownames(comm) = c("Community_1","Community_2","Community_3","Community_4")
+#'colnames(comm) = c("Sp_1","Sp_2","Sp_3","Sp_4", "Sp_5", "Sp_6")
+#'
+#'trait <- cbind(c(2,4,6,8,3,5),c(0.5,1,0.5,0.4,4,4),c(0.7,1.2,0.5,0.4,5,5),c(0.7,2.2,0.5,0.3,6,6))
+#'rownames(trait) = c("Sp_1","Sp_2","Sp_3","Sp_4","Sp_5", "Sp_6")
+#'colnames(trait) = c("Trait_1","Trait_2","Trait_3","Trait_4")
+#'
+#example with convex hull as input
+#'hull.contribution( comm = geometry::convhulln(trait,options = "FA"))
+#'
+#example with comm and trait as input
+#'hull.contribution(comm = comm, trait = trait)
+#' @export
+hull.contribution = function(comm, trait) {
+  
+  #if a convex hull is provided go for it.
+  if (class(comm)[1] == "convhulln") {
+    
+    hull <- comm
+    contrib  <- c()
+    for (i in 1:nrow(hull$p))
+      contrib <- c(contrib, (hull$vol - geometry::convhulln(hull$p[-i,], options = "FA")$vol) )
+    
+    #if a comm matrix is provided just call this same function using hypervolumes.
+  } else if (class(comm)[1] == "data.frame" || class(comm)[1] == "matrix") {
+    
+    #check if there are communities with less then 5 species and remove them
+    comm2 <- comm[rowSums(ifelse(comm>0,1,0)) >= 6,]
+    
+    if(nrow(comm2) != nrow(comm))
+      warning(paste("In the site x species matrix (comm), one or more rows do not contain enough species (6) for estimating contribution.\n  These rows have been removed prior to convex hull estimation.")) 
+    
+    if(nrow(comm2) == 0)
+      stop(paste("There are no communities with enough species for estimating contribution")) 
+    
+    contrib   <- comm2
+    contrib[] <- NA
+    
+    for(k in 1:nrow(comm2)) {
+      contrib[k,comm2[k,]>0] <- hull.contribution( comm = geometry::convhulln(trait[comm2[k,]>0,],options = "FA") )
+    } } else { stop("A convhulln or a sites x species matrix or data.frame is needed as input data.") }
+  
+  return(contrib)
+}
+
 #' Alpha diversity using kernel density hypervolumes.
 #' @description Estimation of functional richness of one or multiple sites, based on n-dimensional hypervolumes.
 #' @param comm A 'Hypervolume' object or a 'HypervolumesList' object (one for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community.
 #' @param trait A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.
 #' @param method Method for constructing the 'Hypervolume' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.
-#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a 'Hypervolume' or 'HypervolumeList' is provided as input data.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE. Ignored if a 'Hypervolume' or 'HypervolumeList' is provided as input data.
 #' @param return.hv Boolean indicating whether the 'Hypervolume' objects used to calculate alpha diversity should be returned (default is FALSE).
 #' @param ... further arguments to be passed for other methods in hypervolume package.
 #' @details Estimates the functional richness (alpha FD) of one or more communities using kernel density hypervolumes, as implemented in Blonder et al. (2014, 2018).
@@ -1352,16 +1617,16 @@ evenness <- function(comm, tree, distance, method = "expected", func = "camargo"
 #'#hvlist <- hypervolume_join(hv1, hv2, hv3)
 #'#kernel.alpha(hvlist)
 #'@export
-kernel.alpha <- function(comm, trait, method = "gaussian", abund = FALSE, return.hv = FALSE, ...){
+kernel.alpha <- function(comm, trait, method = "gaussian", abund = TRUE, return.hv = FALSE, ...){
   
   #check if right data is provided
-  if (!(class(comm) %in% c("HypervolumeList", "Hypervolume", "data.frame", "matrix")))
+  if (!(class(comm)[1] %in% c("HypervolumeList", "Hypervolume", "data.frame", "matrix")))
     stop("A Hypervolume, a HypervolumeList, or a sites x species matrix or data.frame is needed as input data.")
   
   #convert data if needed
-  if (class(comm) == "Hypervolume")
+  if (class(comm)[1] == "Hypervolume")
     return(get_volume(comm))
-  else if (class(comm) == "HypervolumeList")
+  else if (class(comm)[1] == "HypervolumeList")
     hvlist <- name.hypervolumes(comm) 	#name hypervolumes if needed
   else
     hvlist <- list.hypervolumes(comm = comm, trait = trait, method = method, abund = abund, ...)
@@ -1386,7 +1651,7 @@ kernel.alpha <- function(comm, trait, method = "gaussian", abund = FALSE, return
 #' @param trait A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.
 #' @param method Method for constructing the 'Hypervolume' objects. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.
 #' @param func Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is Jaccard.
-#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a HypervolumeList is provided as input data.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE. Ignored if a HypervolumeList is provided as input data.
 #' @param return.hv Boolean indicating whether the hypervolume objects used to calculate beta diversity should be returned (default is FALSE).
 #' @param ... further arguments to be passed for other methods in hypervolume package.
 #' @details Computes a pairwise decomposition of the overall differentiation among kernel hypervolumes into two components: the replacement (shifts) of space between hypervolumes and net differences between the amount of space enclosed by each hypervolume.
@@ -1418,14 +1683,14 @@ kernel.alpha <- function(comm, trait, method = "gaussian", abund = FALSE, return
 #'#kernel.beta(hvlist)
 #' 
 #'@export
-kernel.beta = function(comm, trait, method = "gaussian", func = "jaccard", abund = FALSE, return.hv = FALSE, ... ){
+kernel.beta = function(comm, trait, method = "gaussian", func = "jaccard", abund = TRUE, return.hv = FALSE, ... ){
   
   #check if right data is provided
-  if (!(class(comm) %in% c("HypervolumeList", "data.frame", "matrix")))
+  if (!(class(comm)[1] %in% c("HypervolumeList", "data.frame", "matrix")))
     stop("A HypervolumeList, or a sites x species matrix or data.frame is needed as input data.")
   
   #convert data if needed
-  if (class(comm) == "HypervolumeList")
+  if (class(comm)[1] == "HypervolumeList")
     hvlist <- name.hypervolumes(comm) 	#name hypervolumes if needed
   else
     hvlist <- list.hypervolumes(comm = comm, trait = trait, method = method, abund = abund, ...)
@@ -1467,12 +1732,43 @@ kernel.beta = function(comm, trait, method = "gaussian", func = "jaccard", abund
     return(betaValues)
 }
 
+#' Functional beta diversity evenness using n-dimensional hypervolumes.
+#' @description Difference of evenness between pairs of sites, measuring the regularity of stochastic points distribution within the total functional space.
+#' @param comm A 'HypervolumeList' object (one for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community.
+#' @param trait A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.
+#' @param method Method for constructing the 'Hypervolume' objects. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE. Ignored if a Hypervolume or HypervolumeList is provided as input data.
+#' @param ... further arguments to be passed for other methods in hypervolume package.
+#' @details This measure is simply the pairwise difference of evenness calculated based on the functional evenness (Mason et al., 2005) of a n-dimensional hypervolume, namely the regularity of stochastic points distribution within the total trait space (Mammola & Cardoso, 2020).
+#' Evenness is calculated as the overlap between the observed hypervolume and a theoretical hypervolume where traits and abundances are evenly distributed within the range of their values (Carmona et al., 2016, 2019).
+#' If abundance data of species in the community are provided as input data (abund = TRUE), each species trait is weighted by replicating it by the abundance in the estimation of the hypervolume.
+#' @return Distance matrix between sites.
+#' @references Carmona, C.P., de Bello, F., Mason, N.W.H. & Leps, J. (2016) Traits without borders: integrating functional diversity across scales. Trends in Ecology and Evolution, 31: 382-394.
+#' @references Carmona, C.P., de Bello, F., Mason, N.W.H. & Leps, J. (2019) Trait probability density (TPD): measuring functional diversity across scales based on TPD with R. Ecology, 100: e02876.
+#' @references Mason, N.W.H., Mouillot, D., Lee, W.G. & Wilson, J.B. (2005) Functional richness, functional evenness and functional divergence: the primary components of functional diversity. Oikos, 111: 112-118.
+#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
+#' @examples comm <- matrix(c(0,3,2,1,1,5,6,2,0,0,2,1), nrow = 3, byrow = TRUE)
+#' rownames(comm) <- c("Community_1","Community_2","Community_3")
+#' colnames(comm) <- c("Sp_1","Sp_2","Sp_3","Sp_4")
+#' trait <- cbind(c(2.2,4.4,6.1,8.3),c(0.5,1,0.5,0.4),c(0.7,1.2,0.5,0.4))
+#' rownames(trait) <- c("Sp_1","Sp_2","Sp_3","Sp_4")
+#' colnames(trait) <- c("Trait_1","Trait_2","Trait_3")
+#'
+#' #kernel.beta.evenness(comm = comm, trait = trait)
+#' @export
+kernel.beta.evenness <- function(comm, trait, method = "gaussian", abund = TRUE, ...){
+    if (!(class(comm)[1] %in% c("HypervolumeList", "data.frame", "matrix")))
+      stop("A HypervolumeList, or a sites x species matrix or data.frame is needed as input data.")
+    return(dist(kernel.evenness(comm, trait, method, abund, ...)))
+}
+
+
 #' Functional originality of observations (species or individuals) in a n-dimensional hypervolume representing a given species or community.
 #' @description Average dissimilarity between a species or individual and a sample of random points within the boundaries of the n-dimensional hypervolume.
 #' @param comm A 'Hypervolume' object constructed with the hypervolume R package or a sites x species matrix, with incidence or abundance data about the species in the community. Note that the use of 'HypervolumeList' object is not implemented for this function yet.
 #' @param trait A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.
 #' @param method Method for constructing the 'Hypervolume' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.
-#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a Hypervolume is provided as input data.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE. Ignored if a Hypervolume is provided as input data.
 #' @param frac A value between 0.01 and 1, indicating the fraction of random points to be used in the estimation of originality. Default is 0.1.
 #' @param relative A boolean (T/F) indicating whether originality should be relative to the most original species.
 #' @param ... further arguments to be passed for other methods in hypervolume package.
@@ -1499,17 +1795,17 @@ kernel.beta = function(comm, trait, method = "gaussian", func = "jaccard", abund
 #'#Example with hypervolume as input data
 #'#kernel.originality(comm = hypervolume_gaussian(trait))
 #'@export
-kernel.originality = function(comm, trait, method = 'gaussian', abund = FALSE, frac = 0.1, relative = FALSE, ...) {
+kernel.originality = function(comm, trait, method = 'gaussian', abund = TRUE, frac = 0.1, relative = FALSE, ...) {
   
   #check if right data is provided
-  if (!(class(comm) %in% c("Hypervolume", "data.frame", "matrix")))
+  if (!(class(comm)[1] %in% c("Hypervolume", "data.frame", "matrix")))
     stop("A Hypervolume, or a sites x species matrix or data.frame is needed as input data.")
   
   #check if right frac parameter is provided
   if (frac < 0.01 | frac > 1)
     stop("Frac parameter should be a number between 0.01 and 1.")
   
-  if (class(comm) == "Hypervolume") {    
+  if (class(comm)[1] == "Hypervolume") {    
     
     hv <- comm
     if(is.null(rownames(hv@Data)))
@@ -1525,7 +1821,7 @@ kernel.originality = function(comm, trait, method = 'gaussian', abund = FALSE, f
       originality <- c(originality, mean(originality_run))
     }
     
-  } else if (class(comm) == "data.frame" || class(comm) == "matrix"){
+  } else if (class(comm)[1] == "data.frame" || class(comm) == "matrix"){
     
     hv <- list.hypervolumes(comm = comm, trait = trait, method = method, abund = abund, ...)
     originality <- comm
@@ -1536,7 +1832,7 @@ kernel.originality = function(comm, trait, method = 'gaussian', abund = FALSE, f
       message(paste("Originality values for the observations in hypervolume ",as.character(i)," out of ",as.character(nrow(comm))," have been estimated.\n",sep=''))
     }
     
-  } else if (class(comm) == "HypervolumeList") {
+  } else if (class(comm)[1] == "HypervolumeList") {
     stop("HypervolumeList is not implemented for this function yet. Please calculate originality using individual Hypervolume.")
   }
   
@@ -1551,7 +1847,7 @@ kernel.originality = function(comm, trait, method = 'gaussian', abund = FALSE, f
 #' @param comm A 'Hypervolume' object constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community. Note that the use of 'HypervolumeList' object is not implemented for this function yet.
 #' @param trait A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.
 #' @param method Method for constructing the 'Hypervolume' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.
-#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a Hypervolume is provided as input data.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE. Ignored if a Hypervolume is provided as input data.
 #' @param ... further arguments to be passed for other methods in hypervolume package.
 #' @details The contribution of each observation (species or individual) to the total volume of a kernel hypervolume, calculated as the difference in volume between the total hypervolume and a second hypervolume lacking this specific observation (i.e., leave-one-out approach; Mammola & Cardoso, 2020). 
 #' Contribution is a measure of functional rarity (sensu Violle et al., 2017; Carmona et al., 2017) that allows to map the contribution of each observation to the richness components of FD (Mammola & Cardoso, 2020).
@@ -1577,14 +1873,14 @@ kernel.originality = function(comm, trait, method = 'gaussian', abund = FALSE, f
 #'#Example with hypervolume as input data
 #'#kernel.contribution(hypervolume_box(trait))
 #' @export
-kernel.contribution = function(comm, trait, method = "gaussian", abund = FALSE, ...){
+kernel.contribution = function(comm, trait, method = "gaussian", abund = TRUE, ...){
   
   #check if right data is provided
-  if (!(class(comm) %in% c("Hypervolume", "data.frame", "matrix")))
+  if (!(class(comm)[1] %in% c("Hypervolume", "data.frame", "matrix")))
     stop("A Hypervolume, or a sites x species matrix or data.frame is needed as input data.")
   
   #if hypervolume is provided go for it.
-  if (class(comm) == "Hypervolume"){
+  if (class(comm)[1] == "Hypervolume"){
     hv <- comm
     contrib  <- c()
     for (i in 1:nrow(hv@Data)){
@@ -1597,7 +1893,7 @@ kernel.contribution = function(comm, trait, method = "gaussian", abund = FALSE, 
     }
     
     #if a comm matrix is provided just call this same function using hypervolumes.
-  } else if (class(comm) == "data.frame" || class(comm) == "matrix"){
+  } else if (class(comm)[1] == "data.frame" || class(comm) == "matrix"){
     hv  <- list.hypervolumes(comm = comm, trait = trait, method = method, ...)
     contrib  <- comm
     contrib[] <- NA
@@ -1612,7 +1908,7 @@ kernel.contribution = function(comm, trait, method = "gaussian", abund = FALSE, 
       
       message(paste("Contribution values for the observations in hypervolume ",as.character(i)," out of ",as.character(nrow(comm))," have been estimated.\n",sep=''))
     }
-  }	else if (class(comm) == "HypervolumeList") {
+  }	else if (class(comm)[1] == "HypervolumeList") {
     stop("HypervolumeList is not implemented for this function yet. Please calculate contribution using individual Hypervolume.")
   }	
   
@@ -1628,11 +1924,11 @@ kernel.contribution = function(comm, trait, method = "gaussian", abund = FALSE, 
 #' @param comm A 'Hypervolume' object or a 'HypervolumeList' object (one for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community.
 #' @param trait A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.
 #' @param method Method for constructing the 'Hypervolume'. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.
-#' @param func Function for calculating dispersion. One of 'divergence' or 'dissimilarity'.
+#' @param func Function for calculating dispersion. One of 'divergence', 'dissimilarity' or 'regression'.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a Hypervolume or HypervolumeList is provided as input data.
 #' @param frac A value between 0.01 and 1, indicating the fraction of random points to be used. Default is 0.1.
 #' @param ... further arguments to be passed for other methods in hypervolume package.
-#' @details This function calculates either the average distance between stochastic points within the kernel density hypervolume and the centroid of these points (divergence; Laliberte & Legendre, 2010; see also Carmona et al., 2019) or the average distance between all points (dissimilarity, see also function BAT::dispersion).
+#' @details This function calculates dispersion either: i) as the average distance between stochastic points within the kernel density hypervolume and the centroid of these points (divergence; Laliberte & Legendre, 2010; see also Carmona et al., 2019); ii) as the average distance between all points (dissimilarity, see also function BAT::dispersion); or iii) as the average distance between stochastic points within the kernel density hypervolume and a regression line fitted through the points.
 #' The number of stochastic points is controlled by the 'frac' parameter (increase this number for less deviation in the estimation).
 #' If abundance data of species in the community are provided as input data (abund = TRUE), each species trait is weighted by replicating it by the abundance in the estimation of the hypervolume.
 #' @return A vector of dispersion values for each site.
@@ -1649,21 +1945,18 @@ kernel.contribution = function(comm, trait, method = "gaussian", abund = FALSE, 
 #'
 #'#Example with community and trait matrices as input data
 #'#kernel.dispersion(comm = comm, trait = trait)
-#'
-#'#Example with hypervolume as input data and the dissimilarity method
-#'#kernel.dispersion(hypervolume_gaussian(trait), func = 'dissimilarity')
 #' @export
-kernel.dispersion = function(comm, trait, method = 'gaussian', func = 'divergence', abund = FALSE, frac = 0.1, ...) {
+kernel.dispersion = function(comm, trait, method = 'gaussian', func = 'dissimilarity', abund = FALSE, frac = 0.1, ...) {
   
   #check if right data is provided
-  if (!(class(comm) %in% c("HypervolumeList", "Hypervolume", "data.frame", "matrix")))
+  if (!(class(comm)[1] %in% c("HypervolumeList", "Hypervolume", "data.frame", "matrix")))
     stop("A Hypervolume, a HypervolumeList, or a sites x species matrix or data.frame is needed as input data.")
   
   #check if right frac parameter is provided
   if (frac < 0.01 | frac > 1)
     stop("Frac parameter should be a number between 0.01 and 1.")
   
-  if (class(comm) == "Hypervolume"){
+  if (class(comm)[1] == "Hypervolume"){
     hv = comm
     random_points = hv@RandomPoints[sample(1:nrow(hv@RandomPoints), nrow(hv@RandomPoints)*frac), ]
     
@@ -1674,19 +1967,30 @@ kernel.dispersion = function(comm, trait, method = 'gaussian', func = 'divergenc
       cent <- get_centroid(hv)
       disp <- c()
       for (k in 1:hv@Dimensionality){
-    	  disp <- cbind(disp, (cent[k] - random_points[, k])^2)
+        disp <- cbind(disp, (cent[k] - random_points[, k])^2)
       }
       disp <- mean(rowSums(disp)^0.5)
+    } else if (func == "regression"){
+      disp <- c()
+      for(m in 1:(ncol(random_points)-1)){           # build all bivariate predictor combinations
+        for(n in (m+1):ncol(random_points)){
+          disp <- append(disp,summary(lm(random_points[,m]~random_points[,n]))$r.squared) #get the R^2
+          
+          #disp <- append(disp,mean(residuals(lm(random_points[,m]~random_points[,n])))) ##alternative mean residuals?
+          
+        }
+      }
+      disp <- mean(disp)
     } else {
       stop(sprintf("Function %s not recognized.", func))
     }
     
     names(disp) <- hv@Name
     
-  } else if (class(comm) == "data.frame" || class(comm) == "matrix"){
+  } else if (class(comm)[1] == "data.frame" || class(comm) == "matrix"){
     hvlist <- list.hypervolumes(comm = comm, trait = trait, method = method, abund = abund, ...)
     disp <- kernel.dispersion(comm = hvlist, func = func, frac = frac)
-  } else if (class(comm) == "HypervolumeList"){
+  } else if (class(comm)[1] == "HypervolumeList"){
     hvlist = comm
     hvlist = name.hypervolumes(hvlist)
     disp <- c()
@@ -1701,7 +2005,7 @@ kernel.dispersion = function(comm, trait, method = 'gaussian', func = 'divergenc
 #' @param comm A 'Hypervolume' object or a 'HypervolumeList' object (one for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community.
 #' @param trait A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.
 #' @param method Method for constructing the 'Hypervolume' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.
-#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a Hypervolume or HypervolumeList is provided as input data.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE. Ignored if a Hypervolume or HypervolumeList is provided as input data.
 #' @param ... further arguments to be passed for other methods in hypervolume package.
 #' @details This function measures the functional evenness (Mason et al., 2005) of a n-dimensional hypervolume, namely the regularity of stochastic points distribution within the total trait space (Mammola & Cardoso, 2020).
 #' Evenness is calculated as the overlap between the observed hypervolume and a theoretical hypervolume where traits and abundances are evenly distributed within the range of their values (Carmona et al., 2016, 2019).
@@ -1724,14 +2028,14 @@ kernel.dispersion = function(comm, trait, method = 'gaussian', func = 'divergenc
 #'#Example with hypervolume as input data
 #'#kernel.evenness(hypervolume_gaussian(trait))
 #'@export
-kernel.evenness = function(comm, trait, method = "gaussian", abund = FALSE, ...) {
+kernel.evenness = function(comm, trait, method = "gaussian", abund = TRUE, ...) {
   
   #check if right data is provided
-  if (!(class(comm) %in% c("HypervolumeList", "Hypervolume", "data.frame", "matrix")))
+  if (!(class(comm)[1] %in% c("HypervolumeList", "Hypervolume", "data.frame", "matrix")))
     stop("A Hypervolume, a HypervolumeList, or a sites x species matrix or data.frame is needed as input data.")
   
   #if hypervolume is provided go for it
-  if (class(comm) == "Hypervolume") {
+  if (class(comm)[1] == "Hypervolume") {
     
     hv <- comm
     #creating a perfectly even hypervolume within the distribution of traits
@@ -1754,10 +2058,10 @@ kernel.evenness = function(comm, trait, method = "gaussian", abund = FALSE, ...)
     even <- hypervolume_overlap_statistics(set)[1]
     names(even) <- hv@Name
     
-  } else if (class(comm) == "data.frame" || class(comm) == "matrix"){
+  } else if (class(comm)[1] == "data.frame" || class(comm) == "matrix"){
     hvlist <- list.hypervolumes(comm = comm, trait = trait, method = method, abund = abund, ...)
     even <- kernel.evenness(comm = hvlist)
-  } else if (class(comm) == "HypervolumeList"){
+  } else if (class(comm)[1] == "HypervolumeList"){
     hvlist <- comm
     hvlist <- name.hypervolumes(hvlist) 	#name hypervolumes if needed
     even <- c()
@@ -1774,7 +2078,7 @@ kernel.evenness = function(comm, trait, method = "gaussian", abund = FALSE, ...)
 #' @param comm A 'HypervolumeList' object (one hypervolume for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community.
 #' @param trait A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.
 #' @param method Method for constructing the 'HypervolumeList' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.
-#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a 'HypervolumeList' is provided as input data.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE. Ignored if a 'HypervolumeList' is provided as input data.
 #' @param return.hv Boolean indicating whether the hypervolume objects used to calculate pairwise similarity should be returned (default is FALSE).
 #' @param ... further arguments to be passed for other methods in hypervolume package.
 #' @details Computes a pairwise comparison between kernel density hypervolumes of multiple species or communities, based on the distance and similarity metrics implemented in hypervolume R package (Blonder et al., 2014, 2018). 
@@ -1796,14 +2100,14 @@ kernel.evenness = function(comm, trait, method = "gaussian", abund = FALSE, ...)
 #'#B = hypervolume_box(trait[,2:3], name = "Community_2")
 #'#kernel.similarity(hypervolume_join(A,B))
 #'@export
-kernel.similarity <- function(comm, trait, method = 'gaussian', abund = FALSE, return.hv = FALSE, ... ) {
+kernel.similarity <- function(comm, trait, method = 'gaussian', abund = TRUE, return.hv = FALSE, ... ) {
   
   #check if right data is provided
-  if (!(class(comm) %in% c("HypervolumeList", "data.frame", "matrix")))
+  if (!(class(comm)[1] %in% c("HypervolumeList", "data.frame", "matrix")))
     stop("A HypervolumeList, a sites x species matrix or data.frame is needed as input data.")
   
   #convert data if needed
-  if (class(comm) == "HypervolumeList"){
+  if (class(comm)[1] == "HypervolumeList"){
     hvlist <- comm
     hvlist <- name.hypervolumes(hvlist) 	#name hypervolumes if needed
   } else {
@@ -2758,8 +3062,8 @@ gdm <- function(comm, tree, area, time){
 	model <- list()
 	model[[1]] <- try(nls(div ~ c + z*area + x*time + y*time^2, start = data.frame(c=1, z=1, x=1, y=0)))
 	model[[2]] <- try(nls(div ~ c + z*log(area) + x*time + y*time^2, start = data.frame(c=1, z=1, x=1, y=0)))
-	model[[3]] <- try(nls(div ~ exp(log(c) + z*log(area) + x*time + y*time^2), start = data.frame(c=1, z=1, x=1, y=0)))
-	model[[4]] <- try(nls(div ~ exp(log(c) + z*log(area) + x*log(time) + y*log(time)^2), start = data.frame(c=1, z=1, x=1, y=0)))
+	model[[3]] <- try(nls(div ~ exp(c + z*log(area) + x*time + y*time^2), start = data.frame(c=1, z=1, x=1, y=0)))
+	model[[4]] <- try(nls(div ~ exp(c + z*log(area) + x*log(time) + y*log(time)^2), start = data.frame(c=1, z=1, x=1, y=0)))
 	for(m in 1:length(model)){
 		results[m,1] <- coef(summary(model[[m]]))[1,1]
 		results[m,2] <- coef(summary(model[[m]]))[2,1]
