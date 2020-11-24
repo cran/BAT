@@ -1,6 +1,6 @@
-174ca92ed77f4272ad944ec9efd0a2b1 *DESCRIPTION
-b2856847b68d21fd89cf70223458e52f *NAMESPACE
-0aefc0191653cef4e67eb82372fb0b23 *R/BAT.R
+3cebd437465008147747075886c47d80 *DESCRIPTION
+42e462754b9588c804ad8e6b3b8c84cb *NAMESPACE
+bd5f07f965c7bc677a249509193b910e *R/BAT.R
 dcaed1578113ec8d3e2f349487e7fffc *data/arrabida.rda
 dd86dc6c6bea68a3b8ff605352919747 *data/functree.rda
 8beb17284bf3e4069b3dd1105cf8f269 *data/geres.rda
@@ -21,6 +21,7 @@ f4becfb75435b5c46d3c24ce7608ee6a *man/cwe.Rd
 cc2aba35da0820c3c453fd1598573237 *man/cwm.Rd
 4af9d876d61d1794dbbc020f2110d3b5 *man/dispersion.Rd
 b9a9dece7943f2d6f1531877b67e32ef *man/evenness.Rd
+7d507e9f45ca4072d6468efaaf21fc4b *man/evenness.contribution.Rd
 5d5b7be3c63641ceb032a86e39646d0e *man/functree.Rd
 f474a14a3ebb4f5d2cbeab640883588c *man/gdm.Rd
 a2dc8f267ed70cc738a1c78c3db11cc7 *man/geres.Rd
@@ -35,6 +36,7 @@ a95710da7ded920ac1b51cd222aacda0 *man/kernel.beta.evenness.Rd
 54c583bb7a41448e60c2b7cfb557fb20 *man/kernel.contribution.Rd
 5a2c0dbfb61cb72aa6a48e3573b305d2 *man/kernel.dispersion.Rd
 b76a63cf752b826cf7cb2b171ebe8c39 *man/kernel.evenness.Rd
+98e3ec473857f370016749c79d8cee93 *man/kernel.evenness.contribution.Rd
 ce611807936d39c7b75cdccd2c1d1fce *man/kernel.originality.Rd
 169fd90917521a282e1e3b17aee43c22 *man/kernel.similarity.Rd
 bd80085f96feaa1210f8d5adc5874749 *man/linnean.Rd

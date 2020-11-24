@@ -1,14 +1,11 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.3.0 (2020-10-28)
+#####Version 2.4.0 (2020-11-24)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.2.1:
-#####added functions beta.evenness and kernel.beta.evenness
-#####added functions hull.alpha, hull.beta, hull.contribution
-#####corrected gdm function
-#####corrected help file of evenness function
+#####Changed from v2.3.0:
+#####added functions evenness.contribution and kernel.evenness.contribution
 
 #####required packages
 library("geometry")
@@ -59,14 +56,14 @@ clean <- function(comm, tree = NA){
 reorderComm <- function(comm, tree = NULL){
   if (class(tree) == "phylo"){
     if(!is.null(tree$tip.label) && !is.null(colnames(comm))){ ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$tip.label, colnames(comm))]
-      if (tree$tip.label != colnames(comm))
+      comm <- comm[,match(tree$tip.label, colnames(comm)),]
+      if (any(tree$tip.label != colnames(comm)))
         warning("Species names of comm and tree do not match!")
     }
   } else {
     if(!is.null(tree$labels) && !is.null(colnames(comm))){ ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$labels, colnames(comm))]
-      if (tree$labels != colnames(comm))
+      comm <- comm[,match(tree$labels, colnames(comm)),]
+      if (any(tree$labels != colnames(comm)))
         warning("Species names of comm and tree do not match!")
     }
   }
@@ -1320,6 +1317,7 @@ dispersion <- function(comm, tree, distance, func = "originality", abund = TRUE,
 #' evenness(comm, tree, abund = FALSE)
 #' @export
 evenness <- function(comm, tree, distance, method = "expected", func = "camargo", abund = TRUE){
+
 	if(missing(comm))
 		comm = rep(1, length(tree$order))
 	if(is.vector(comm))
@@ -1392,6 +1390,73 @@ evenness <- function(comm, tree, distance, method = "expected", func = "camargo"
 	
 	return(evenness)
 }
+
+#' Contribution of each species or individual to the total taxonomic/phylogenetic/functional evenness.
+#' @description Contribution of each observation to the regularity of abundances and distances (if PD/FD) between species in a community (or individuals in a species).
+#' @param comm A sites x species matrix, with either abundance or incidence data. If missing, the evenness using the full tree or distance matrix is calculated.
+#' @param tree An hclust or phylo object representing a phylogenetic or functional tree.
+#' @param distance A dist or matrix object representing the phylogenetic or functional distance between species. If both tree and distance are missing, taxonomic evenness is calculated.
+#' @param method Calculate evenness using "expected" values (default) or values based on "contribution" of species to the tree.
+#' @param func Calculate evenness using "Camargo" (default) or "Bulla" index.
+#' @param abund A boolean (T/F) indicating whether evenness should be calculated using abundance data.
+#' @details Contribution to evenness is calculated using a leave-one-out approach, whereby the contribution of a single observation is the total evenness minus the evenness calculated without that observation. Evenness is based on the index of Camargo (1993) or Bulla (1994) using the values of both species abundances and edge lengths in the tree (if PD/FD).
+#' Note that the contribution of a species or individual can be negative, if the removal of an observation increases the total evenness.  
+#' @details If no tree or distance is provided the result is calculated for taxonomic evenness using the original index.
+#' @return A vector of values per site (or a single value if no comm is given).
+#' @references Bulla, L. (1994) An index of evenness and its associated diversity measure. Oikos, 70: 167-171.
+#' @references Camargo, J.A. (1993) Must dominance increase with the number of subordinate species in competitive interactions? Journal of Theoretical Biology, 161: 537-542.
+#' @examples comm <- matrix(c(1,2,0,5,5,1,1,0,0,0,0,2,2,0,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
+#' distance <- dist(c(1:5), method = "euclidean")
+#' tree <- hclust(distance, method = "average")
+#' evenness.contribution(comm)
+#' evenness.contribution(tree = tree, func = "bulla")
+#' evenness.contribution(comm, tree)
+#' evenness.contribution(comm, tree, method = "contribution")
+#' evenness.contribution(comm, tree, abund = FALSE)
+#' @export
+evenness.contribution <- function(comm, tree, distance, method = "expected", func = "camargo", abund = TRUE){
+  
+  #check if right data is provided
+  if(missing(comm))
+    comm <- rep(1, length(tree$order))
+  if(is.vector(comm))
+    comm <- matrix(comm, nrow = 1)
+  if(!abund)
+    comm <- ifelse(comm > 0, 1, 0)
+  comm[is.na(comm)] = 0
+  
+  if(!missing(tree)){
+    comm = reorderComm(comm, tree)
+  } else if (!missing(distance)){
+    tree = hclust(distance, method = "average")
+  } else {
+    tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
+    tree$labels = colnames(comm)
+  }
+  
+  #extract total evenness
+  tot_evenness <- evenness(comm = comm, tree = tree, distance = distance, method = method, func = func, abund = abund)
+
+  #leave-one-out
+  evenness.contrib <- comm
+  evenness.contrib[] <- NA
+  
+  for(i in 1:nrow(evenness.contrib))  {
+    if(length(comm[i, comm[i,]>0]) < 3) {
+      warning(paste("Community ", as.character(i), " contains less than 3 species. Cannot evaluate contribution to evenness." ) )
+    } else  {
+      for(k in 1:length(evenness.contrib[i,])) {
+        comm2 <- comm[i,]
+        comm2[k] <- 0 #for each iteration, assign one species to 0 
+        evenness.contrib[i,k] <- (tot_evenness[i] - evenness(comm = comm2, tree = tree, distance = distance, method = method, func = func, abund = abund))
+      }
+    }
+  }
+  
+  evenness.contrib[comm[] == 0] <- NA
+  return(evenness.contrib)
+  
+}  
 
 #' Alpha diversity using convex hulls.
 #' @description Estimation of functional richness of one or multiple sites, based on convex hull.
@@ -1545,10 +1610,10 @@ hull.beta <- function(comm, trait, func = "jaccard", return.hull = FALSE) {
 #example with comm and trait as input
 #'hull.contribution(comm = comm, trait = trait)
 #' @export
-hull.contribution = function(comm, trait) {
+hull.contribution = function(comm, trait){
   
   #if a convex hull is provided go for it.
-  if (class(comm)[1] == "convhulln") {
+  if (class(comm)[1] == "convhulln"){
     
     hull <- comm
     contrib  <- c()
@@ -1556,7 +1621,7 @@ hull.contribution = function(comm, trait) {
       contrib <- c(contrib, (hull$vol - geometry::convhulln(hull$p[-i,], options = "FA")$vol) )
     
     #if a comm matrix is provided just call this same function using hypervolumes.
-  } else if (class(comm)[1] == "data.frame" || class(comm)[1] == "matrix") {
+  } else if (class(comm)[1] == "data.frame" || class(comm)[1] == "matrix"){
     
     #check if there are communities with less then 5 species and remove them
     comm2 <- comm[rowSums(ifelse(comm>0,1,0)) >= 6,]
@@ -1571,8 +1636,11 @@ hull.contribution = function(comm, trait) {
     contrib[] <- NA
     
     for(k in 1:nrow(comm2)) {
-      contrib[k,comm2[k,]>0] <- hull.contribution( comm = geometry::convhulln(trait[comm2[k,]>0,],options = "FA") )
-    } } else { stop("A convhulln or a sites x species matrix or data.frame is needed as input data.") }
+      contrib[k,comm2[k,]>0] <- hull.contribution(comm = geometry::convhulln(trait[comm2[k,]>0,], options = "FA") )
+    }
+  } else {
+    stop("A convhulln or a sites x species matrix or data.frame is needed as input data.")
+  }
   
   return(contrib)
 }
@@ -1894,7 +1962,7 @@ kernel.contribution = function(comm, trait, method = "gaussian", abund = TRUE, .
     
     #if a comm matrix is provided just call this same function using hypervolumes.
   } else if (class(comm)[1] == "data.frame" || class(comm) == "matrix"){
-    hv  <- list.hypervolumes(comm = comm, trait = trait, method = method, ...)
+    hv  <- list.hypervolumes(comm = comm, trait = trait, method = method, abund = abund, ...)
     contrib  <- comm
     contrib[] <- NA
     for(i in 1:nrow(comm)){
@@ -2072,6 +2140,79 @@ kernel.evenness = function(comm, trait, method = "gaussian", abund = TRUE, ...) 
   }
   return(even)
 }
+
+#' Contribution of each observation to the evenness of a n-dimensional hypervolume representing a given species or community.
+#' @description Contribution of each species or individual to the evenness of one or more kernel hypervolumes.
+#' @param comm A 'Hypervolume' object constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community. Note that the use of 'HypervolumeList' object is not implemented for this function yet.
+#' @param trait A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.
+#' @param method Method for constructing the 'Hypervolume' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE. Ignored if a Hypervolume is provided as input data.
+#' @param ... further arguments to be passed for other methods in hypervolume package.
+#' @details The contribution of each observation (species or individual) to the total evenness of a kernel hypervolume. Contribution to evenness is calculated as the difference in evenness between the total hypervolume and a second hypervolume lacking this specific observation (i.e., leave-one-out approach; Mammola & Cardoso, 2020). 
+#' Note that the contribution of a species or individual can be negative, if the removal of an observation increases the total evenness.  
+#' @return A matrix with the contribution values of each species or individual for each community or species respectively.
+#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
+#' @examples comm <- rbind(c(0,3,2,1), c(1,5,6,2), c(0,0,2,1))
+#' rownames(comm) <- c("Community_1", "Community_2", "Community_3")
+#' colnames(comm) <- c("Sp_1", "Sp_2", "Sp_3", "Sp_4")
+#'
+#' trait <- cbind(c(2.2,4.4,6.1,8.3), c(0.5,1,0.5,0.4), c(0.7,1.2,0.5,0.4))
+#' rownames(trait) <- c("Sp_1", "Sp_2", "Sp_3", "Sp_4")
+#' colnames(trait) <- c("Trait_1", "Trait_2", "Trait_3")
+#'
+#' #Example with community and trait matrices as input data
+#' #kernel.evenness.contribution(comm = comm, trait = trait, method = "gaussian")
+#' 
+#' #Example with hypervolume as input data
+#' #kernel.evenness.contribution(comm = hypervolume_gaussian(trait))
+#' @export
+kernel.evenness.contribution = function(comm, trait, method = "gaussian", abund = TRUE, ...){
+  
+  #if hypervolume is provided go for it.
+  if (class(comm)[1] == "Hypervolume"){
+    hv <- comm
+    
+    #extract total evenness:
+    hv.evenness <- kernel.evenness(hv)
+    
+    #leave-one-out:
+    evenness.contrib <- c()
+    
+    for (i in 1:nrow(hv@Data)){
+      if (hv@Method == "Box kernel density estimate")
+        evenness.contrib <- c(evenness.contrib, hv.evenness - kernel.evenness(hypervolume_box(hv@Data[-i, ], verbose = FALSE)))
+      else if (hv@Method == "Gaussian kernel density estimate")
+        evenness.contrib <- c(evenness.contrib, hv.evenness - kernel.evenness(hypervolume_gaussian(hv@Data[-i, ], verbose = FALSE)))
+      else if (hv@Method == "One-class support vector machine")
+        evenness.contrib <- c(evenness.contrib, hv.evenness - kernel.evenness(hypervolume_svm(hv@Data[-i, ], verbose = FALSE)))
+    }
+    
+  #if a comm matrix is provided just call this same function using hypervolumes.
+  } else if (class(comm)[1] == "data.frame" || class(comm) == "matrix"){
+    
+    hv  <- list.hypervolumes(comm = comm, trait = trait, method = method, abund = abund, ...)
+    
+    evenness.contrib  <- comm
+    evenness.contrib[] <- NA
+    
+    for(i in 1:nrow(comm)){
+      
+      if (method == "box")
+        evenness.contrib[i, comm[i, ] > 0] <- kernel.evenness.contribution(hypervolume_box(data = trait[comm[i, ] > 0, ], verbose = FALSE))
+      if (method == "gaussian")
+        evenness.contrib[i, comm[i, ] > 0] <- kernel.evenness.contribution(hypervolume_gaussian(data = trait[comm[i, ] > 0, ], verbose = FALSE))
+      if (method == "svm")
+        evenness.contrib[i,comm[i, ] > 0] <- kernel.evenness.contribution(hypervolume_svm(data = trait[comm[i, ] > 0, ], verbose = FALSE))
+      
+      message(paste("Contribution values for the observations in hypervolume ",as.character(i)," out of ",as.character(nrow(comm))," have been estimated.\n",sep=''))
+    }
+  }	else {
+    stop("A Hypervolume, or a sites x species matrix or data.frame is needed as input data.")
+  }	
+  
+  return(evenness.contrib)
+}
+
 
 #' Pairwise similarity among n-dimensional hypervolumes.
 #' @description Calculate pairwise distance metrics (centroid and minimum distance) and similarity indices (Intersection, Jaccard, Soerensen-Dice) among n-dimensional hypervolumes.
