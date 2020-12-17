@@ -1,11 +1,11 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.4.0 (2020-11-24)
+#####Version 2.4.1 (2020-12-17)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.3.0:
-#####added functions evenness.contribution and kernel.evenness.contribution
+#####Changed from v2.4.0:
+#####corrected error in comm and tree matching names
 
 #####required packages
 library("geometry")
@@ -56,13 +56,13 @@ clean <- function(comm, tree = NA){
 reorderComm <- function(comm, tree = NULL){
   if (class(tree) == "phylo"){
     if(!is.null(tree$tip.label) && !is.null(colnames(comm))){ ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$tip.label, colnames(comm)),]
+      comm <- comm[,match(tree$tip.label, colnames(comm))]
       if (any(tree$tip.label != colnames(comm)))
         warning("Species names of comm and tree do not match!")
     }
   } else {
     if(!is.null(tree$labels) && !is.null(colnames(comm))){ ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$labels, colnames(comm)),]
+      comm <- comm[,match(tree$labels, colnames(comm))]
       if (any(tree$labels != colnames(comm)))
         warning("Species names of comm and tree do not match!")
     }
