@@ -1,11 +1,11 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.4.1 (2020-12-17)
+#####Version 2.4.2 (2021-01-22)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.4.0:
-#####corrected error in comm and tree matching names
+#####Changed from v2.4.1:
+#####Allowing NA values in cwm, cwd and cwe
 
 #####required packages
 library("geometry")
@@ -21,7 +21,6 @@ library("vegan")
 #' @import graphics
 #' @import hypervolume
 #' @import nls2
-#' @import spatstat
 #' @import stats
 #' @import utils
 #' @import vegan
@@ -29,6 +28,7 @@ library("vegan")
 #' @importFrom raster raster
 #' @importFrom raster rasterize
 #' @importFrom raster rasterToPoints
+#' @importFrom spatstat dummify
 
 #####auxiliary functions
 prep <- function(comm, xtree, abund = TRUE){
@@ -2298,6 +2298,7 @@ kernel.similarity <- function(comm, trait, method = 'gaussian', abund = TRUE, re
 #' @param comm A sites x species matrix, with incidence or abundance data about the species in the community.
 #' @param trait A species x traits matrix, with trait values for each species in comm.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.
+#' @param na.rm Remove NA values before calculating cwm.
 #' @details Community weighted mean is used to compare communities in terms of their "typical" trait values.
 #' @return A sites x trait matrix with mean value per site and trait.
 #' @examples comm <- matrix(c(2,5,0,0,0,1,1,0,0,0,0,1,2,0,0,0,0,0,10,1), nrow = 4, ncol = 5, byrow = TRUE)
@@ -2309,7 +2310,7 @@ kernel.similarity <- function(comm, trait, method = 'gaussian', abund = TRUE, re
 #' cwm(comm, trait)
 #' cwm(comm, trait, FALSE)
 #' @export
-cwm <- function(comm, trait, abund = TRUE){
+cwm <- function(comm, trait, abund = TRUE, na.rm = FALSE){
   trait = dummy(trait)
   if(!abund)
       comm[comm > 1] = 1
@@ -2321,7 +2322,7 @@ cwm <- function(comm, trait, abund = TRUE){
   colnames(results) = colnames(trait)
   for (s in 1:nSites)
     for (t in 1:nTraits)
-      results[s, t] = sum(comm[s,] * trait[,t]) / nSp[s]
+      results[s, t] = sum(comm[s,] * trait[,t], na.rm = na.rm) / nSp[s]
   return(results)
 }
 
@@ -2330,6 +2331,7 @@ cwm <- function(comm, trait, abund = TRUE){
 #' @param comm A sites x species matrix, with incidence or abundance data about the species in the community.
 #' @param trait A species x traits matrix, with trait values for each species in comm.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.
+#' @param na.rm Remove NA values before calculating cwd.
 #' @details Community weighted dispersion is used to compare communities in terms of their dispersion of trait values around a mean, reflecting individual trait variability or diversity.
 #' @return A sites x trait matrix with sd value per site and trait.
 #' @examples comm <- matrix(c(2,5,0,0,0,1,1,0,0,0,0,1,2,0,0,0,0,0,10,1), nrow = 4, ncol = 5, byrow = TRUE)
@@ -2341,7 +2343,7 @@ cwm <- function(comm, trait, abund = TRUE){
 #' cwd(comm, trait)
 #' cwd(comm, trait, FALSE)
 #' @export
-cwd <- function(comm, trait, abund = TRUE){
+cwd <- function(comm, trait, abund = TRUE, na.rm = FALSE){
   trait = dummy(trait)
   if(!abund)
     comm[comm > 1] = 1
@@ -2351,10 +2353,10 @@ cwd <- function(comm, trait, abund = TRUE){
   results = matrix(NA, nrow = nSites, ncol = nTraits)
   rownames(results) = rownames(comm)
   colnames(results) = colnames(trait)
-  cwmean = cwm(comm, trait, abund)
+  cwmean = cwm(comm, trait, abund, na.rm)
   for (s in 1:nSites)
     for (t in 1:nTraits)
-      results[s, t] = (sum(comm[s,] * (trait[,t] - cwmean[s,t])^2) / nSp[s])^0.5
+      results[s, t] = (sum(comm[s,] * (trait[,t] - cwmean[s,t])^2, na.rm = na.rm) / nSp[s])^0.5
   return(results)
 }
 
@@ -2364,6 +2366,7 @@ cwd <- function(comm, trait, abund = TRUE){
 #' @param trait A species x traits matrix, with trait values for each species in comm.
 #' @param func Calculate evenness using Camargo (1993, default) or Bulla (1994) index.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.
+#' @param na.rm Remove NA values before calculating cwe.
 #' @details Community weighted evenness is used to compare communities in terms of their evenness of trait values, reflecting trait abundance and distances between values.
 #' @return A sites x trait matrix with evenness value per site and trait.
 #' @references Bulla, L. (1994) An index of evenness and its associated diversity measure. Oikos, 70: 167-171.
@@ -2378,7 +2381,7 @@ cwd <- function(comm, trait, abund = TRUE){
 #' cwe(comm, trait, abund = FALSE)
 #' cwe(comm, trait, "bulla")
 #' @export
-cwe <- function(comm, trait, func = "camargo", abund = TRUE){
+cwe <- function(comm, trait, func = "camargo", abund = TRUE, na.rm = FALSE){
   trait = dummy(trait)
   if(!abund)
     comm[comm > 1] = 1
@@ -2416,10 +2419,10 @@ cwe <- function(comm, trait, func = "camargo", abund = TRUE){
       #if only 2 categories use regular evenness without the functional part
       if(nDist == 1){
         #calculate the observed values as proportional abundance per species
-        thisObs = thisComm / sum(thisComm)
+        thisObs = thisComm / sum(thisComm, na.rm = na.rm)
         if(func == "bulla"){
           thisExp = 1 / length(thisComm)
-          results[s,t] = (sum(apply(cbind(thisObs, rep(thisExp, length(thisObs))), 1, min)) - thisExp) / (1 - thisExp)
+          results[s,t] = (sum(apply(cbind(thisObs, rep(thisExp, length(thisObs))), 1, min), na.rm = na.rm) - thisExp) / (1 - thisExp)
         } else if(func == "camargo"){
           results[s,t] = 1 - (abs(thisObs[1] - thisObs[2]))
         }
@@ -2436,14 +2439,14 @@ cwe <- function(comm, trait, func = "camargo", abund = TRUE){
       #calculate the observed values as proportional abundance per species / distance
       thisObs = c()
       for(i in 1:nDist)											   #cycle through all distances of this site/sample
-        thisObs[i] = mean(thisComm[c(i, i+1)]) / disTraits[i]
-      thisObs = thisObs / sum(thisObs)         #sum all observations to 1
+        thisObs[i] = mean(thisComm[c(i, i+1)], na.rm = na.rm) / disTraits[i]
+      thisObs = thisObs / sum(thisObs, na.rm = na.rm)         #sum all observations to 1
       
       if(func == "bulla"){
         ##calculate the expected values as average length of distances between observations
         thisExp = 1 / nDist
         #calculate evenness as the sum of minimum values between observed and expected with correction from Bulla, 1994
-        results[s,t] = (sum(apply(cbind(thisObs, rep(thisExp, length(thisObs))), 1, min)) - thisExp) / (1 - thisExp)
+        results[s,t] = (sum(apply(cbind(thisObs, rep(thisExp, length(thisObs))), 1, min), na.rm = na.rm) - thisExp) / (1 - thisExp)
       } else if(func == "camargo"){
         results[s,t] = 0
         for(j in 1:(nDist - 1)){

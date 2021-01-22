@@ -4,7 +4,7 @@
 \alias{cwe}
 \title{Community Weighted Evenness.}
 \usage{
-cwe(comm, trait, func = "camargo", abund = TRUE)
+cwe(comm, trait, func = "camargo", abund = TRUE, na.rm = FALSE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with incidence or abundance data about the species in the community.}
@@ -14,6 +14,8 @@ cwe(comm, trait, func = "camargo", abund = TRUE)
 \item{func}{Calculate evenness using Camargo (1993, default) or Bulla (1994) index.}
 
 \item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.}
+
+\item{na.rm}{Remove NA values before calculating cwe.}
 }
 \value{
 A sites x trait matrix with evenness value per site and trait.

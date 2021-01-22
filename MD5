@@ -1,6 +1,6 @@
-52ff9c11aa241fa14c89901ade2161b7 *DESCRIPTION
-42e462754b9588c804ad8e6b3b8c84cb *NAMESPACE
-919d09c3f4d3365a9c9ef4eb2cc3e704 *R/BAT.R
+2d1fb8eb1a4e0e8e4394627e8d36be37 *DESCRIPTION
+ffab68294f42c15e6cb24a30327a279b *NAMESPACE
+d70f549583a58aa5e3609f253ed62faf *R/BAT.R
 dcaed1578113ec8d3e2f349487e7fffc *data/arrabida.rda
 dd86dc6c6bea68a3b8ff605352919747 *data/functree.rda
 8beb17284bf3e4069b3dd1105cf8f269 *data/geres.rda
@@ -16,9 +16,9 @@ c3c604034c5e6b83605d75a05f43f177 *man/beta.accum.Rd
 66d85ab9c45191025b2cbd6c048d2451 *man/beta.evenness.Rd
 378e72772aea18ac0758af97a95b049f *man/beta.multi.Rd
 47aec3356fe02b3337327f027125f621 *man/contribution.Rd
-5a03fad01621a95af251f12917bc8200 *man/cwd.Rd
-f4becfb75435b5c46d3c24ce7608ee6a *man/cwe.Rd
-cc2aba35da0820c3c453fd1598573237 *man/cwm.Rd
+58b181ee53a0a04e6f5bbee5d73dd42d *man/cwd.Rd
+18d8f1a20e56faefb9fa43e31bc653fe *man/cwe.Rd
+948ac8aabf7c75f84eecb4e3eb7dcd48 *man/cwm.Rd
 4af9d876d61d1794dbbc020f2110d3b5 *man/dispersion.Rd
 b9a9dece7943f2d6f1531877b67e32ef *man/evenness.Rd
 7d507e9f45ca4072d6468efaaf21fc4b *man/evenness.contribution.Rd

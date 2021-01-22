@@ -4,7 +4,7 @@
 \alias{cwd}
 \title{Community Weighted Dispersion.}
 \usage{
-cwd(comm, trait, abund = TRUE)
+cwd(comm, trait, abund = TRUE, na.rm = FALSE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with incidence or abundance data about the species in the community.}
@@ -12,6 +12,8 @@ cwd(comm, trait, abund = TRUE)
 \item{trait}{A species x traits matrix, with trait values for each species in comm.}
 
 \item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.}
+
+\item{na.rm}{Remove NA values before calculating cwd.}
 }
 \value{
 A sites x trait matrix with sd value per site and trait.

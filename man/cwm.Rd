@@ -4,7 +4,7 @@
 \alias{cwm}
 \title{Community Weighted Mean.}
 \usage{
-cwm(comm, trait, abund = TRUE)
+cwm(comm, trait, abund = TRUE, na.rm = FALSE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with incidence or abundance data about the species in the community.}
@@ -12,6 +12,8 @@ cwm(comm, trait, abund = TRUE)
 \item{trait}{A species x traits matrix, with trait values for each species in comm.}
 
 \item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.}
+
+\item{na.rm}{Remove NA values before calculating cwm.}
 }
 \value{
 A sites x trait matrix with mean value per site and trait.
