@@ -20,7 +20,7 @@ If not specified, default is 0.}
 \item{runs}{Number of resampling runs for rarefaction. If not specified, default is 100.}
 }
 \value{
-A matrix of sites x diversity values (either "Obs" OR "Median, Min, LowerCL, UpperCL and Max").
+A matrix of sites x diversity values (either "Richness" OR "Mean, Median, Min, LowerCL, UpperCL and Max").
 }
 \description{
 Observed richness with possible rarefaction, multiple sites simultaneously.

@@ -27,7 +27,7 @@ evenness.contribution(
 \item{abund}{A boolean (T/F) indicating whether evenness should be calculated using abundance data.}
 }
 \value{
-A vector of values per site (or a single value if no comm is given).
+A matrix of sites x species (or a vector if no comm is given).
 }
 \description{
 Contribution of each observation to the regularity of abundances and distances (if PD/FD) between species in a community (or individuals in a species).

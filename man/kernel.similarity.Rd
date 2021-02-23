@@ -44,7 +44,7 @@ trait <- cbind(c(2.2,4.4,6.1,8.3),c(0.5,1,0.5,0.4),c(0.7,1.2,0.5,0.4))
 #example with community and trait matrices as input data:
 #kernel.similarity(comm = comm, trait = trait)
 
-#'#example with a list of hypervolume as input data:
+#example with a list of hypervolume as input data:
 #A = hypervolume_box(trait[,1:2], name = "Community_1")
 #B = hypervolume_box(trait[,2:3], name = "Community_2")
 #kernel.similarity(hypervolume_join(A,B))

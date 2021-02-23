@@ -29,8 +29,10 @@ trait <- cbind(c(2,4,6,8,3,5),c(0.5,1,0.5,0.4,4,4),c(0.7,1.2,0.5,0.4,5,5),c(0.7,
 rownames(trait) = c("Sp_1","Sp_2","Sp_3","Sp_4","Sp_5", "Sp_6")
 colnames(trait) = c("Trait_1","Trait_2","Trait_3","Trait_4")
 
-hull.contribution( comm = geometry::convhulln(trait,options = "FA"))
+#example with convex hull as input
+hull.contribution(comm = geometry::convhulln(trait,options = "FA"))
 
+#example with comm and trait as input
 hull.contribution(comm = comm, trait = trait)
 }
 \references{
