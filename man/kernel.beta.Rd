@@ -15,7 +15,7 @@ kernel.beta(
 )
 }
 \arguments{
-\item{comm}{A 'HypervolumeList' object (one 'Hypervolume' object for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community.}
+\item{comm}{A 'HypervolumeList' object (one 'Hypervolume' object for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix or data.frame, with incidence or abundance data about the species in the community.}
 
 \item{trait}{A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.}
 
@@ -23,7 +23,7 @@ kernel.beta(
 
 \item{func}{Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is Jaccard.}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE. Ignored if a HypervolumeList is provided as input data.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method = "gaussian". Ignored if a 'Hypervolume' or 'HypervolumeList' is provided as input data.}
 
 \item{return.hv}{Boolean indicating whether the hypervolume objects used to calculate beta diversity should be returned (default is FALSE).}
 

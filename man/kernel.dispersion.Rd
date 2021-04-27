@@ -9,13 +9,13 @@ kernel.dispersion(
   trait,
   method = "gaussian",
   func = "dissimilarity",
-  abund = FALSE,
+  abund = TRUE,
   frac = 0.1,
   ...
 )
 }
 \arguments{
-\item{comm}{A 'Hypervolume' object or a 'HypervolumeList' object (one for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix, with incidence or abundance data about the species in the community.}
+\item{comm}{A 'Hypervolume' object or a 'HypervolumeList' object (one for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix, data.frame or vector, with incidence or abundance data about the species in the community.}
 
 \item{trait}{A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.}
 
@@ -23,7 +23,7 @@ kernel.dispersion(
 
 \item{func}{Function for calculating dispersion. One of 'divergence', 'dissimilarity' or 'regression'.}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is FALSE. Ignored if a Hypervolume or HypervolumeList is provided as input data.}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method = "gaussian". Ignored if a 'Hypervolume' or 'HypervolumeList' is provided as input data.}
 
 \item{frac}{A value between 0.01 and 1, indicating the fraction of random points to be used. Default is 0.1.}
 

@@ -4,12 +4,14 @@
 \alias{rao.alpha}
 \title{Rao quadratic entropy.}
 \usage{
-rao.alpha(comm, distance, raref = 0, runs = 100)
+rao.alpha(comm, tree, distance, raref = 0, runs = 100)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with abundance data.}
 
-\item{distance}{Distance matrix between species. Species order should be the same as in comm.}
+\item{tree}{An hclust or phylo object representing a phylogenetic or functional tree. One of tree or distance must be provided.}
+
+\item{distance}{A dist object representing the phylogenetic or functional distance between species.}
 
 \item{raref}{An integer specifying the number of individuals for rarefaction (individual based).
 If raref < 1 no rarefaction is made.
@@ -29,10 +31,11 @@ Rao quadratic entropy for Phylogenetic or Functional richness.
 Rao quadratic entropy (Rao, 1982) measures diversity based on the abundance of species and the dissimilarity between them.
 }
 \examples{
-comm <- matrix(c(0,0,1,1,0,0,100,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
+comm <- matrix(c(0,0,1,1,0,0,100,1,2,0), nrow = 2, ncol = 5, byrow = TRUE)
 distance = dist(1:5)
-rao.alpha(comm, distance)
-rao.alpha(comm, distance, 1)
+rao.alpha(comm)
+rao.alpha(comm, , distance)
+rao.alpha(comm, hclust(distance), raref = 1)
 }
 \references{
 Rao, C.R. (1982). Diversity and dissimilarity coefficients: a unified approach. Theoretical Population Biology, 21: 24-43.

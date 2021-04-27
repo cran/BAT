@@ -4,10 +4,12 @@
 \alias{dummy}
 \title{Dummify variables.}
 \usage{
-dummy(trait)
+dummy(trait, convert = NULL)
 }
 \arguments{
 \item{trait}{a species x traits matrix or data.frame.}
+
+\item{convert}{a vector of column numbers to be converted to dummy variables.}
 }
 \value{
 A matrix with variables converted when needed.
@@ -15,7 +17,11 @@ A matrix with variables converted when needed.
 \description{
 Convert factor variables to dummy variables.
 }
+\details{
+If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with characters as values.
+}
 \examples{
 trait = data.frame(length = c(2,4,6,3,1), wing = c("A", "B", "A", "A", "B"))
 dummy(trait)
+dummy(trait, convert = c(1))
 }
