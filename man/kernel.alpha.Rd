@@ -4,64 +4,36 @@
 \alias{kernel.alpha}
 \title{Alpha diversity using kernel density hypervolumes.}
 \usage{
-kernel.alpha(
-  comm,
-  trait,
-  method = "gaussian",
-  abund = TRUE,
-  return.hv = FALSE,
-  ...
-)
+kernel.alpha(comm)
 }
 \arguments{
-\item{comm}{A 'Hypervolume' object or a 'HypervolumesList' object (one for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix, data.frame or vector, with incidence or abundance data about the species in the community.}
-
-\item{trait}{A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.}
-
-\item{method}{Method for constructing the 'Hypervolume' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.}
-
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method = "gaussian". Ignored if a 'Hypervolume' or 'HypervolumeList' is provided as input data.}
-
-\item{return.hv}{Boolean indicating whether the 'Hypervolume' objects used to calculate alpha diversity should be returned (default is FALSE).}
-
-\item{...}{further arguments to be passed for other methods in hypervolume package.}
+\item{comm}{A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.}
 }
 \value{
-A vector of alpha diversity values for each site. If return.hv is set to TRUE, the function also returns the list of hypervolumes used to compute alpha diversity.
+A value or vector of alpha diversity values for each site.
 }
 \description{
 Estimation of functional richness of one or multiple sites, based on n-dimensional hypervolumes.
 }
 \details{
 Estimates the functional richness (alpha FD) of one or more communities using kernel density hypervolumes, as implemented in Blonder et al. (2014, 2018).
-Functional richness is expressed as the total volume of the n-dimensional hypervolume (Mammola & Cardoso, 2020), as returned by the function hypervolume::get_volume. Note that the hypervolume is dimensionless, and that only hypervolumes with the same number of dimensions can be compared in terms of functional richness.
+Functional richness is expressed as the total volume of the n-dimensional hypervolume (Mammola & Cardoso, 2020). Note that the hypervolume is dimensionless, and that only hypervolumes with the same number of dimensions can be compared in terms of functional richness.
 Given that the density and positions of stochastic points in the hypervolume are probabilistic, the functional richness of the trait space will intimately depend on the quality of input hypervolumes (details in Mammola & Cardoso, 2020).
-If abundance data of species in the community are provided as input data (abund = TRUE), each species trait is weighted by replicating it by the abundance in the estimation of the hypervolume.
 }
 \examples{
-comm <- rbind(c(0,3,2,1), c(1,5,6,2), c(0,0,2,1))
-rownames(comm) <- c("Community_1","Community_2","Community_3")
-colnames(comm) <- c("Sp_1","Sp_2","Sp_3","Sp_4")
+\dontrun{
+comm = rbind(c(1,3,0,5,3), c(3,2,5,0,0))
+colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+rownames(comm) = c("Site 1", "Site 2")
 
-trait <- cbind(c(2.2,4.4,6.1,8.3),c(0.5,1,0.5,0.4),c(0.7,1.2,0.5,0.4))
-rownames(trait) <- c("Sp_1","Sp_2","Sp_3","Sp_4")
-colnames(trait) <- c("Trait_1","Trait_2","Trait_3")
+trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
+rownames(trait) = colnames(comm)
 
-#Example with community and trait matrices as input data
-#kernel.alpha(comm = comm, trait = trait, method = "box", return.hv = FALSE)
-
-#Example with community and trait matrices as input data and abundance data
-#kernel.alpha(comm = comm, trait = trait, method = "box", abund = TRUE, return.hv = FALSE)
-
-#Example with hypervolume as input data
-#kernel.alpha(comm = hypervolume_box(trait[comm[1,]==1,], name="Community_1"))
-
-#Example with hypervolumeList as input data
-#hv1 <- hypervolume_box(trait[comm[1,]==1,],name="Community_1")
-#hv2 <- hypervolume_box(trait[comm[2,]==1,],name="Community_2")
-#hv3 <- hypervolume_box(trait[comm[3,]==1,],name="Community_3")
-#hvlist <- hypervolume_join(hv1, hv2, hv3)
-#kernel.alpha(hvlist)
+hv = kernel.build(comm[1,], trait)
+kernel.alpha(hv)
+hvlist = kernel.build(comm, trait, axes = 0.8)
+kernel.alpha(hvlist)
+}
 }
 \references{
 Blonder, B., Lamanna, C., Violle, C. & Enquist, B.J. (2014) The n-dimensional hypervolume. Global Ecology and Biogeography, 23: 595-609.

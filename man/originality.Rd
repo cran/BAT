@@ -9,7 +9,7 @@ originality(comm, tree, distance, abund = TRUE, relative = TRUE)
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data. If missing, the originality using the full tree or distance matrix is calculated.}
 
-\item{tree}{An hclust or phylo object representing a phylogenetic or functional tree. One of tree or distance must be provided.}
+\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
 \item{distance}{A dist object representing the phylogenetic or functional distance between species.}
 
@@ -29,7 +29,7 @@ This is the originality measure of Pavoine et al. (2005) without replacement.
 \examples{
 comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
 distance <- dist(c(1:5), method="euclidean")
-tree <- hclust(distance, method="average")
+tree <- tree.build(1:5)
 originality(tree = tree)
 originality(distance = distance)
 originality(comm, tree)

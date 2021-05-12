@@ -2,17 +2,17 @@
 % Please edit documentation in R/BAT.R
 \name{hull.contribution}
 \alias{hull.contribution}
-\title{Contribution of each observation (individuals or species) to the convex hull representing a given species or community.}
+\title{Contribution of each observation to a convex hull hypervolume.}
 \usage{
-hull.contribution(comm, trait)
+hull.contribution(comm, relative = FALSE)
 }
 \arguments{
-\item{comm}{A "convhulln" object or a sites x species matrix, with incidence data about the species in the community.}
+\item{comm}{A 'convhulln' object or list, preferably built with function hull.build.}
 
-\item{trait}{A matrix of traits for each species/individuals in comm (a species/individual for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.}
+\item{relative}{A boolean (T/F) indicating whether contribution should be relative to total PD or FD (proportional contribution per individual or species). If FALSE, the sum of contributions for each site is equal to total PD/FD, if TRUE it is 1.}
 }
 \value{
-A matrix with the contribution values of each species or individual for each site.
+A vector or matrix with the contribution values of each species or individual for each site.
 }
 \description{
 Contribution of each species or individual to the total volume of one or more convex hulls.
@@ -21,19 +21,17 @@ Contribution of each species or individual to the total volume of one or more co
 The contribution of each observation (species or individual) to the total volume of a convex hull, calculated as the difference in volume between the total convex hull and a second hypervolume lacking this specific observation (i.e., leave-one-out approach; Mammola & Cardoso, 2020).
 }
 \examples{
-comm <- rbind(c(1,1,1,1,1,1), c(1,1,1,1,1,1), c(1,1,1,1,1,1),c(1,1,1,1,1,1))
-rownames(comm) = c("Community_1","Community_2","Community_3","Community_4")
-colnames(comm) = c("Sp_1","Sp_2","Sp_3","Sp_4", "Sp_5", "Sp_6")
+comm = rbind(c(1,3,0,5,3), c(3,2,5,1,0))
+colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+rownames(comm) = c("Site 1", "Site 2")
 
-trait <- cbind(c(2,4,6,8,3,5),c(0.5,1,0.5,0.4,4,4),c(0.7,1.2,0.5,0.4,5,5),c(0.7,2.2,0.5,0.3,6,6))
-rownames(trait) = c("Sp_1","Sp_2","Sp_3","Sp_4","Sp_5", "Sp_6")
-colnames(trait) = c("Trait_1","Trait_2","Trait_3","Trait_4")
+trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
+rownames(trait) = colnames(comm)
 
-#example with convex hull as input
-hull.contribution(comm = geometry::convhulln(trait,options = "FA"))
-
-#example with comm and trait as input
-hull.contribution(comm = comm, trait = trait)
+hv = hull.build(comm[1,], trait)
+hull.contribution(hv)
+hvlist = hull.build(comm, trait, axes = 2)
+hull.contribution(hvlist, relative = TRUE)
 }
 \references{
 Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution. https://doi.org/10.1111/2041-210X.13424

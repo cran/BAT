@@ -16,7 +16,7 @@ alpha.accum(
 \arguments{
 \item{comm}{A sampling units x species matrix, with either abundance or incidence data.}
 
-\item{tree}{An hclust or phylo object (used only for Phylogenetic (PD) or Functional (FD) Diversity, not for Taxon Diversity (TD)).}
+\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
 \item{func}{The class of estimators to be used:
 If func is partial match of "curve", TD, PD or FD are based on extrapolating the accumulation curve of observed diversity.

@@ -4,24 +4,27 @@
 \alias{dummy}
 \title{Dummify variables.}
 \usage{
-dummy(trait, convert = NULL)
+dummy(trait, convert = NULL, weight = FALSE)
 }
 \arguments{
-\item{trait}{a species x traits matrix or data.frame.}
+\item{trait}{A species x traits matrix or data.frame.}
 
-\item{convert}{a vector of column numbers to be converted to dummy variables.}
+\item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables.}
+
+\item{weight}{Indicates whether weights of variables should be returned (TRUE/FALSE) or a vector with weights per variable.}
 }
 \value{
-A matrix with variables converted when needed.
+A matrix with variables converted or, if weight == TRUE or a vector, a list also with weights.
 }
 \description{
 Convert factor variables to dummy variables.
 }
 \details{
-If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with characters as values.
+If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters.
 }
 \examples{
 trait = data.frame(length = c(2,4,6,3,1), wing = c("A", "B", "A", "A", "B"))
 dummy(trait)
-dummy(trait, convert = c(1))
+dummy(trait, weight = TRUE)
+dummy(trait, convert = 2, weight = c(0.9, 0.1))
 }

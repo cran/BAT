@@ -9,7 +9,7 @@ contribution(comm, tree, abund = TRUE, relative = TRUE)
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data. If missing, the contribution of all species to the full tree is calculated.}
 
-\item{tree}{An hclust or phylo object representing a phylogenetic or functional tree.}
+\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
 \item{abund}{A boolean (T/F) indicating whether contribution should be weighted by abundance of each species.}
 

@@ -9,7 +9,7 @@ beta(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 100)
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data.}
 
-\item{tree}{An hclust or phylo object (used only for PD or FD).}
+\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
 \item{func}{Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is Jaccard.}
 

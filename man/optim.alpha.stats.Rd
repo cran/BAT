@@ -9,7 +9,7 @@ optim.alpha.stats(comm, tree, methods, samples, runs = 0)
 \arguments{
 \item{comm}{A samples x species x sites array, with either abundance or incidence data.}
 
-\item{tree}{An hclust or phylo object (used only to optimize PD or FD sampling).}
+\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
 \item{methods}{A vector specifying the method of each sample (length must be equal to nrow(comm))}
 

@@ -2,29 +2,15 @@
 % Please edit documentation in R/BAT.R
 \name{kernel.evenness.contribution}
 \alias{kernel.evenness.contribution}
-\title{Contribution of each observation to the evenness of a n-dimensional hypervolume representing a given species or community.}
+\title{Contribution of each observation to the evenness of a kernel density hypervolume.}
 \usage{
-kernel.evenness.contribution(
-  comm,
-  trait,
-  method = "gaussian",
-  abund = TRUE,
-  ...
-)
+kernel.evenness.contribution(comm)
 }
 \arguments{
-\item{comm}{A 'Hypervolume' object constructed with the hypervolume R package. Alternatively, a sites x species matrix, data.frame or vector, with incidence or abundance data about the species in the community. Note that the use of 'HypervolumeList' object is not implemented for this function yet.}
-
-\item{trait}{A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.}
-
-\item{method}{Method for constructing the 'Hypervolume' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.}
-
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method = "gaussian". Ignored if a 'Hypervolume' or 'HypervolumeList' is provided as input data.}
-
-\item{...}{further arguments to be passed for other methods in hypervolume package.}
+\item{comm}{A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.}
 }
 \value{
-A matrix with the contribution values of each species or individual for each community or species respectively.
+A vector or matrix with the contribution values of each species or individual for each community or species respectively.
 }
 \description{
 Contribution of each species or individual to the evenness of one or more kernel hypervolumes.
@@ -34,19 +20,21 @@ The contribution of each observation (species or individual) to the total evenne
 Note that the contribution of a species or individual can be negative, if the removal of an observation increases the total evenness.
 }
 \examples{
-comm <- rbind(c(0,3,2,1), c(1,5,6,2), c(0,0,2,1))
-rownames(comm) <- c("Community_1", "Community_2", "Community_3")
-colnames(comm) <- c("Sp_1", "Sp_2", "Sp_3", "Sp_4")
+\dontrun{
+comm = rbind(c(100,3,0,5,3), c(3,2,5,1,0))
+colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+rownames(comm) = c("Site 1", "Site 2")
 
-trait <- cbind(c(2.2,4.4,6.1,8.3), c(0.5,1,0.5,0.4), c(0.7,1.2,0.5,0.4))
-rownames(trait) <- c("Sp_1", "Sp_2", "Sp_3", "Sp_4")
-colnames(trait) <- c("Trait_1", "Trait_2", "Trait_3")
+trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
+rownames(trait) = colnames(comm)
 
-#Example with community and trait matrices as input data
-#kernel.evenness.contribution(comm = comm, trait = trait, method = "gaussian")
-
-#Example with hypervolume as input data
-#kernel.evenness.contribution(comm = hypervolume_gaussian(trait))
+hv = kernel.build(comm[1,], trait)
+kernel.evenness.contribution(hv)
+hvlist = kernel.build(comm, trait)
+kernel.evenness.contribution(hvlist)
+hvlist = kernel.build(comm, trait, axes = 0.8)
+kernel.evenness.contribution(hvlist)
+}
 }
 \references{
 Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.

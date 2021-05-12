@@ -2,20 +2,12 @@
 % Please edit documentation in R/BAT.R
 \name{kernel.beta.evenness}
 \alias{kernel.beta.evenness}
-\title{Functional beta diversity evenness using n-dimensional hypervolumes.}
+\title{Functional beta diversity evenness using kernel density hypervolumes.}
 \usage{
-kernel.beta.evenness(comm, trait, method = "gaussian", abund = TRUE, ...)
+kernel.beta.evenness(comm)
 }
 \arguments{
-\item{comm}{A 'HypervolumeList' object (one for each species or community) constructed with the hypervolume R package. Alternatively, a sites x species matrix or data.frame, with incidence or abundance data about the species in the community.}
-
-\item{trait}{A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.}
-
-\item{method}{Method for constructing the 'Hypervolume' objects. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.}
-
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method = "gaussian". Ignored if a 'Hypervolume' or 'HypervolumeList' is provided as input data.}
-
-\item{...}{further arguments to be passed for other methods in hypervolume package.}
+\item{comm}{A 'HypervolumesList' object, preferably built using function kernel.build.}
 }
 \value{
 Distance matrix between sites.
@@ -26,17 +18,22 @@ Difference of evenness between pairs of sites, measuring the regularity of stoch
 \details{
 This measure is simply the pairwise difference of evenness calculated based on the functional evenness (Mason et al., 2005) of a n-dimensional hypervolume, namely the regularity of stochastic points distribution within the total trait space (Mammola & Cardoso, 2020).
 Evenness is calculated as the overlap between the observed hypervolume and a theoretical hypervolume where traits and abundances are evenly distributed within the range of their values (Carmona et al., 2016, 2019).
-If abundance data of species in the community are provided as input data (abund = TRUE), each species trait is weighted by replicating it by the abundance in the estimation of the hypervolume.
 }
 \examples{
-comm <- matrix(c(0,3,2,1,1,5,6,2,0,0,2,1), nrow = 3, byrow = TRUE)
-rownames(comm) <- c("Community_1","Community_2","Community_3")
-colnames(comm) <- c("Sp_1","Sp_2","Sp_3","Sp_4")
-trait <- cbind(c(2.2,4.4,6.1,8.3),c(0.5,1,0.5,0.4),c(0.7,1.2,0.5,0.4))
-rownames(trait) <- c("Sp_1","Sp_2","Sp_3","Sp_4")
-colnames(trait) <- c("Trait_1","Trait_2","Trait_3")
+\dontrun{
+comm <- rbind(c(1,1,1,1,1), c(1,1,1,1,1), c(0,0,1,1,1),c(0,0,1,1,1))
+colnames(comm) = c("SpA","SpB","SpC","SpD", "SpE")
+rownames(comm) = c("Site 1","Site 2","Site 3","Site 4")
 
-#kernel.beta.evenness(comm = comm, trait = trait)
+trait <- cbind(c(2.2,4.4,6.1,8.3,3),c(0.5,1,0.5,0.4,4),c(0.7,1.2,0.5,0.4,5),c(0.7,2.2,0.5,0.3,6))
+colnames(trait) = c("Trait 1","Trait 2","Trait 3","Trait 4")
+rownames(trait) = colnames(comm)
+
+hvlist = kernel.build(comm, trait)
+kernel.beta.evenness(hvlist)
+hvlist = kernel.build(comm, trait, axes = 0.9)
+kernel.beta.evenness(hvlist)
+}
 }
 \references{
 Carmona, C.P., de Bello, F., Mason, N.W.H. & Leps, J. (2016) Traits without borders: integrating functional diversity across scales. Trends in Ecology and Evolution, 31: 382-394.

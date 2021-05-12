@@ -2,32 +2,16 @@
 % Please edit documentation in R/BAT.R
 \name{kernel.contribution}
 \alias{kernel.contribution}
-\title{Contribution of each observation (species or individuals) to the n-dimensional hypervolume representing a given species or community.}
+\title{Contribution of each observation to the kernel density hypervolume.}
 \usage{
-kernel.contribution(
-  comm,
-  trait,
-  method = "gaussian",
-  func = "neighbor",
-  abund = TRUE,
-  relative = FALSE,
-  ...
-)
+kernel.contribution(comm, func = "neighbor", relative = FALSE)
 }
 \arguments{
-\item{comm}{A 'Hypervolume' object constructed with the hypervolume R package. Alternatively, a sites x species matrix, data.frame or vector, with incidence or abundance data about the species in the community. Note that the use of 'HypervolumeList' object is not implemented for this function yet.}
-
-\item{trait}{A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.}
-
-\item{method}{Method for constructing the 'Hypervolume' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.}
+\item{comm}{A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.}
 
 \item{func}{Calculate contribution using either closest "neighbor" or leave "one out" approach.}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method = "gaussian". Ignored if a 'Hypervolume' or 'HypervolumeList' is provided as input data.}
-
 \item{relative}{A boolean (T/F) indicating whether contribution should be relative to total PD or FD (proportional contribution per individual or species). If FALSE, the sum of contributions for each site is equal to total PD/FD, if TRUE it is 1.}
-
-\item{...}{further arguments to be passed for other methods in hypervolume package.}
 }
 \value{
 A matrix with the contribution values of each species or individual for each site.
@@ -36,27 +20,26 @@ A matrix with the contribution values of each species or individual for each sit
 Contribution of each species or individual to the total volume of one or more kernel hypervolumes.
 }
 \details{
-The contribution of each observation (species or individual) to the total volume of a kernel hypervolume, calculated as the difference in volume between the total hypervolume and a second hypervolume lacking this specific observation (i.e., leave-one-out approach; Mammola & Cardoso, 2020). 
 Contribution is a measure of functional rarity (sensu Violle et al., 2017; Carmona et al., 2017) that allows to map the contribution of each observation to the richness components of FD (Mammola & Cardoso, 2020).
+If using func = "neighbor", each random point will be attributed to the closest species. The contribution of each species will be proportional to the number of its points. The sum of contributions of all species is equal to total richness.
 Note that the contribution of a species or individual can be negative if leave-one-out approach is taken, if the removal of an observation increases the total volume (see Figure 2d in Mammola & Cardoso 2020).  
-This might happen, although not always, in cases when the presence of a given species decreases the average distance between all the species in the community, i.e., when a given species is close to the "average" species of that community, making that community less diverse in some sense (Mammola & Cardoso, 2020). 
-This does not happen in the case of the closest neighbor approach. For large sample sizes, computation time can be high (use method = 'box' for a quicker estimation).
-If abundance data are provided (abund = TRUE), the contribution of each observation is divided by its abundance value, thus representing the contribution of each individual.
+This might happen, although not always, in cases when the presence of a given species decreases the average distance between all the species in the community, i.e., when a given species is close to the "average" species of that community, making that community less diverse in some sense (Mammola & Cardoso, 2020).
 }
 \examples{
-comm <- rbind(c(0,3,2,1), c(1,1,1,1), c(0,0,2,1))
-rownames(comm) <- c("Community_1", "Community_2", "Community_3")
-colnames(comm) <- c("Sp_1", "Sp_2", "Sp_3", "Sp_4")
+\dontrun{
+comm = rbind(c(1,3,0,5,3), c(3,2,5,1,0))
+colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+rownames(comm) = c("Site 1", "Site 2")
 
-trait <- cbind(c(0.2,0.4,0.6,0.8), c(0.5,1,0.5,0.4), c(0.7,0.2,0.5,0.4))
-rownames(trait) <- c("Sp_1", "Sp_2", "Sp_3", "Sp_4")
-colnames(trait) <- c("Trait_1", "Trait_2", "Trait_3")
+trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
+rownames(trait) = colnames(comm)
 
-#Example with community and trait matrices as input data
-#kernel.contribution(comm = comm, trait = trait, method = "gaussian")
-
-#Example with hypervolume as input data
-#kernel.contribution(hypervolume_gaussian(trait), relative = TRUE)
+hv = kernel.build(comm[1,], trait)
+kernel.contribution(hv)
+hvlist = kernel.build(comm, trait, axes = 2)
+kernel.contribution(hvlist)
+kernel.contribution(hvlist, relative = TRUE)
+}
 }
 \references{
 Carmona, C.P., de Bello, F., Sasaki, T., Uchida, K. & Partel, M. (2017) Towards a common toolbox for rarity: A response to Violle et al. Trends in Ecology and Evolution, 32(12): 889-891.

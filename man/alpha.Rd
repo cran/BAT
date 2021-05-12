@@ -9,7 +9,7 @@ alpha(comm, tree, raref = 0, runs = 100)
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data.}
 
-\item{tree}{An hclust or phylo object (used only for PD or FD).}
+\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
 \item{raref}{An integer specifying the number of individuals for rarefaction (individual based).
 If raref < 1 no rarefaction is made.
@@ -33,9 +33,12 @@ The rarefaction option is useful to compare communities with much different numb
 }
 \examples{
 comm <- matrix(c(0,0,1,1,0,0,2,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
+trait = 1:5
 tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 alpha(comm)
 alpha(comm, raref = 0)
+alpha(comm, trait)
+alpha(comm, tree)
 alpha(comm, tree, 2, 100)
 }
 \references{

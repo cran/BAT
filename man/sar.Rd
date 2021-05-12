@@ -9,7 +9,7 @@ sar(comm, tree, area)
 \arguments{
 \item{comm}{Either a vector with the diversity values per site, or a sites x species matrix.}
 
-\item{tree}{An hclust or phylo object (used only to fit the PD or FD-area relationships, requires comm to be a sites x species matrix).}
+\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree (used only to fit the PD or FD-area relationships, requires comm to be a sites x species matrix).}
 
 \item{area}{A vector with the area per site.}
 }

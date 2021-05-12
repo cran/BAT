@@ -9,7 +9,7 @@ coverage(comm, tree)
 \arguments{
 \item{comm}{A matrix of sites x species with abundance values.}
 
-\item{tree}{An hclust or phylo object (used only for PD or FD).}
+\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 }
 \value{
 A vector with coverage values per site.

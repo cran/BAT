@@ -2,43 +2,33 @@
 % Please edit documentation in R/BAT.R
 \name{hull.alpha}
 \alias{hull.alpha}
-\title{Alpha diversity using convex hulls.}
+\title{Alpha diversity using convex hull hypervolumes.}
 \usage{
-hull.alpha(comm, trait, return.hull = FALSE)
+hull.alpha(comm)
 }
 \arguments{
-\item{comm}{A "convhulln" object or a sites x species matrix, with incidence data about the species in the community.}
-
-\item{trait}{A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.}
-
-\item{return.hull}{Boolean indicating whether the generated 'convhulln' objects used to calculate alpha diversity should be returned (default is FALSE).}
+\item{comm}{A 'convhulln' object or list, preferably built with function hull.build.}
 }
 \value{
-A vector of alpha diversity values for each site. If return.hull is set to TRUE, the function also returns the list of convex hulls used to compute alpha diversity.
+One value or a vector of alpha diversity values for each site.
 }
 \description{
-Estimation of functional richness of one or multiple sites, based on convex hull.
+Estimation of functional richness of one or multiple sites, based on convex hull hypervolumes.
 }
 \details{
-Estimates the functional richness (alpha FD) of one or more communities using convex hull. Note that a minimum of 4 observations for each community are needed to generate the convex hull. 
+Estimates the functional richness (alpha FD) of one or more communities using convex hull hypervolumes.
 Functional richness is expressed as the total volume of the convex hull.
 }
 \examples{
-comm <- rbind(c(1,1,1,1,1), c(1,1,1,1,1), c(0,0,1,1,1),c(0,0,1,1,1))
-rownames(comm) = c("Community_1","Community_2","Community_3","Community_4")
-colnames(comm) = c("Sp_1","Sp_2","Sp_3","Sp_4", "Sp_5")
+comm = rbind(c(1,3,0,5,3), c(3,2,5,0,0))
+colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+rownames(comm) = c("Site 1", "Site 2")
 
-trait <- cbind(c(2.2,4.4,6.1,8.3,3),c(0.5,1,0.5,0.4,4),c(0.7,1.2,0.5,0.4,5),c(0.7,2.2,0.5,0.3,6))
-rownames(trait) = c("Sp_1","Sp_2","Sp_3","Sp_4","Sp_5")
-colnames(trait) = c("Trait_1","Trait_2","Trait_3","Trait_4")
+trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
+rownames(trait) = colnames(comm)
 
-#example with convex hull as imput
-hull.alpha(geometry::convhulln(trait,options = "FA"))
-
-#example with comm and trait as imput
-hull.alpha(comm = comm, trait = trait, return.hull = FALSE)
-
-alpha_hull <- hull.alpha(comm = comm, trait = trait, return.hull = TRUE)
-alpha_hull[[1]] #alpha diversity
-alpha_hull[[2]] #list of convex hulls
+hv = hull.build(comm[1,], trait)
+hull.alpha(hv)
+hvlist = hull.build(comm, trait, axes = 2)
+hull.alpha(hvlist)
 }

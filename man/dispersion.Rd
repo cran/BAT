@@ -16,7 +16,7 @@ dispersion(
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data. If missing, the dispersion using the full tree or distance matrix is calculated.}
 
-\item{tree}{An hclust or phylo object representing a phylogenetic or functional tree. One of tree or distance must be provided.}
+\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
 \item{distance}{A dist object representing the phylogenetic or functional distance between species.}
 

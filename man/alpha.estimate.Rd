@@ -9,7 +9,7 @@ alpha.estimate(comm, tree, func = "nonparametric")
 \arguments{
 \item{comm}{A sites x species matrix, with either abundances or number of incidences.}
 
-\item{tree}{An hclust or phylo object (used only for Phylogenetic (PD) or Functional (FD) Diversity, not for Taxon Diversity (TD)).}
+\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
 \item{func}{The class of estimators to be used:
 If func is partial match of "nonparametric", TD, PD or FD are based on non-parametric estimators.

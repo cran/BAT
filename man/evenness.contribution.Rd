@@ -16,7 +16,7 @@ evenness.contribution(
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data. If missing, the evenness using the full tree or distance matrix is calculated.}
 
-\item{tree}{An hclust or phylo object representing a phylogenetic or functional tree.}
+\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
 \item{distance}{A dist or matrix object representing the phylogenetic or functional distance between species. If both tree and distance are missing, taxonomic evenness is calculated.}
 

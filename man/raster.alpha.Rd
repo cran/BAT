@@ -9,7 +9,7 @@ raster.alpha(layers, tree)
 \arguments{
 \item{layers}{A Raster* object of species distributions (typically a multi-layer type: RasterStack or RasterBrick).}
 
-\item{tree}{An hclust or phylo object (used only for PD or FD).}
+\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 }
 \value{
 A raster object representing richness in space.

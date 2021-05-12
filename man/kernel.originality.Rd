@@ -2,35 +2,19 @@
 % Please edit documentation in R/BAT.R
 \name{kernel.originality}
 \alias{kernel.originality}
-\title{Functional originality of observations (species or individuals) in a n-dimensional hypervolume representing a given species or community.}
+\title{Functional originality of observations in kernel density hypervolumes.}
 \usage{
-kernel.originality(
-  comm,
-  trait,
-  method = "gaussian",
-  abund = TRUE,
-  frac = 0.1,
-  relative = FALSE,
-  ...
-)
+kernel.originality(comm, frac = 0.1, relative = FALSE)
 }
 \arguments{
-\item{comm}{A 'Hypervolume' object constructed with the hypervolume R package or a sites x species matrix, data.frame or vector, with incidence or abundance data about the species in the community. Note that the use of 'HypervolumeList' object is not implemented for this function yet.}
-
-\item{trait}{A matrix of traits for each species in comm (a species for each row and traits as columns). Must be provided only if 'comm' is a sites x species matrix.}
-
-\item{method}{Method for constructing the 'Hypervolume' object. One of "box" (box kernel density estimation), "gaussian" (Gaussian kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details. Must be provided only if 'comm' is a sites x species matrix. Default is 'gaussian'.}
-
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method = "gaussian". Ignored if a 'Hypervolume' or 'HypervolumeList' is provided as input data.}
+\item{comm}{A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.}
 
 \item{frac}{A value between 0.01 and 1, indicating the fraction of random points to be used in the estimation of originality. Default is 0.1.}
 
-\item{relative}{A boolean (T/F) indicating whether originality should be relative to the most original species.}
-
-\item{...}{further arguments to be passed for other methods in hypervolume package.}
+\item{relative}{A boolean (T/F) indicating whether originality should be relative to the most original species in the community.}
 }
 \value{
-A matrix with the originality values of each species or individual in each site.
+A vector or matrix with the originality values of each species or individual in each site.
 }
 \description{
 Average dissimilarity between a species or individual and a sample of random points within the boundaries of the n-dimensional hypervolume.
@@ -38,23 +22,23 @@ Average dissimilarity between a species or individual and a sample of random poi
 \details{
 A measure of the originality (sensu Pavoine et al., 2005) of each observation (species or individuals) used to construct the n-dimensional hypervolume. In a probabilistic hypervolume, originality is calculated as the average distance between each observation to a sample of stochastic points within the boundaries of the n-dimensional hypervolume (Mammola & Cardoso, 2020).
 Originality is a measure of functional rarity (sensu Violle et al., 2017; Carmona et al., 2017) that allows to map the contribution of each observation to the divergence components of FD (Mammola & Cardoso, 2020).
-The number of sample points to be used in the estimation of the originality is controlled by the frac parameter. Increase frac for less deviation in the estimation, but mind that computation time also increases. For large sample sizes, computation time can be very high (use method = 'box' for a quicker estimation).
-If abundance data of species in the community are provided as input data (abund = TRUE), each species trait is weighted by replicating it by the abundance in the estimation of the hypervolume.
+The number of sample points to be used in the estimation of the originality is controlled by the frac parameter. Increase frac for less deviation in the estimation, but mind that computation time also increases.
 }
 \examples{
-comm <- rbind(c(0,3,2,1), c(1,5,6,2), c(0,0,2,1))
-rownames(comm) <- c("Community_1","Community_2","Community_3")
-colnames(comm) <- c("Sp_1","Sp_2","Sp_3","Sp_4")
+\dontrun{
+comm = rbind(c(1,3,0,5,3), c(3,2,5,1,0))
+colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+rownames(comm) = c("Site 1", "Site 2")
 
-trait <- cbind(c(2.2,4.4,6.1,8.3),c(0.5,1,0.5,0.4),c(0.7,1.2,0.5,0.4))
-rownames(trait) <- c("Sp_1","Sp_2","Sp_3","Sp_4")
-colnames(trait) <- c("Trait_1","Trait_2","Trait_3")
+trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
+rownames(trait) = colnames(comm)
 
-#Example with community and trait matrices as input data 
-#kernel.originality(comm = comm, trait = trait, method='gaussian', abund = TRUE, frac = 0.01)
-
-#Example with hypervolume as input data
-#kernel.originality(comm = hypervolume_gaussian(trait))
+hv = kernel.build(comm[1,], trait)
+kernel.originality(hv)
+hvlist = kernel.build(comm, trait)
+kernel.originality(hvlist)
+kernel.originality(hvlist, relative = TRUE)
+}
 }
 \references{
 Carmona, C.P., de Bello, F., Sasaki, T., Uchida, K. & Partel, M. (2017) Towards a common toolbox for rarity: A response to Violle et al. Trends in Ecology and Evolution, 32: 889-891.
