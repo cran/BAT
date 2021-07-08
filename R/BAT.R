@@ -1,17 +1,12 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.6.0 (2021-05-12)
+#####Version 2.6.1 (2021-07-08)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.5.1:
-#####Added functions fill, standard, gower, tree.build, hull.build, kernel.build
-#####Added parameter "weight" to dummy
-#####Added parameter "relative" to hull.contribution
-#####All tree functions now allow using trait matrices in addition to trees
-#####All kernel.* and hull.* functions were considerably improved
-#####All kernel.* and hull.* functions now require hypervolumes (or lists) as input
-#####Improved help throughout
+#####Changed from v2.6.0:
+#####Now allows to build hypervolumes without comm data
+#####Now allows to use community data covering only part of a tree
 
 library("ape")
 library("geometry")
@@ -30,7 +25,7 @@ library("vegan")
 #' @import stats
 #' @import utils
 #' @import vegan
-#' @importFrom ape pcoa
+#' @importFrom ape as.phylo pcoa
 #' @importFrom MASS stepAIC
 #' @importFrom raster cellStats
 #' @importFrom raster raster
@@ -61,16 +56,27 @@ clean <- function(comm, tree = NA){
 }
 
 reorderComm <- function(comm, tree = NULL){
+  
+  if(is.vector(comm))
+    comm = as.matrix(comm, nrow = 1)
+  if(class(tree) == "hclust")
+    tree = as.phylo(tree)
+
   if (class(tree) == "phylo"){
     if(!is.null(tree$tip.label) && !is.null(colnames(comm))){ ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$tip.label, colnames(comm))]
+      
+      #if some species are missing from comm add 0s
+      if(length(tree$tip.label) > ncol(comm) && all(colnames(comm) %in% tree$tip.label)){
+        miss = tree$tip.label[which(!(tree$tip.label %in% colnames(comm)))]
+        addComm = matrix(0, nrow = nrow(comm), ncol = length(miss))
+        colnames(addComm) = miss
+        comm = cbind(comm, addComm)
+      }
+      if(length(dim(comm)) == 2)
+        comm <- comm[,match(tree$tip.label, colnames(comm)), drop = FALSE]
+      else
+        comm <- comm[,match(tree$tip.label, colnames(comm)),, drop = FALSE]
       if (any(tree$tip.label != colnames(comm)))
-        warning("Species names of comm and tree do not match!")
-    }
-  } else if (class(tree) == "hclust"){
-    if(!is.null(tree$labels) && !is.null(colnames(comm))){ ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$labels, colnames(comm))]
-      if (any(tree$labels != colnames(comm)))
         warning("Species names of comm and tree do not match!")
     }
   } else if (class(tree) == "dist"){
@@ -128,16 +134,19 @@ euclid <- function(x, y){
 }
 
 #prepare build of hull or kernel
-prep.build <- function(comm, trait, axes, convert, weight){
+prep.build <- function(comm = NULL, trait, axes, convert, weight){
   
   #prepare data
-  if (any(is.na(comm)))
-    stop("The function cannot be computed with missing comm values. Please remove observations with missing values.")
-  if(is.vector(comm)){
+  if(is.null(comm)){
+    comm = matrix(rep(1, nrow(trait)), nrow = 1)
+    colnames(comm) = rownames(trait)
+  } else if(is.vector(comm)){
     n = names(comm)
     comm = matrix(comm, nrow = 1)
     colnames(comm) = n
   }
+  if (any(is.na(comm)))
+    stop("The function cannot be computed with missing comm values. Please remove observations with missing values.")
   if (ncol(comm) != nrow(trait))
     stop("Number of species in comm and trait matrices are different.")
   
@@ -426,7 +435,7 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
     comm = cleanData[[1]]
     tree = cleanData[[2]]
   }
-  
+
   #now let's go for what matters
   nComm <- nrow(comm)
 	if(raref < 1){						# no rarefaction if 0 or negative
@@ -2660,6 +2669,7 @@ coverage <- function(comm, tree){
 #' colnames(comm) <- c("Sp1","Sp2","Sp3")
 #' methods <- c("Met1","Met2","Met2","Met3")
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+#' tree$labels <- colnames(comm)
 #' optim.alpha(comm,,methods)
 #' optim.alpha(comm, tree, methods)
 #' optim.alpha(comm,, methods = methods, base = c(0,0,1), runs = 100)
@@ -2734,6 +2744,7 @@ optim.alpha <- function(comm, tree, methods, base, runs = 0, prog = TRUE){
 #' colnames(comm) <- c("Sp1","Sp2","Sp3")
 #' methods <- c("Met1","Met2","Met2","Met3")
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+#' tree$labels <- colnames(comm)
 #' optim.alpha.stats(comm,,methods, c(1,1,1))
 #' optim.alpha.stats(comm, tree, methods = methods, samples = c(0,0,1), runs = 100)
 #' @export
@@ -2806,6 +2817,7 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 0){
 #' colnames(comm) <- c("sp1","sp2","sp3")
 #' methods <- c("Met1","Met2","Met2","Met3")
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+#' tree$labels <- colnames(comm)
 #' optim.beta(comm, methods = methods, runs = 100)
 #' optim.beta(comm, tree, methods = methods, abund = FALSE, base = c(0,0,1), runs = 100)
 #' @export
@@ -2877,6 +2889,7 @@ optim.beta <- function(comm, tree, methods, base, abund = TRUE, runs = 0, prog =
 #' colnames(comm) <- c("sp1","sp2","sp3")
 #' methods <- c("Met1","Met2","Met2","Met3")
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+#' tree$labels <- colnames(comm)
 #' optim.beta.stats(comm,,methods, c(1,1,1))
 #' optim.beta.stats(comm, tree, methods = methods, samples = c(0,0,1), runs = 100)
 #' @export
@@ -2987,6 +3000,8 @@ optim.spatial <- function(layers, n, latlong = TRUE, clusterMap = TRUE){
 #' sp3 <- raster::raster(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 #' spp <- raster::stack(sp1, sp2, sp3)
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+#' tree$labels = c("Sp1", "Sp2", "Sp3")
+#' names(spp) = tree$labels
 #' raster.alpha(spp)
 #' raster.alpha(spp, tree)
 #' @export
@@ -3026,6 +3041,8 @@ raster.alpha <- function(layers, tree){
 #' sp3 <- raster::raster(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 #' spp <- raster::stack(sp1, sp2, sp3)
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+#' tree$labels = c("Sp1", "Sp2", "Sp3")
+#' names(spp) = tree$labels
 #' raster.beta(spp)
 #' raster.beta(spp, tree)
 #' @export
@@ -3073,6 +3090,8 @@ raster.beta <- function(layers, tree, func = "jaccard", neighbour = 8, abund = F
 #' sp3 <- raster::raster(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 #' spp <- raster::stack(sp1, sp2, sp3)
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+#' tree$labels = c("Sp1", "Sp2", "Sp3")
+#' names(spp) = tree$labels
 #' raster.dispersion(spp, tree)
 #' @export
 raster.dispersion <- function(layers, tree, distance, func = "originality", abund = FALSE, relative = FALSE){
@@ -3105,6 +3124,8 @@ raster.dispersion <- function(layers, tree, distance, func = "originality", abun
 #' sp3 <- raster::raster(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 #' spp <- raster::stack(sp1, sp2, sp3)
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+#' tree$labels = c("Sp1", "Sp2", "Sp3")
+#' names(spp) = tree$labels
 #' raster.evenness(spp, tree)
 #' @export
 raster.evenness <- function(layers, tree, distance, method = "expected", func = "camargo", abund = TRUE){
@@ -3956,7 +3977,7 @@ kernel.build <- function(comm, trait, method = "gaussian", abund = TRUE, axes = 
       stop(paste("There are no communities with species.\n"))
     comm2 = comm[-(fewSpp), , drop = FALSE]
     for(i in fewSpp)
-      warning(paste("Site", fewSpp, "does not contain any species and has been removed prior to convex hull estimation.\n"))
+      warning(paste("Site", fewSpp, "does not contain any species and has been removed prior to hypervolume estimation.\n"))
     comm <- comm2
   }
   

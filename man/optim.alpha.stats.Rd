@@ -35,6 +35,7 @@ comm <- array(c(comm1, comm2), c(4,3,2))
 colnames(comm) <- c("Sp1","Sp2","Sp3")
 methods <- c("Met1","Met2","Met2","Met3")
 tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+tree$labels <- colnames(comm)
 optim.alpha.stats(comm,,methods, c(1,1,1))
 optim.alpha.stats(comm, tree, methods = methods, samples = c(0,0,1), runs = 100)
 }

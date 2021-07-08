@@ -41,6 +41,7 @@ comm <- array(c(comm1, comm2, comm3), c(4,3,3))
 colnames(comm) <- c("sp1","sp2","sp3")
 methods <- c("Met1","Met2","Met2","Met3")
 tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+tree$labels <- colnames(comm)
 optim.beta(comm, methods = methods, runs = 100)
 optim.beta(comm, tree, methods = methods, abund = FALSE, base = c(0,0,1), runs = 100)
 }

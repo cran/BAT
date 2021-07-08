@@ -42,6 +42,8 @@ sp2 <- raster::raster(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = T
 sp3 <- raster::raster(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 spp <- raster::stack(sp1, sp2, sp3)
 tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
+tree$labels = c("Sp1", "Sp2", "Sp3")
+names(spp) = tree$labels
 raster.dispersion(spp, tree)
 }
 \references{
