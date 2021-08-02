@@ -4,12 +4,14 @@
 \alias{hull.beta}
 \title{Beta diversity partitioning using convex hull hypervolumes.}
 \usage{
-hull.beta(comm, func = "jaccard")
+hull.beta(comm, func = "jaccard", comp = FALSE)
 }
 \arguments{
 \item{comm}{A list of 'convhulln' objects, preferably built with function hull.build.}
 
 \item{func}{Partial match indicating whether the Jaccard (default) or Soerensen family of beta diversity measures should be used.}
+
+\item{comp}{Boolean indicating whether beta diversity components (shared and unique fractions) should be returned.}
 }
 \value{
 Three pairwise distance matrices, one per each of the three beta diversity components.
@@ -27,14 +29,14 @@ comm <- rbind(c(1,1,1,1,1), c(1,1,1,1,1), c(0,0,1,1,1),c(0,0,1,1,1))
 colnames(comm) = c("SpA","SpB","SpC","SpD", "SpE")
 rownames(comm) = c("Site 1","Site 2","Site 3","Site 4")
 
-trait <- cbind(c(2.2,4.4,6.1,8.3,3),c(0.5,1,0.5,0.4,4),c(0.7,1.2,0.5,0.4,5),c(0.7,2.2,0.5,0.3,6))
-colnames(trait) = c("Trait 1","Trait 2","Trait 3","Trait 4")
+trait <- cbind(c(2.2,4.4,6.1,8.3,3),c(0.5,1,0.5,0.4,4))
+colnames(trait) = c("Trait 1","Trait 2")
 rownames(trait) = colnames(comm)
 
 hvlist = hull.build(comm, trait)
 hull.beta(hvlist)
 hvlist = hull.build(comm, trait, axes = 2)
-hull.beta(hvlist)
+hull.beta(hvlist, comp = TRUE)
 }
 \references{
 Carvalho, J.C. & Cardoso, P. (2020) Decomposing the causes for niche differentiation between species using hypervolumes. Frontiers in Ecology and Evolution. https://doi.org/10.3389/fevo.2020.00243

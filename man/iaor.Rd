@@ -18,7 +18,7 @@ Fits and compares several of the most supported models for the IAOR.
 \details{
 Locally abundant species tend to be widespread while locally rare species tend to be narrowly distributed.
 That is, for a given species assemblage, there is a positive interspecific abundance-occupancy relationship (Brown 1984).
-This function compares some of the most commonly used and theoretically or empirically suported models (Nachman 1981; He & Gaston 2000; Cardoso et al. subm.).
+This function compares some of the most commonly used and theoretically or empirically suported models (Nachman 1981; He & Gaston 2000; Cardoso et al. 2020).
 }
 \examples{
 comm <- matrix(c(4,3,2,1,5,4,3,2,3,2,1,0,6,3,0,0,0,0,0,0), nrow = 5, ncol = 4, byrow = TRUE)
@@ -27,7 +27,7 @@ iaor(comm)
 \references{
 Brown, J.H. (1984) On the relationship between abundance and distribution of species. American Naturalist, 124: 255-279.
 
-Cardoso, P., Branco, V.V., Borges, P.A.V., Carvalho, J.C., Rigal, F., Gabriel, R., Mammola, S., Cascalho, J. & Correia, L. (subm.) Automated discovery of relationships, models and principles in ecology. Pre-print available from bioRxiv doi: http://dx.doi.org/10.1101/027839
+Cardoso, P., Branco, V.V., Borges, P.A.V., Carvalho, J.C., Rigal, F., Gabriel, R., Mammola, S., Cascalho, J. & Correia, L. (2020) Automated discovery of relationships, models and principles in ecology. Frontiers in Ecology and Evolution, 8: 530135.
 
 He, F.L. & Gaston, K.J. (2000) Estimating species abundance from occurrence. American Naturalist, 156: 553-559.
 

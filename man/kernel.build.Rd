@@ -9,9 +9,10 @@ kernel.build(
   trait,
   method = "gaussian",
   abund = TRUE,
+  weight = NULL,
   axes = 0,
   convert = NULL,
-  weight = NULL,
+  cores = 1,
   ...
 )
 }
@@ -24,15 +25,17 @@ kernel.build(
 
 \item{abund}{A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method = "gaussian".}
 
-\item{axes}{If 0, no transformation of data is done.
-If 0 < axes <= 1 a PCoA is done with Gower distances and as many axes as needed to achieve this proportion of variance explained are selected.
-If axes > 1 these many axes are selected.}
+\item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.}
+
+\item{axes}{If 0, no transformation of data is done.}
 
 \item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.}
 
-\item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.}
+\item{cores}{Number of cores to be used in parallel processing. If = 0 all available cores are used. Beware that multicore for Windows is not optimized yet and it often takes longer than single core.}
 
-\item{...}{Further arguments to be passed to hypervolume::hypervolume.}
+\item{...}{further arguments to be passed to hypervolume::hypervolume
+If 0 < axes <= 1 a PCoA is done with Gower distances and as many axes as needed to achieve this proportion of variance explained are selected.
+If axes > 1 these many axes are selected.}
 }
 \value{
 A 'Hypervolume' or 'HypervolumeList', representing the hypervolumes of each community.
@@ -41,33 +44,24 @@ A 'Hypervolume' or 'HypervolumeList', representing the hypervolumes of each comm
 Builds kernel density hypervolumes from trait data.
 }
 \details{
-Hypervolumes can be constructed with the given data or data can be transformed using PCoA over Gower distances (Pavoine et al. 2009) after traits are dummyfied (if needed) and standardized (always).
-Gower distance allows continuous, ordinal, categorical or binary variables, with possible weighting.
-NAs are allowed as long as each pair of species has at least one trait value in common.
-If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters as values.
-Transformation of traits is recommended if (Carvalho & Cardoso, 2020):
-1) Some traits are not continuous; or
-2) Some traits are correlated.
+The hypervolumes can be constructed with the given data or data can be transformed using PCoA over Gower distances (Pavoine et al. 2009) after traits are dummyfied (if needed) and standardized (always).
+Beware that if transformations are required, all communities to be compared should be built simultaneously to guarantee comparability. In such case, one might want to first run hyper.build and use the resulting data in different runs of kernel.build.
+See function hyper.build for more details.
 }
 \examples{
 \dontrun{
-comm = rbind(c(1,3,0,5,3), c(3,2,5,0,0))
+comm = rbind(c(1,1,0,5,1), c(3,2,5,0,0))
 colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
-rownames(comm) = c("Site 1", "Site 2")
+rownames(comm) = c("Site1", "Site2")
 
-trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
+trait = data.frame(body = c(1,2,3,1,2), beak = c(1,2,3,2,1))
 rownames(trait) = colnames(comm)
 
 hv = kernel.build(comm[1,], trait)
 plot(hv)
-hvlist = kernel.build(comm, trait)
+hvlist = kernel.build(comm, trait, abund = FALSE, cores = 0)
 plot(hvlist)
-hvlist = kernel.build(comm, trait, method = "box", axes = 2, weight = c(1,2))
+hvlist = kernel.build(comm, trait, method = "box", weight = c(1,2), axes = 2)
 plot(hvlist)
 }
-}
-\references{
-Carvalho, J.C. & Cardoso, P. (2020) Decomposing the causes for niche differentiation between species using hypervolumes. Frontiers in Ecology and Evolution, 8: 243.
-
-Pavoine et al. (2009) On the challenge of treating various types of variables: application for improving the measurement of functional diversity. Oikos, 118: 391-402.
 }

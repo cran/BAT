@@ -4,37 +4,31 @@
 \alias{hull.build}
 \title{Build convex hull hypervolumes.}
 \usage{
-hull.build(comm, trait, axes = 0, convert = NULL, weight = NULL)
+hull.build(comm, trait, weight = NULL, axes = 0, convert = NULL)
 }
 \arguments{
 \item{comm}{A sites x species matrix, data.frame or vector, with incidence data about the species in the community.}
 
 \item{trait}{A species x traits matrix or data.frame.}
 
+\item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.}
+
 \item{axes}{If 0, no transformation of data is done.
 If 0 < axes <= 1 a PCoA is done with Gower distances and as many axes as needed to achieve this proportion of variance explained are selected.
 If axes > 1 these many axes are selected.}
 
 \item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.}
-
-\item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.}
 }
 \value{
 A 'convhulln' object or a list, representing the hypervolumes of each community.
 }
 \description{
-Builds convex hull hypervolumes from trait data.
+Builds convex hull hypervolumes for each community from incidence and trait data.
 }
 \details{
 The hypervolumes can be constructed with the given data or data can be transformed using PCoA over Gower distances (Pavoine et al. 2009) after traits are dummyfied (if needed) and standardized (always).
-Gower distance allows continuous, ordinal, categorical or binary variables, with possible weighting.
-NAs are allowed as long as each pair of species has at least one trait value in common.
-If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters as values.
-Note that each community should have at least 3 species and more species than traits or axes (if axes > 0) to build convex hull hypervolumes.
-Transformation of traits is recommended if (Carvalho & Cardoso, 2020):
-1) Some traits are not continuous;
-2) Some traits are correlated; or
-3) There are less species than traits + 1, in which case the number of axes should be smaller.
+Beware that if transformations are required, all communities to be compared should be built simultaneously to guarantee comparability. In such case, one might want to first run hyper.build and use the resulting data in different runs of hull.build.
+See function hyper.build for more details.
 }
 \examples{
 comm = rbind(c(1,3,0,5,3), c(3,2,5,0,0))
@@ -47,12 +41,7 @@ rownames(trait) = colnames(comm)
 hv = hull.build(comm[1,], trait)
 plot(hv)
 hvlist = hull.build(comm, trait)
-plot(hvlist[[1]])
+plot(hvlist[[2]])
 hvlist = hull.build(comm, trait, axes = 2, weight = c(1,2))
 plot(hvlist[[1]])
-}
-\references{
-Carvalho, J.C. & Cardoso, P. (2020) Decomposing the causes for niche differentiation between species using hypervolumes. Frontiers in Ecology and Evolution, 8: 243.
-
-Pavoine et al. (2009) On the challenge of treating various types of variables: application for improving the measurement of functional diversity. Oikos, 118: 391-402.
 }

@@ -4,15 +4,17 @@
 \alias{kernel.beta}
 \title{Beta diversity partitioning using kernel density hypervolumes.}
 \usage{
-kernel.beta(comm, func = "jaccard")
+kernel.beta(comm, func = "jaccard", comp = FALSE)
 }
 \arguments{
 \item{comm}{A 'HypervolumesList' object, preferably built using function kernel.build.}
 
 \item{func}{Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is Jaccard.}
+
+\item{comp}{Boolean indicating whether beta diversity components (shared and unique fractions) should be returned}
 }
 \value{
-Three pairwise distance matrices, one per each of the three beta diversity components.
+Three pairwise distance matrices, one per each of the three beta diversity components. If comp = TRUE also three distance matrices with beta diversity components.
 }
 \description{
 Pairwise beta diversity partitioning into replacement and net difference in amplitude components of n-dimensional hypervolumes.
@@ -35,7 +37,7 @@ rownames(trait) = colnames(comm)
 hvlist = kernel.build(comm, trait)
 kernel.beta(hvlist)
 hvlist = kernel.build(comm, trait, axes = 0.9)
-kernel.beta(hvlist)
+kernel.beta(hvlist, comp = TRUE)
 }
 }
 \references{

@@ -11,7 +11,7 @@ kernel.contribution(comm, func = "neighbor", relative = FALSE)
 
 \item{func}{Calculate contribution using either closest "neighbor" or leave "one out" approach.}
 
-\item{relative}{A boolean (T/F) indicating whether contribution should be relative to total PD or FD (proportional contribution per individual or species). If FALSE, the sum of contributions for each site is equal to total PD/FD, if TRUE it is 1.}
+\item{relative}{A boolean (T/F) indicating whether contribution should be relative to total FD (proportional contribution per individual or species). If FALSE, the sum of contributions for each site is equal to total FD, if TRUE it is 1.}
 }
 \value{
 A matrix with the contribution values of each species or individual for each site.

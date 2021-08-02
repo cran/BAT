@@ -4,7 +4,15 @@
 \alias{beta}
 \title{Beta diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).}
 \usage{
-beta(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 100)
+beta(
+  comm,
+  tree,
+  func = "jaccard",
+  abund = TRUE,
+  raref = 0,
+  runs = 100,
+  comp = FALSE
+)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data.}
@@ -22,6 +30,8 @@ If raref > 1 rarefaction is made by the abundance indicated.
 If not specified, default is 0.}
 
 \item{runs}{Number of resampling runs for rarefaction. If not specified, default is 100.}
+
+\item{comp}{Boolean indicating whether beta diversity components (shared and unique fractions) should be returned}
 }
 \value{
 Three distance matrices between sites, one per each of the three beta diversity measures (either "Obs" OR "Mean, Median, Min, LowerCL, UpperCL and Max").
@@ -42,7 +52,7 @@ The rarefaction option is useful to compare communities with much different numb
 comm <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)
 tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 beta(comm)
-beta(comm, func = "Soerensen")
+beta(comm, abund = FALSE, comp = TRUE)
 beta(comm, tree)
 beta(comm, raref = 1)
 beta(comm, tree, "s", abund = FALSE, raref = 2)

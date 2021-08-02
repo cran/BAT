@@ -36,6 +36,8 @@ Regularity of abundances and distances (if PD/FD) between species in a community
 Evenness is calculated based on the index of Camargo (1993) or Bulla (1994) using the values of both species abundances and edge lengths in the tree (if PD/FD).
 
 If no tree or distance is provided the result is the original index.
+
+If any site has < 2 species its value will be NA.
 }
 \examples{
 comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
