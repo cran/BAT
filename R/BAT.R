@@ -1,16 +1,12 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.7.0 (2021-08-02)
+#####Version 2.7.1 (2021-10-07)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.6.1:
-#####Added functions r2, aic, and ses
-#####Added function hyper.build
-#####Added function kernel.hotspots
-#####Added option cores to kernel.build
-#####Added option comp to *.beta
-#####Improved function evenness
+#####Changed from v2.7.0:
+#####Improved xTree to allow nj trees
+#####Improved information of kernel.build, *.beta
 
 library("ape")
 library("geometry")
@@ -31,7 +27,7 @@ library("vegan")
 #' @import stats
 #' @import utils
 #' @import vegan
-#' @importFrom ape as.phylo pcoa
+#' @importFrom ape as.phylo nj pcoa
 #' @importFrom MASS stepAIC
 #' @importFrom raster cellStats
 #' @importFrom raster raster
@@ -142,24 +138,45 @@ xTree <- function(tree) {
   		}
   	}
   	rownames(sppEdges) <- tree$labels
-  	list(lenEdges, sppEdges)
+  	return(list(lenEdges, sppEdges))
+  	
   } else if (class(tree) == "phylo"){
-    lenEdges <- tree$edge.length
-    nSpp <- length(tree$tip.label)
-    nEdges <- length(tree$edge.length)
-    root <- nSpp + 1
-    sppEdges <- matrix(0, nSpp, nEdges)
-    for(i in 1:nSpp){
-      find = i                                    #start by finding the ith species
-      repeat{
-        row = which(tree$edge[,2] == find)        #locate in which row of the edge table is our species or edge to be found
-        sppEdges[i, row] = 1
-        find = tree$edge[row,1]                   #find next edge if any until reaching the root
-        if(find == root) break                    #all edges of this species were found, go to next species
+    
+    # old code
+    # lenEdges <- tree$edge.length
+    # nSpp <- length(tree$tip.label)
+    # nEdges <- length(tree$edge.length)
+    # root <- nSpp + 1
+    # sppEdges <- matrix(0, nSpp, nEdges)
+    # for(i in 1:nSpp){
+    #   find = i                                    #start by finding the ith species
+    #   repeat{
+    #     row = which(tree$edge[,2] == find)        #locate in which row of the edge table is our species or edge to be found
+    #     sppEdges[i, row] = 1
+    #     find = tree$edge[row,1]                   #find next edge if any until reaching the root
+    #     if(find == root) break                    #all edges of this species were found, go to next species
+    #   }
+    # }
+    # rownames(sppEdges) <- tree$tip.label
+    # return(list(lenEdges, sppEdges))
+    
+    edgeList = tree$edge # edge list
+    edgeLength = tree$edge.length # edge length
+    spp = tree$tip.label # species
+    basal = min(edgeList[,1]) # Basal node
+    mat = matrix(data = 0, nrow = length(spp), ncol = length(edgeLength)) # empty matrix
+    for (i in 1:length(spp)) {
+      x = i
+      repeat {
+        mat[i, which(edgeList[,2] == x)] = 1
+        x = edgeList[which(edgeList[,2] == x), 1]
+        if (x == basal){
+          break
+        }
       }
     }
-    rownames(sppEdges) <- tree$tip.label
-    list(lenEdges, sppEdges)
+    return(list(edgeLength, mat))
+    
   } else {
     cat("Unrecognized tree object!")
   }
@@ -876,20 +893,20 @@ hill <- function(comm, q = 0, raref = 0, runs = 100){
 #' If raref > 1 rarefaction is made by the abundance indicated.
 #' If not specified, default is 0.
 #' @param runs Number of resampling runs for rarefaction. If not specified, default is 100.
-#' @param comp Boolean indicating whether beta diversity components (shared and unique fractions) should be returned
+#' @param comp Boolean indicating whether beta diversity components (shared and unique fractions) should be returned.
 #' @details The beta diversity measures used here follow the partitioning framework independently developed by Podani & Schmera (2011) and Carvalho et al. (2012)
 #' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
 #' Btotal = total beta diversity, reflecting both species replacement and loss/gain;
 #' Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone.
 #' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
-#' The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001)
+#' The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001).
 #' @return Three distance matrices between sites, one per each of the three beta diversity measures (either "Obs" OR "Mean, Median, Min, LowerCL, UpperCL and Max").
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 #' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
 #' @references Gotelli, N.J. & Colwell, R.K. (2001) Quantifying biodiversity: procedures and pitfalls in the measurement and comparison of species richness. Ecology Letters, 4, 379-391.
 #' @references Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
-#' @examples comm <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)
+#' @examples comm <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,2,2), nrow = 4, ncol = 5, byrow = TRUE)
 #' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 #' beta(comm)
 #' beta(comm, abund = FALSE, comp = TRUE)
@@ -929,8 +946,8 @@ beta <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 1
 		results <- list(Btotal = as.dist(results[,,1]),Brepl = as.dist(results[,,2]),Brich = as.dist(results[,,3]))
 		if (comp){
 		  results$Shared = round(as.dist(comps[,,1]),3)
-		  results$Unique1 = round(as.dist(comps[,,2]),3)
-		  results$Unique2 = round(as.dist(comps[,,3]),3)
+		  results$Unique_to_Cols = round(as.dist(comps[,,2]),3)
+		  results$Unique_to_Rows = round(as.dist(comps[,,3]),3)
 		}
 		return(results)
 	}
@@ -1644,8 +1661,8 @@ hull.beta <- function(comm, func = "jaccard", comp = FALSE){
   if (comp){
     rownames(compA) <- colnames(compA) <- rownames(compB) <- colnames(compB) <- rownames(compC) <- colnames(compC) <- names(comm)
     betaValues$Shared = round(as.dist(compA),3)
-    betaValues$Unique1 = round(as.dist(compB),3)
-    betaValues$Unique2 = round(as.dist(compC),3)
+    betaValues$Unique_to_Cols = round(as.dist(compB),3)
+    betaValues$Unique_to_Rows = round(as.dist(compC),3)
   }
   return(betaValues)
 }
@@ -1818,8 +1835,8 @@ kernel.beta = function(comm, func = "jaccard", comp = FALSE){
   if (comp){
     rownames(compA) <- colnames(compA) <- rownames(compB) <- colnames(compB) <- rownames(compC) <- colnames(compC) <- commNames
     betaValues$Shared = round(as.dist(compA),3)
-    betaValues$Unique1 = round(as.dist(compB),3)
-    betaValues$Unique2 = round(as.dist(compC),3)
+    betaValues$Unique_to_Cols = round(as.dist(compB),3)
+    betaValues$Unique_to_Rows = round(as.dist(compC),3)
   }
   return(betaValues)
 }
@@ -4137,11 +4154,11 @@ hull.build <- function(comm, trait, weight = NULL, axes = 0, convert = NULL){
 #' @param abund A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method = "gaussian".
 #' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.
 #' @param axes If 0, no transformation of data is done.
-#' @param ... further arguments to be passed to hypervolume::hypervolume
 #' If 0 < axes <= 1 a PCoA is done with Gower distances and as many axes as needed to achieve this proportion of variance explained are selected.
 #' If axes > 1 these many axes are selected.
 #' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.
 #' @param cores Number of cores to be used in parallel processing. If = 0 all available cores are used. Beware that multicore for Windows is not optimized yet and it often takes longer than single core.
+#' @param ... further arguments to be passed to hypervolume::hypervolume
 #' @details The hypervolumes can be constructed with the given data or data can be transformed using PCoA over Gower distances (Pavoine et al. 2009) after traits are dummyfied (if needed) and standardized (always).
 #' Beware that if transformations are required, all communities to be compared should be built simultaneously to guarantee comparability. In such case, one might want to first run hyper.build and use the resulting data in different runs of kernel.build.
 #' See function hyper.build for more details.
@@ -4156,7 +4173,7 @@ hull.build <- function(comm, trait, weight = NULL, axes = 0, convert = NULL){
 #' 
 #' hv = kernel.build(comm[1,], trait)
 #' plot(hv)
-#' hvlist = kernel.build(comm, trait, abund = FALSE, cores = 0)
+#' hvlist = kernel.build(comm, trait, abund = FALSE, cores = 2)
 #' plot(hvlist)
 #' hvlist = kernel.build(comm, trait, method = "box", weight = c(1,2), axes = 2)
 #' plot(hvlist)
@@ -4180,9 +4197,12 @@ kernel.build <- function(comm, trait, method = "gaussian", abund = TRUE, weight 
   }
   
   #general function for lapply (serial), mcapply (Mac/Linux) or parLapply (Win)
-  parbuild <- function(subComm, trait, method, abund, ... ){
+  parbuild <- function(i, commList, trait, method, abund, ... ){
+    subComm = commList[[i]]
     subTrait <- trait[subComm > 0, ] ##Select traits
     subComm <- subComm[subComm > 0]
+    
+    cat("Building hypervolume", i, "of", length(commList), "\n")
      
     if (method == "box"){
       newHv <- hypervolume_box(subTrait, verbose = FALSE, ... )
@@ -4210,16 +4230,16 @@ kernel.build <- function(comm, trait, method = "gaussian", abund = TRUE, weight 
   
   #make list to go for parallel if required
   commList = as.list(as.data.frame(t(comm)))
-  if(cores == 1){
-    hv = lapply(commList, parbuild, trait = trait, method = method, abund = abund, ... )
-  } else if (Sys.info()[['sysname']] == 'Windows'){
-    cl = makeCluster(cores)
-    func = paste("hypervolume", method, sep = "_")
-    clusterExport(cl, c("trait", "method", "abund", func))
-    hv = parLapply(cl, commList, parbuild, trait = trait, method = method, abund = abund, ...)
-    stopCluster(cl)
+  if(cores == 1 || Sys.info()[['sysname']] == 'Windows'){
+    hv = lapply(seq(commList), parbuild, commList = commList, trait = trait, method = method, abund = abund, ... )
+  #} else if (Sys.info()[['sysname']] == 'Windows'){
+  #  cl = makeCluster(cores)
+  #  func = paste("hypervolume", method, sep = "_")
+  #  clusterExport(cl, varlist = c("trait", "method", "abund", func))
+  #  hv = parLapply(cl, seq(commList), parbuild, commList = commList, trait = trait, method = method, abund = abund, ... )
+  #  stopCluster(cl)
   } else {
-    hv = mclapply(commList, parbuild, trait = trait, method = method, abund = abund, mc.cores = cores, ... )
+    hv = mclapply(seq(commList), parbuild, commList = commList, trait = trait, method = method, abund = abund, mc.cores = cores, ... )
   }
   
   #name hypervolumes and convert list to HypervolumeList

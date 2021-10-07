@@ -1,6 +1,6 @@
-18abe928b48e9291591cc5a6bc2e42ca *DESCRIPTION
-cf5a522e162627da2d5e13a3171ae0e1 *NAMESPACE
-107b2fb1216251ca4150bcc1352e2be6 *R/BAT.R
+8a5043353e907dfc4da582c8fec06ed1 *DESCRIPTION
+de18179ee0376b7dcc33c01ef90eb869 *NAMESPACE
+fb6f62d390ff527d4d6f82ecfc508afd *R/BAT.R
 dcaed1578113ec8d3e2f349487e7fffc *data/arrabida.rda
 dd86dc6c6bea68a3b8ff605352919747 *data/functree.rda
 8beb17284bf3e4069b3dd1105cf8f269 *data/geres.rda
@@ -12,7 +12,7 @@ e2c9e6339463c22cbe90acc4fe4d13fc *data/phylotree.rda
 954d2cbb0c62031e8d0a1a4b2b42a5e8 *man/alpha.accum.Rd
 b8e4c84777075d0856579c1551025dfc *man/alpha.estimate.Rd
 ea38ff271114e67c70898f75f5aa78a4 *man/arrabida.Rd
-e68b6a0e6f76a72e168193c4b0bcca69 *man/beta.Rd
+21f1fc64ea4fa7c1cdeacafadcd915de *man/beta.Rd
 a419d0fed33209c6e6570c9c3773a71a *man/beta.accum.Rd
 cf2cbff16e1a3ae2dfceac098933d88c *man/beta.evenness.Rd
 9f64e3b71434d9b78efda541f449c056 *man/beta.multi.Rd
@@ -41,7 +41,7 @@ dfceced54e0ed397e4b09dfb17189a65 *man/iaor.Rd
 b37756836bf6d00246082ef53004dd7c *man/kernel.alpha.Rd
 a152dea90b08e95dc064b2a580820cbe *man/kernel.beta.Rd
 1deba185267980df31d007c5f41613ef *man/kernel.beta.evenness.Rd
-ba5adcf067f9d9b0de239e5a28c3fda1 *man/kernel.build.Rd
+a12343d926f187416943dddd43dbd397 *man/kernel.build.Rd
 10d0d9e85cee4e3f101d913931563c9e *man/kernel.contribution.Rd
 e26b393220116041c49b97d56878cf9b *man/kernel.dispersion.Rd
 b6a848ce03645f384fe80937e0166fad *man/kernel.evenness.Rd

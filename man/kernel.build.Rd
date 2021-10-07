@@ -27,15 +27,15 @@ kernel.build(
 
 \item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.}
 
-\item{axes}{If 0, no transformation of data is done.}
+\item{axes}{If 0, no transformation of data is done.
+If 0 < axes <= 1 a PCoA is done with Gower distances and as many axes as needed to achieve this proportion of variance explained are selected.
+If axes > 1 these many axes are selected.}
 
 \item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.}
 
 \item{cores}{Number of cores to be used in parallel processing. If = 0 all available cores are used. Beware that multicore for Windows is not optimized yet and it often takes longer than single core.}
 
-\item{...}{further arguments to be passed to hypervolume::hypervolume
-If 0 < axes <= 1 a PCoA is done with Gower distances and as many axes as needed to achieve this proportion of variance explained are selected.
-If axes > 1 these many axes are selected.}
+\item{...}{further arguments to be passed to hypervolume::hypervolume}
 }
 \value{
 A 'Hypervolume' or 'HypervolumeList', representing the hypervolumes of each community.
@@ -59,7 +59,7 @@ rownames(trait) = colnames(comm)
 
 hv = kernel.build(comm[1,], trait)
 plot(hv)
-hvlist = kernel.build(comm, trait, abund = FALSE, cores = 0)
+hvlist = kernel.build(comm, trait, abund = FALSE, cores = 2)
 plot(hvlist)
 hvlist = kernel.build(comm, trait, method = "box", weight = c(1,2), axes = 2)
 plot(hvlist)

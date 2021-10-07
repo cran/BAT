@@ -1,7 +1,7 @@
 Package: BAT
 Title: Biodiversity Assessment Tools
-Version: 2.7.0
-Date: 2021-08-02
+Version: 2.7.1
+Date: 2021-10-07
 Authors@R: c(
     person("Pedro", "Cardoso", email = "pedro.cardoso@helsinki.fi", role = c("aut", "cre")),
     person("Stefano", "Mammola", role = c("aut")),
@@ -20,13 +20,13 @@ Imports: ape, geometry, graphics, hypervolume, MASS, nls2, parallel,
 Encoding: UTF-8
 License: GPL-3
 LazyData: true
-RoxygenNote: 7.1.1
+RoxygenNote: 7.1.2
 NeedsCompilation: no
-Packaged: 2021-08-02 14:41:00 UTC; ungol
+Packaged: 2021-10-07 10:34:12 UTC; ungol
 Author: Pedro Cardoso [aut, cre],
   Stefano Mammola [aut],
   Francois Rigal [aut],
   Jose Carvalho [aut]
 Maintainer: Pedro Cardoso <pedro.cardoso@helsinki.fi>
 Repository: CRAN
-Date/Publication: 2021-08-02 15:00:02 UTC
+Date/Publication: 2021-10-07 11:30:02 UTC

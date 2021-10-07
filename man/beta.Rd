@@ -31,7 +31,7 @@ If not specified, default is 0.}
 
 \item{runs}{Number of resampling runs for rarefaction. If not specified, default is 100.}
 
-\item{comp}{Boolean indicating whether beta diversity components (shared and unique fractions) should be returned}
+\item{comp}{Boolean indicating whether beta diversity components (shared and unique fractions) should be returned.}
 }
 \value{
 Three distance matrices between sites, one per each of the three beta diversity measures (either "Obs" OR "Mean, Median, Min, LowerCL, UpperCL and Max").
@@ -46,10 +46,10 @@ Btotal = total beta diversity, reflecting both species replacement and loss/gain
 Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone.
 PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 The number and order of species in comm must be the same as in tree.
-The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001)
+The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001).
 }
 \examples{
-comm <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)
+comm <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,2,2), nrow = 4, ncol = 5, byrow = TRUE)
 tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 beta(comm)
 beta(comm, abund = FALSE, comp = TRUE)
