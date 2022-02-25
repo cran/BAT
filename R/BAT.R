@@ -1,33 +1,35 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.7.1 (2021-10-07)
+#####Version 2.8.0 (2022-02-25)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.7.0:
-#####Improved xTree to allow nj trees
-#####Improved information of kernel.build, *.beta
+#####Changed from v2.7.1:
+#####Added *.quality and tree.zero functions
+#####Improved raster.beta, dispersion, and ses
 
 library("ape")
 library("geometry")
 library("graphics")
 library("hypervolume")
 library("MASS")
+library("methods")
 library("nls2")
 library("parallel")
 library("raster")
 library("stats")
 library("utils")
 library("vegan")
+#' @import ape
 #' @import geometry
 #' @import graphics
 #' @import hypervolume
+#' @import methods
 #' @import nls2
 #' @import parallel
 #' @import stats
 #' @import utils
 #' @import vegan
-#' @importFrom ape as.phylo nj pcoa
 #' @importFrom MASS stepAIC
 #' @importFrom raster cellStats
 #' @importFrom raster raster
@@ -61,10 +63,10 @@ reorderComm <- function(comm, tree = NULL){
   
   if(is.vector(comm))
     comm = as.matrix(comm, nrow = 1)
-  if(class(tree) == "hclust")
+  if (is(tree, "hclust"))
     tree = ape::as.phylo(tree)
 
-  if (class(tree) == "phylo"){
+  if (is(tree, "phylo")){
     if(!is.null(tree$tip.label) && !is.null(colnames(comm))){ ##if both tree and comm have species names match and reorder species (columns) in comm
       
       #if some species are missing from comm add 0s
@@ -81,7 +83,7 @@ reorderComm <- function(comm, tree = NULL){
       if (any(tree$tip.label != colnames(comm)))
         warning("Species names of comm and tree do not match!")
     }
-  } else if (class(tree) == "dist"){
+  } else if (is(tree, "dist")){
     if(!is.null(colnames(tree)) && !is.null(colnames(comm))){ ##if both tree and comm have species names match and reorder species (columns) in comm
       comm <- comm[,match(colnames(tree), colnames(comm))]
       if (any(colnames(tree) != colnames(comm)))
@@ -117,7 +119,7 @@ euclid <- function(x, y){
 #####xTree function partly adapted from http://owenpetchey.staff.shef.ac.uk/Code/Code/calculatingfd_assets/Xtree.r
 #####by Jens Schumacher (described in Petchey & Gaston 2002, 2006)
 xTree <- function(tree) {
-  if (class(tree) == "hclust"){
+  if (is(tree, "hclust")){
   	nSpp <- nrow(as.data.frame(tree['order']))
   	sppEdges <- matrix(0, nSpp, 2 * nSpp - 2)
   	lenEdges <- vector("numeric", 2 * nSpp - 2)
@@ -140,7 +142,7 @@ xTree <- function(tree) {
   	rownames(sppEdges) <- tree$labels
   	return(list(lenEdges, sppEdges))
   	
-  } else if (class(tree) == "phylo"){
+  } else if (is(tree, "phylo")){
     
     # old code
     # lenEdges <- tree$edge.length
@@ -336,22 +338,79 @@ betaObs <- function(comm, xtree, func = "jaccard", abund = TRUE, comp = FALSE){
   return(betaValues)
 }
 
-##create latitude layer
-raster.lat <- function(layers){
-	lat <- layers[[1]]
-	x <- rasterToPoints(lat)[,1:2]
-	lat <- rasterize(x[,1:2], lat, x[,2])
-	names(lat) <- "latitude"
-	return(lat)
+#####Auxiliary function to calculate the mean squared deviation (mSD)
+msd <- function(dist1, dist2){
+  
+  #standardize all distances to 0-1
+  dist1 = dist1 / max(dist1)
+  dist2 = dist2 / max(dist2)
+  
+  #calculate mSD between 0 (min quality) and 1 (max quality)
+  qual = 0
+  n = length(dist1)
+  for(i in 1:n)
+    qual = qual + (dist1[i] - dist2[i])^2
+  qual = qual / ((n * (n - 1))/2)
+  qual = 1 - qual
+  
+  #calculate mSD for all species with same pairwise distance to rescale the min
+  dist2[] = 1
+  minQual = 0
+  for(i in 1:n)
+    minQual = minQual + (dist1[i] - dist2[i])^2
+  minQual = minQual / ((n * (n - 1))/2)
+  minQual = 1 - minQual
+  
+  #rescale
+  qual = (qual - minQual) / (1 - minQual)
+
+  return(qual)
 }
 
-##create longitude layer
-raster.long <- function(layers){
-	long <- layers[[1]]
-	x <- rasterToPoints(long)[,1:2]
-	long <- rasterize(x[,1:2], long, x[,1])
-	names(long) <- "longitude"
-	return(long)
+#####Auxiliary function doing most work for sad.*
+sad.core <- function(comm, contr = NULL, octaves = TRUE, raref = 0, runs = 100){
+
+  #prepare data
+  if(is.vector(comm))
+    comm = matrix(comm, 1)
+  if(is.null(contr))
+    contr = rep(1, ncol(comm))
+  if(is.vector(contr))
+    contr = matrix(contr, 1)
+  if(raref == 1)
+    raref = min(rowSums(comm))
+  
+  #get octaves
+  if(octaves)
+    nOctaves = as.integer(log2(max(comm))+1)
+  else
+    nOctaves = max(comm)
+  res = matrix(0, nrow = nrow(comm), ncol = nOctaves)
+  
+  #the core stuff
+  for(i in 1:nrow(comm)){
+    #if rarefying data
+    if(raref > 0){
+      r = matrix(0, nrow = runs, ncol = nOctaves)
+      for(j in 1:runs){
+        samp = rrarefy(comm[i,], sample = raref)
+        newSad = sad.core(samp, contr[i,], octaves, raref = 0, runs = 0)
+        r[j, 1:length(newSad)] = newSad
+      }
+      res[i,] = apply(r, 2, mean, na.rm = TRUE)
+    } else {
+      thisComm = comm[i, comm[i,] > 0]
+      thisContr = contr[i, comm[i,] > 0]
+      for(j in unique(thisComm)){
+        selected <- ifelse(thisComm == j, thisContr, 0) # vector of contribution of species with given abundance
+        if(octaves)
+          res[i, as.integer(log2(j)+1)] = sum(res[i, as.integer(log2(j)+1)], selected)
+        else
+          res[i, j] = sum(selected)
+      }
+    }
+  }
+  return(res)
 }
 
 ##################################################################################
@@ -379,7 +438,7 @@ raster.long <- function(layers){
 #' @references Petchey, O.L. & Gaston, K.J. (2006) Functional diversity: back to basics and looking forward. Ecology Letters, 9, 741-758.
 #' @examples comm <- matrix(c(0,0,1,1,0,0,2,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
 #' trait = 1:5
-#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' tree <- hclust(dist(c(1:5), method = "euclidean"), method = "average")
 #' alpha(comm)
 #' alpha(comm, raref = 0)
 #' alpha(comm, trait)
@@ -625,7 +684,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 			form <- y ~ (a*x)/(b+x)
 			mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
 			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
-			if(class(curve) != "try-error"){
+			if (!is(curve, "try-error")){
 				a <- coef(curve)[1]
 				results[s,5] <- a
 			}
@@ -633,7 +692,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
       form <- y ~ a*(1-exp(-b*x))
 			mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
 			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
-			if(class(curve) != "try-error"){
+			if (!is(curve, "try-error")){
 				a <- coef(curve)[1]
 				results[s,6] <- a
 			}
@@ -642,7 +701,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 			form <- y ~ (c+(a*x))/(b+x)
 			mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
 			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
-			if(class(curve) != "try-error"){
+			if (!is(curve, "try-error")){
 				a <- coef(curve)[1]
 				results[s,4] <- a
 			}
@@ -651,7 +710,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
  			form <- y ~ a*(1-exp(-b*(x^c)))
       mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
  			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
-  			if(class(curve) != "try-error"){
+  			if (!is(curve, "try-error")){
   				a <- coef(curve)[1]
   				results[s,7] <- a
   			}
@@ -1172,8 +1231,6 @@ originality <- function(comm, tree, distance, abund = TRUE, relative = TRUE){
 	distance <- as.matrix(distance)													#convert distance to matrix
   if(!abund){
   	comm <- ifelse(comm > 0, 1, 0)
-  	for(i in 1:nrow(distance))
-  		distance[i,i] = NA
   }
 
   original <- matrix(NA,nrow(comm),ncol(comm))
@@ -1266,7 +1323,7 @@ uniqueness <- function(comm, tree, distance, relative = TRUE){
 #' contribution(comm, tree, FALSE)
 #' contribution(comm, tree, abund = FALSE, relative = FALSE)
 #' @export
-contribution <- function(comm, tree, abund = TRUE, relative = TRUE){
+contribution <- function(comm, tree, abund = TRUE, relative = FALSE){
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
@@ -1277,11 +1334,11 @@ contribution <- function(comm, tree, abund = TRUE, relative = TRUE){
 	if(is.vector(comm))
 		comm <- matrix(comm, nrow = 1)
 	comm <- as.matrix(comm)
-	
 	if(!abund)
 		comm <- ifelse(comm > 0, 1, 0)
+	
 	if (!missing(tree)){
-		if (class(tree) == "phylo"){
+		if (is(tree, "phylo")){
 			nEdges <- length(tree$edge.length)
 			if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
 				comm <- comm[,match(tree$tip.label, colnames(comm))]
@@ -1357,12 +1414,15 @@ dispersion <- function(comm, tree, distance, func = "originality", abund = TRUE,
 	}
 	if(is.vector(comm))
 		comm <- matrix(comm, nrow = 1)
+	if(!abund)
+	  comm = ifelse(comm > 0, 1, 0)
+
 	if(func == "originality")
-		funcValue <- originality(comm, tree, distance, abund, relative)
+		funcValue <- originality(comm, tree, distance, abund = TRUE, relative)
 	else if (func == "uniqueness")
 		funcValue <- uniqueness(comm, tree, distance, relative)
 	else if (func == "contribution")
-		funcValue <- contribution(comm, tree, abund, relative)
+		funcValue <- contribution(comm, tree, abund = TRUE, relative)
 	else
     stop(sprintf("Function %s not recognized.", func))
 
@@ -1588,7 +1648,7 @@ hull.alpha <- function(comm){
     stop("A convhulln or list is needed as input data.")
   
   #if single comm
-  if (class(comm) == "convhulln")
+  if (is(comm, "convhulln"))
     return(comm$vol)
 
   #if multiple comm
@@ -1693,7 +1753,7 @@ hull.contribution = function(comm, relative = FALSE){
     stop("A convhulln or list is needed as input data.")
   
   #if a convex hull is provided go for it.
-  if (class(comm) == "convhulln"){
+  if (is(comm, "convhulln")){
     contrib <- c()
     for (i in 1:nrow(comm$p))
       contrib <- c(contrib, (comm$vol - geometry::convhulln(comm$p[-i,], options = "FA")$vol))
@@ -1701,7 +1761,7 @@ hull.contribution = function(comm, relative = FALSE){
     if(relative)
       contrib = contrib/sum(contrib)
     
-  #if a comm matrix is provided just call this same function using hypervolumes.
+  #if a list is provided just call this same function using hypervolumes.
   } else {
     
     #get species names from hypervolumes and order them alphabetically
@@ -1727,7 +1787,7 @@ hull.contribution = function(comm, relative = FALSE){
 
 #' Alpha diversity using kernel density hypervolumes.
 #' @description Estimation of functional richness of one or multiple sites, based on n-dimensional hypervolumes.
-#' @param comm A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.
+#' @param comm A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.
 #' @details Estimates the functional richness (alpha FD) of one or more communities using kernel density hypervolumes, as implemented in Blonder et al. (2014, 2018).
 #' Functional richness is expressed as the total volume of the n-dimensional hypervolume (Mammola & Cardoso, 2020). Note that the hypervolume is dimensionless, and that only hypervolumes with the same number of dimensions can be compared in terms of functional richness.
 #' Given that the density and positions of stochastic points in the hypervolume are probabilistic, the functional richness of the trait space will intimately depend on the quality of input hypervolumes (details in Mammola & Cardoso, 2020).
@@ -1756,7 +1816,7 @@ kernel.alpha <- function(comm){
     stop("A Hypervolume or HypervolumeList is needed as input data.")
 
   #convert data if needed
-  if (class(comm) == "Hypervolume")
+  if (is(comm, "Hypervolume"))
     return(get_volume(comm))
 
   #calculate alpha values and give them a name
@@ -1772,7 +1832,7 @@ kernel.alpha <- function(comm){
 
 #' Beta diversity partitioning using kernel density hypervolumes.
 #' @description Pairwise beta diversity partitioning into replacement and net difference in amplitude components of n-dimensional hypervolumes.
-#' @param comm A 'HypervolumesList' object, preferably built using function kernel.build.
+#' @param comm A 'HypervolumeList' object, preferably built using function kernel.build.
 #' @param func Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is Jaccard.
 #' @param comp Boolean indicating whether beta diversity components (shared and unique fractions) should be returned
 #' @details Computes a pairwise decomposition of the overall differentiation among kernel hypervolumes into two components: the replacement (shifts) of space between hypervolumes and net differences between the amount of space enclosed by each hypervolume.
@@ -1843,7 +1903,7 @@ kernel.beta = function(comm, func = "jaccard", comp = FALSE){
 
 #' Functional beta diversity evenness using kernel density hypervolumes.
 #' @description Difference of evenness between pairs of sites, measuring the regularity of stochastic points distribution within the total functional space.
-#' @param comm A 'HypervolumesList' object, preferably built using function kernel.build.
+#' @param comm A 'HypervolumeList' object, preferably built using function kernel.build.
 #' @details This measure is simply the pairwise difference of evenness calculated based on the functional evenness (Mason et al., 2005) of a n-dimensional hypervolume, namely the regularity of stochastic points distribution within the total trait space (Mammola & Cardoso, 2020).
 #' Evenness is calculated as the overlap between the observed hypervolume and a theoretical hypervolume where traits and abundances are evenly distributed within the range of their values (Carmona et al., 2016, 2019).
 #' @return Distance matrix between sites.
@@ -1874,7 +1934,7 @@ kernel.beta.evenness <- function(comm){
 
 #' Functional originality of observations in kernel density hypervolumes.
 #' @description Average dissimilarity between a species or individual and a sample of random points within the boundaries of the n-dimensional hypervolume.
-#' @param comm A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.
+#' @param comm A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.
 #' @param frac A value between 0.01 and 1, indicating the fraction of random points to be used in the estimation of originality. Default is 0.1.
 #' @param relative A boolean (T/F) indicating whether originality should be relative to the most original species in the community.
 #' @details A measure of the originality (sensu Pavoine et al., 2005) of each observation (species or individuals) used to construct the n-dimensional hypervolume. In a probabilistic hypervolume, originality is calculated as the average distance between each observation to a sample of stochastic points within the boundaries of the n-dimensional hypervolume (Mammola & Cardoso, 2020).
@@ -1910,7 +1970,7 @@ kernel.originality = function(comm, frac = 0.1, relative = FALSE){
   if (frac < 0.01 | frac > 1)
     stop("The frac parameter should be a number between 0.01 and 1.")
 
-  if (class(comm) == "Hypervolume") {    
+  if (is(comm, "Hypervolume")) {    
     
     sample.points <- comm@RandomPoints[sample(1:nrow(comm@RandomPoints), nrow(comm@RandomPoints)*frac), ]
     
@@ -1924,7 +1984,7 @@ kernel.originality = function(comm, frac = 0.1, relative = FALSE){
     }
     names(originality) = rownames(comm@Data)
     
-  } else if (class(comm) == "HypervolumeList") {
+  } else if (is(comm, "HypervolumeList")) {
     if (all(rownames(comm@HVList[[1]]@Data) == 1:nrow(comm@HVList[[1]]@Data)))
       warning("Species names are probably missing from hypervolumes, consider renaming them.")
     spp = c()
@@ -1956,7 +2016,7 @@ kernel.originality = function(comm, frac = 0.1, relative = FALSE){
 
 #' Contribution of each observation to the kernel density hypervolume.
 #' @description Contribution of each species or individual to the total volume of one or more kernel hypervolumes.
-#' @param comm A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.
+#' @param comm A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.
 #' @param func Calculate contribution using either closest "neighbor" or leave "one out" approach. 
 #' @param relative A boolean (T/F) indicating whether contribution should be relative to total FD (proportional contribution per individual or species). If FALSE, the sum of contributions for each site is equal to total FD, if TRUE it is 1.
 #' @details Contribution is a measure of functional rarity (sensu Violle et al., 2017; Carmona et al., 2017) that allows to map the contribution of each observation to the richness components of FD (Mammola & Cardoso, 2020).
@@ -1989,7 +2049,7 @@ kernel.contribution = function(comm, func = "neighbor", relative = FALSE){
     stop("A Hypervolume or HypervolumeList is needed as input data.")
   
   #if hypervolume is provided go for it.
-  if (class(comm) == "Hypervolume"){
+  if (is(comm, "Hypervolume")){
     contrib  <- c()
     if(substring(func, 1, 3) == "nei"){
       
@@ -2039,7 +2099,7 @@ kernel.contribution = function(comm, func = "neighbor", relative = FALSE){
     
     names(contrib) = rownames(comm@Data)
     
-  } else if (class(comm) == "HypervolumeList") {
+  } else if (is(comm, "HypervolumeList")) {
     if (all(rownames(comm@HVList[[1]]@Data) == 1:nrow(comm@HVList[[1]]@Data)))
       warning("Species names are probably missing from hypervolumes, consider renaming them.")
     spp = c()
@@ -2071,7 +2131,7 @@ kernel.contribution = function(comm, func = "neighbor", relative = FALSE){
 
 #' Functional dispersion of kernel density hypervolumes.
 #' @description Average distance to centroid or dissimilarity between random points within the boundaries of the kernel density hypervolume.
-#' @param comm A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.
+#' @param comm A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.
 #' @param func Function for calculating dispersion. One of 'divergence', 'dissimilarity' or 'regression'.
 #' @param frac A value between 0.01 and 1, indicating the fraction of random points to be used. Default is 0.1.
 #' @details This function calculates dispersion either: i) as the average distance between stochastic points within the kernel density hypervolume and the centroid of these points (divergence; Laliberte & Legendre, 2010; see also Carmona et al., 2019); ii) as the average distance between all points (dissimilarity, see also function BAT::dispersion); or iii) as the average distance between stochastic points within the kernel density hypervolume and a regression line fitted through the points.
@@ -2104,7 +2164,7 @@ kernel.dispersion = function(comm, func = 'dissimilarity', frac = 0.1) {
   if (frac < 0.01 | frac > 1)
     stop("Frac parameter should be a number between 0.01 and 1.")
 
-  if (class(comm) == "Hypervolume"){
+  if (is(comm, "Hypervolume")){
     
     random_points = comm@RandomPoints[sample(1:nrow(comm@RandomPoints), nrow(comm@RandomPoints)*frac), ]
     
@@ -2130,7 +2190,7 @@ kernel.dispersion = function(comm, func = 'dissimilarity', frac = 0.1) {
     }
     names(disp) <- comm@Name
     
-  } else if (class(comm) == "HypervolumeList"){
+  } else if (is(comm, "HypervolumeList")){
     disp <- c()
     for (i in 1:length(comm@HVList))
       disp <- c(disp, kernel.dispersion(comm@HVList[[i]], func = func, frac = frac))
@@ -2140,7 +2200,7 @@ kernel.dispersion = function(comm, func = 'dissimilarity', frac = 0.1) {
 
 #' Functional evenness of kernel density hypervolumes.
 #' @description Functional evenness of a community, measuring the regularity of stochastic points distribution within the total functional space.
-#' @param comm A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.
+#' @param comm A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.
 #' @details This function measures the functional evenness (Mason et al., 2005) of a n-dimensional hypervolume, namely the regularity of stochastic points distribution within the total trait space (Mammola & Cardoso, 2020).
 #' Evenness is calculated as the overlap between the observed hypervolume and a theoretical hypervolume where traits and abundances are evenly distributed within the range of their values (Carmona et al., 2016, 2019).
 #' @return A value or vector of evenness values for each site.
@@ -2171,7 +2231,7 @@ kernel.evenness = function(comm) {
     stop("A Hypervolume or HypervolumeList is needed as input data.")
 
   #if hypervolume is provided go for it
-  if (class(comm) == "Hypervolume") {
+  if (is(comm, "Hypervolume")) {
     
     #creating a perfectly even hypervolume within the distribution of traits
     ref_even <- comm@Data
@@ -2193,7 +2253,7 @@ kernel.evenness = function(comm) {
     even <- hypervolume_overlap_statistics(set)[1]
     names(even) <- comm@Name
     
-  } else if (class(comm) == "HypervolumeList"){
+  } else if (is(comm, "HypervolumeList")){
     even <- c()
     for(i in 1:length(comm@HVList)){
       even <- c(even, kernel.evenness(comm@HVList[[i]]))
@@ -2205,7 +2265,7 @@ kernel.evenness = function(comm) {
 
 #' Contribution of each observation to the evenness of a kernel density hypervolume.
 #' @description Contribution of each species or individual to the evenness of one or more kernel hypervolumes.
-#' @param comm A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.
+#' @param comm A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.
 #' @details The contribution of each observation (species or individual) to the total evenness of a kernel hypervolume. Contribution to evenness is calculated as the difference in evenness between the total hypervolume and a second hypervolume lacking this specific observation (i.e., leave-one-out approach; Mammola & Cardoso, 2020). 
 #' Note that the contribution of a species or individual can be negative, if the removal of an observation increases the total evenness.  
 #' @return A vector or matrix with the contribution values of each species or individual for each community or species respectively.
@@ -2233,7 +2293,7 @@ kernel.evenness.contribution = function(comm){
     stop("A Hypervolume or HypervolumeList is needed as input data.")
 
   #if hypervolume is provided go for it.
-  if (class(comm) == "Hypervolume"){
+  if (is(comm, "Hypervolume")){
 
     #extract total evenness:
     comm.evenness <- kernel.evenness(comm)
@@ -2251,7 +2311,7 @@ kernel.evenness.contribution = function(comm){
     
     names(contrib) = rownames(comm@Data)
 
-  }	else if (class(comm) == "HypervolumeList"){
+  }	else if (is(comm, "HypervolumeList")){
     if (all(rownames(comm@HVList[[1]]@Data) == 1:nrow(comm@HVList[[1]]@Data)))
       warning("Species names are probably missing from hypervolumes, consider renaming them.")
     spp = c()
@@ -2276,7 +2336,7 @@ kernel.evenness.contribution = function(comm){
 
 #' Pairwise similarity among kernel density hypervolumes.
 #' @description Calculate pairwise distance metrics (centroid and minimum distance) and similarity indices (Intersection, Jaccard, Soerensen-Dice) among n-dimensional hypervolumes.
-#' @param comm A 'HypervolumesList' object, preferably built using function kernel.build.
+#' @param comm A 'HypervolumeList' object, preferably built using function kernel.build.
 #' @details Computes a pairwise comparison between kernel density hypervolumes of multiple species or communities, based on the distance and similarity metrics implemented in hypervolume R package (Blonder et al., 2014, 2018).
 #' See Mammola (2019) for a description of the different indices, and a comparison between their performance. Note that computation time largely depends on the number of 'Hypervolume' objects in the list, and scales almost exponentially with the number of hypervolume axes.
 #' @return Five pairwise distance matrices, one per each of the distance and similarity indices (in order: distance between centroids, minimum distance, Jaccard overlap, Soerensen-Dice overlap, and Intersection among hypervolumes).
@@ -2337,7 +2397,7 @@ kernel.similarity <- function(comm) {
 
 #' Hotspots in hypervolumes.
 #' @description Identify hotspots in kernel density hypervolumes based on minimum volume needed to cover a given proportion of random points.
-#' @param comm A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.
+#' @param comm A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.
 #' @param prop Proportion of random points to be included.
 #' @details Estimates the hotspots of one or more communities using kernel density hypervolumes as in Carmona et al. (2021).
 #' @return A 'Hypervolume' or 'HypervolumeList' with the hotspots of each site.
@@ -2370,13 +2430,13 @@ kernel.hotspots <- function(comm, prop = 0.5){
     stop("A Hypervolume or HypervolumeList is needed as input data.")
   
   #single volume
-  if (class(comm) == "Hypervolume"){
+  if (is(comm, "Hypervolume")){
     
     hot = hypervolume_threshold(comm, num.thresholds = 1000, quantile.requested = prop, quantile.requested.type = "probability", plot = FALSE, verbose = FALSE)
     hot = hot$HypervolumesThresholded
     hot@Name = comm@Name
 
-  } else if (class(comm) == "HypervolumeList") {
+  } else if (is(comm, "HypervolumeList")) {
     #if list call this same function
     for (i in 1:length(comm@HVList)){
       newHot <- kernel.hotspots(comm@HVList[[i]], prop)
@@ -3114,15 +3174,15 @@ raster.beta <- function(layers, tree, func = "jaccard", neighbour = 8, abund = F
 			resRepl[c] = NA
 			resRich[c] = NA
 		} else {
-			betaValue = matrix(ncol=3)
-			adj = raster::adjacent(layers, c, neighbour)[,2]
+			betaValue = matrix(ncol = 3)
+			adj = raster::adjacent(layers, c, neighbour)[, 2]
 			for(a in adj)
 				if(!is.na(sum(layers[a])))
 					betaValue = rbind(betaValue, beta(rbind(layers[c], layers[a]), tree, func = func, abund = abund))
-			betaValue = betaValue[-1,]
-			resTotal[c] = mean(unlist(betaValue[,1]))
-			resRepl[c] = mean(unlist(betaValue[,2]))
-			resRich[c] = mean(unlist(betaValue[,3]))
+			betaValue = betaValue[-1, ,drop = FALSE]
+			resTotal[c] = mean(unlist(betaValue[, 1]))
+			resRepl[c] = mean(unlist(betaValue[, 2]))
+			resRich[c] = mean(unlist(betaValue[, 3]))
 		}
 	}
 	res = raster::stack(resTotal, resRepl, resRich)
@@ -3218,37 +3278,37 @@ raster.evenness <- function(layers, tree, distance, method = "expected", func = 
 #' sad(comm, raref = 1)
 #' @export
 sad <- function(comm, raref = 0, runs = 100){
-	if(is.vector(comm))
-		comm <- matrix(comm, nrow = 1)
-	if(raref == 1)
-		raref = min(rowSums(comm))
-
-	nClasses = as.integer(max(log(comm, 2))) + 1
-	res = matrix(0, nrow = nrow(comm), ncol = nClasses)
-	
-	for(i in 1:nrow(comm)){
-		#if rarefying data
-		if(raref > 0){
-			r = matrix(NA, nrow = runs, ncol = nClasses)
-			for(j in 1:runs){
-				samp = rrarefy(comm[i,], sample = raref)
-				samp = samp[samp > 0]
-				newSad = sad(samp)
-				r[j,1:length(newSad)] = newSad
-			}
-			res[i,] = apply(r, 2, median, na.rm = TRUE)
-			res[i, is.na(res[i,])] = 0
-		} else {
-			r = c()
-			thisComm = comm[i,]
-			thisComm = thisComm[thisComm > 0]
-			thisComm = as.integer(log(thisComm, 2)) + 1
-			for(j in 1:max(thisComm))
-				r[j] = sum(thisComm == j)
-			res[i,1:length(r)] = r
-		}
-	}
-	return(res)
+  if(is.vector(comm))
+    comm <- matrix(comm, nrow = 1)
+  if(raref == 1)
+    raref = min(rowSums(comm))
+  
+  nClasses = as.integer(max(log(comm, 2))) + 1
+  res = matrix(0, nrow = nrow(comm), ncol = nClasses)
+  
+  for(i in 1:nrow(comm)){
+    #if rarefying data
+    if(raref > 0){
+      r = matrix(NA, nrow = runs, ncol = nClasses)
+      for(j in 1:runs){
+        samp = rrarefy(comm[i,], sample = raref)
+        samp = samp[samp > 0]
+        newSad = sad(samp)
+        r[j,1:length(newSad)] = newSad
+      }
+      res[i,] = apply(r, 2, median, na.rm = TRUE)
+      res[i, is.na(res[i,])] = 0
+    } else {
+      r = c()
+      thisComm = comm[i,]
+      thisComm = thisComm[thisComm > 0]
+      thisComm = as.integer(log(thisComm, 2)) + 1
+      for(j in 1:max(thisComm))
+        r[j] = sum(thisComm == j)
+      res[i,1:length(r)] = r
+    }
+  }
+  return(res)
 }
 
 #' Species-area relationship (SAR).
@@ -3735,9 +3795,9 @@ fill <- function(trait, method = "regression", group = NULL, weight = NULL, step
           #model formula 
           formula.lm <- as.formula(paste(colnames(trait)[i], " ~ ", paste(column_names, collapse=" + "), sep=""))
           #preparing the weight
-          if(class(weight) == "dist")
+          if (is(weight, "dist"))
             weight <- (1 / as.matrix(weight)[j,])
-          else if(class(weight) == "phylo" || class(weight) == "hclust")
+          else if (is(weight, "phylo") || is(weight, "hclust"))
             weight <- (1 / as.matrix(cophenetic(weight))[j,])
           else
             weight <- (1 - as.matrix(gower(trait))[j,])
@@ -3994,12 +4054,11 @@ ses <- function(obs, est, param = TRUE, p = TRUE){
     res = (obs - mean(est)) / (sd(est, na.rm = TRUE))
     pval = pnorm(res)   #converts ses to p
   } else {
-    pval = (sum(est < obs) + sum(est == obs)/2) / (length(est) + 1)
-    if(pval == 0)
-      pval = pval + (1 / (length(est)))
+    est = c(obs, est)
+    pval = (sum(est < obs) + sum(est == obs)/2) / length(est)
     res = qnorm(pval)   #converts p to ses
   }
-
+  
   if(p){
     res = c(res, pval)
     names(res) = c("ses", "p-value")
@@ -4029,16 +4088,81 @@ tree.build <- function(trait, convert = NULL, weight = NULL){
   return(res)
 }
 
+#' Convert negative branches of tree.
+#' @description Converts negative branch lengths of any tree to zero.
+#' @param tree A phylo object.
+#' @details Converts branches with negative values to zero while shortening only the two branches immediately below it by the same absolute amount to ensure the tree remains with tips at same distances and there are no polytomies.
+#' @return A phylo object.
+#' @examples par(mfrow = c(1,2))
+#' tree <- ape::read.tree(text = 
+#' '(((A:3, B:3):1, (G:6, (H:5, I:5):1):-2):3, ((C:1, D:1):2, (E:4, F:4):-1):4);')
+#' plot(tree)
+#' 
+#' tree = tree.zero(tree)
+#' plot(tree)
+#' @export
+tree.zero <- function (tree){
+  
+  #identify which branches are negative
+  neg = which(tree$edge.length < 0)
+  
+  #go one by one negative branches, do it until there are no negative
+  while (length(neg) > 0){
+    for(i in neg){
+      
+      #get branch length
+      len = tree$edge.length[i]
+      
+      #identify which branches are immediately under branch i
+      under = tree$edge[i,2]
+      under = which(tree$edge[,1] == under)
+      
+      #increase length of negative branch
+      tree$edge.length[i] = 0
+      
+      #decrease length of branches under
+      tree$edge.length[under] = tree$edge.length[under] + len
+      
+    }
+    neg = which(tree$edge.length < 0)
+  }
+  return(tree)
+}
+
+#' Quality of tree.
+#' @description Assess the quality of a functional tree.
+#' @param distance A dist matrix representing the initial distances between species.
+#' @param tree A phylo or hclust object.
+#' @details The algorithm calculates the inverse of mean squared deviation between initial and cophenetic distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation. A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for a star tree.
+#' @return A single value of quality.
+#' @references Maire et al. (2015) How many dimensions are needed to accurately assess functional diversity? A pragmatic approach for assessing the quality of functional spaces. Global Ecology and Biogeography, 24: 728:740.
+#' @examples trait = data.frame(body = c(1,2,3,4,4), beak = c(1,1,1,1,2))
+#' distance = gower(trait)
+#' 
+#' tree = tree.build(trait)
+#' tree.quality(distance, tree)
+#' 
+#' distance1 = distance
+#' distance1[] = 1
+#' tree = hclust(distance1)
+#' tree.quality(distance, tree)
+#' @export
+tree.quality <- function(distance, tree){
+  tree = as.dist(cophenetic(tree))
+  return(msd(distance, tree))
+}
+
 #' Build hyperspace.
 #' @description Builds hyperspace by transforming trait data to use with either hull.build or kernel.build.
 #' @param trait A species x traits matrix or data.frame.
+#' @param distance One of "gower" or "euclidean".
 #' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.
 #' @param axes If 0, no transformation of data is done.
-#' If 0 < axes <= 1 a PCoA is done with Gower distances and as many axes as needed to achieve this proportion of variance explained are selected.
+#' If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
 #' If axes > 1 these many axes are selected.
 #' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.
-#' @details The hyperspace can be constructed with the given data or data can be transformed using PCoA over Gower distances (Pavoine et al. 2009) after traits are dummyfied (if needed) and standardized (always).
-#' Gower distance allows continuous, ordinal, categorical or binary variables, with possible weighting.
+#' @details The hyperspace can be constructed with the given data or data can be transformed using PCoA after traits are dummyfied (if needed) and standardized (always).
+#' Gower distance (Pavoine et al. 2009) allows continuous, ordinal, categorical or binary variables, with possible weighting.
 #' NAs are allowed as long as each pair of species has at least one trait value in common.
 #' If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters as values.
 #' Note that each community should have at least 3 species and more species than traits or axes (if axes > 0) to build convex hull hypervolumes.
@@ -4056,11 +4180,19 @@ tree.build <- function(trait, convert = NULL, weight = NULL){
 #' hs = hyper.build(trait, weight = c(1,2), axes = 2)
 #' plot(hs)
 #' @export
-hyper.build <- function(trait, weight = NULL, axes = 1, convert = NULL){
+hyper.build <- function(trait, distance = "gower", weight = NULL, axes = 1, convert = NULL){
   
-  #do gower and pcoa if axes is larger than 0
+  #do gower/euclidean and pcoa if axes is larger than 0
   if(axes > 0){
-    trait = gower(trait, convert, weight)
+    
+    #get distance matrix
+    if (distance == "gower"){
+      trait = gower(trait, convert, weight)
+    } else if (distance == "euclidean"){
+      trait = dist(trait, method = "euclidean")
+    } else {
+      stop("Distance should be one of gower or euclidean")
+    }
     trait = ape::pcoa(trait)
 
     if(axes <= 1){
@@ -4080,16 +4212,38 @@ hyper.build <- function(trait, weight = NULL, axes = 1, convert = NULL){
   return(trait)
 }
 
+#' Quality of hyperspace.
+#' @description Assess the quality of a functional hyperspace.
+#' @param distance A dist matrix representing the initial distances between species.
+#' @param hyper A matrix with trait data from function hyper.build.
+#' @details The algorithm calculates the inverse of the squared deviation between initial and euclidean distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation. A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for an hyperspace where all distances between species are 1.
+#' @return A single value of quality.
+#' @references Maire et al. (2015) How many dimensions are needed to accurately assess functional diversity? A pragmatic approach for assessing the quality of functional spaces. Global Ecology and Biogeography, 24: 728:740.
+#' @examples trait = data.frame(body = c(1,2,3,4,4), beak = c(1,1,1,1,2))
+#' distance = gower(trait)
+#' 
+#' hyper = hyper.build(trait, axes = 2)
+#' hyper.quality(distance, hyper)
+#' 
+#' hyper = hyper.build(trait, axes = 0)
+#' hyper.quality(distance, hyper)
+#' @export
+hyper.quality <- function(distance, hyper){
+  hyper = dist(hyper)
+  return(msd(distance, hyper))
+}
+
 #' Build convex hull hypervolumes.
 #' @description Builds convex hull hypervolumes for each community from incidence and trait data.
 #' @param comm A sites x species matrix, data.frame or vector, with incidence data about the species in the community.
 #' @param trait A species x traits matrix or data.frame.
+#' @param distance One of "gower" or "euclidean".
 #' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.
 #' @param axes If 0, no transformation of data is done.
-#' If 0 < axes <= 1 a PCoA is done with Gower distances and as many axes as needed to achieve this proportion of variance explained are selected.
+#' If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
 #' If axes > 1 these many axes are selected.
 #' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.
-#' @details The hypervolumes can be constructed with the given data or data can be transformed using PCoA over Gower distances (Pavoine et al. 2009) after traits are dummyfied (if needed) and standardized (always).
+#' @details The hypervolumes can be constructed with the given data or data can be transformed using PCoA after traits are dummyfied (if needed) and standardized (always).
 #' Beware that if transformations are required, all communities to be compared should be built simultaneously to guarantee comparability. In such case, one might want to first run hyper.build and use the resulting data in different runs of hull.build.
 #' See function hyper.build for more details.
 #' @return A 'convhulln' object or a list, representing the hypervolumes of each community.
@@ -4107,9 +4261,9 @@ hyper.build <- function(trait, weight = NULL, axes = 1, convert = NULL){
 #' hvlist = hull.build(comm, trait, axes = 2, weight = c(1,2))
 #' plot(hvlist[[1]])
 #' @export
-hull.build <- function(comm, trait, weight = NULL, axes = 0, convert = NULL){
+hull.build <- function(comm, trait, distance = "gower", weight = NULL, axes = 0, convert = NULL){
   
-  trait = hyper.build(trait, weight, axes, convert)
+  trait = hyper.build(trait, distance, weight, axes, convert)
   if(is.vector(comm))
     comm = matrix(comm, nrow = 1)
 
@@ -4135,6 +4289,7 @@ hull.build <- function(comm, trait, weight = NULL, axes = 0, convert = NULL){
     subComm <- trait[comm[s,] > 0, ]
     hull_list[[s]] <- geometry::convhulln(subComm, options = "FA")
     rownames(hull_list[[s]]$p) = rownames(subComm)
+    hull_list[[s]]$comm = comm[s,]
   }
   names(hull_list) = rownames(comm)
 
@@ -4150,16 +4305,17 @@ hull.build <- function(comm, trait, weight = NULL, axes = 0, convert = NULL){
 #' @description Builds kernel density hypervolumes from trait data.
 #' @param comm A sites x species matrix, data.frame or vector, with incidence or abundance data about the species in the community.
 #' @param trait A species x traits matrix or data.frame.
+#' @param distance One of "gower" or "euclidean".
 #' @param method Method for constructing the 'Hypervolume' object. One of "gaussian" (Gaussian kernel density estimation, default), "box" (box kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method = "gaussian".
 #' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.
 #' @param axes If 0, no transformation of data is done.
-#' If 0 < axes <= 1 a PCoA is done with Gower distances and as many axes as needed to achieve this proportion of variance explained are selected.
+#' If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
 #' If axes > 1 these many axes are selected.
 #' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.
 #' @param cores Number of cores to be used in parallel processing. If = 0 all available cores are used. Beware that multicore for Windows is not optimized yet and it often takes longer than single core.
 #' @param ... further arguments to be passed to hypervolume::hypervolume
-#' @details The hypervolumes can be constructed with the given data or data can be transformed using PCoA over Gower distances (Pavoine et al. 2009) after traits are dummyfied (if needed) and standardized (always).
+#' @details The hypervolumes can be constructed with the given data or data can be transformed using PCoA after traits are dummyfied (if needed) and standardized (always).
 #' Beware that if transformations are required, all communities to be compared should be built simultaneously to guarantee comparability. In such case, one might want to first run hyper.build and use the resulting data in different runs of kernel.build.
 #' See function hyper.build for more details.
 #' @return A 'Hypervolume' or 'HypervolumeList', representing the hypervolumes of each community.
@@ -4179,9 +4335,9 @@ hull.build <- function(comm, trait, weight = NULL, axes = 0, convert = NULL){
 #' plot(hvlist)
 #' }
 #' @export
-kernel.build <- function(comm, trait, method = "gaussian", abund = TRUE, weight = NULL, axes = 0, convert = NULL, cores = 1, ... ){
+kernel.build <- function(comm, trait, distance = "gower", method = "gaussian", abund = TRUE, weight = NULL, axes = 0, convert = NULL, cores = 1, ... ){
 
-  trait = hyper.build(trait, weight, axes, convert)
+  trait = hyper.build(trait, distance, weight, axes, convert)
   if(is.vector(comm))
     comm = matrix(comm, nrow = 1)
 
@@ -4241,20 +4397,22 @@ kernel.build <- function(comm, trait, method = "gaussian", abund = TRUE, weight 
   } else {
     hv = mclapply(seq(commList), parbuild, commList = commList, trait = trait, method = method, abund = abund, mc.cores = cores, ... )
   }
-  
+
   #name hypervolumes and convert list to HypervolumeList
   if(length(hv) > 1){
-    for(i in 1:length(hv))
+    for(i in 1:length(hv)){
       hv[[i]]@Name = rownames(comm)[i]
-  }
-  hv = hypervolume_join(hv)
-  
-  #return
-  if(length(hv@HVList) > 1){
-    return(hv)
+    }
+    hv = hypervolume_join(hv)
   } else {
-    return(hv[[1]])
+    hv = hv[[1]]
   }
+
+  #add abundance data to hypervolumes (required for sad)
+  attributes(hv)$comm = comm
+
+  return(hv)
+  
 }
 
 #' Simulation of species abundance distributions (SAD).

@@ -7,7 +7,7 @@
 kernel.dispersion(comm, func = "dissimilarity", frac = 0.1)
 }
 \arguments{
-\item{comm}{A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.}
+\item{comm}{A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.}
 
 \item{func}{Function for calculating dispersion. One of 'divergence', 'dissimilarity' or 'regression'.}
 

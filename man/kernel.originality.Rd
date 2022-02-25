@@ -7,7 +7,7 @@
 kernel.originality(comm, frac = 0.1, relative = FALSE)
 }
 \arguments{
-\item{comm}{A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.}
+\item{comm}{A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.}
 
 \item{frac}{A value between 0.01 and 1, indicating the fraction of random points to be used in the estimation of originality. Default is 0.1.}
 

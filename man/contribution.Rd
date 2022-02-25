@@ -4,7 +4,7 @@
 \alias{contribution}
 \title{Contribution of species or individuals to total phylogenetic/functional diversity.}
 \usage{
-contribution(comm, tree, abund = TRUE, relative = TRUE)
+contribution(comm, tree, abund = TRUE, relative = FALSE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data. If missing, the contribution of all species to the full tree is calculated.}

@@ -4,15 +4,17 @@
 \alias{hyper.build}
 \title{Build hyperspace.}
 \usage{
-hyper.build(trait, weight = NULL, axes = 1, convert = NULL)
+hyper.build(trait, distance = "gower", weight = NULL, axes = 1, convert = NULL)
 }
 \arguments{
 \item{trait}{A species x traits matrix or data.frame.}
 
+\item{distance}{One of "gower" or "euclidean".}
+
 \item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.}
 
 \item{axes}{If 0, no transformation of data is done.
-If 0 < axes <= 1 a PCoA is done with Gower distances and as many axes as needed to achieve this proportion of variance explained are selected.
+If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
 If axes > 1 these many axes are selected.}
 
 \item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.}
@@ -24,8 +26,8 @@ A matrix with trait data.
 Builds hyperspace by transforming trait data to use with either hull.build or kernel.build.
 }
 \details{
-The hyperspace can be constructed with the given data or data can be transformed using PCoA over Gower distances (Pavoine et al. 2009) after traits are dummyfied (if needed) and standardized (always).
-Gower distance allows continuous, ordinal, categorical or binary variables, with possible weighting.
+The hyperspace can be constructed with the given data or data can be transformed using PCoA after traits are dummyfied (if needed) and standardized (always).
+Gower distance (Pavoine et al. 2009) allows continuous, ordinal, categorical or binary variables, with possible weighting.
 NAs are allowed as long as each pair of species has at least one trait value in common.
 If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters as values.
 Note that each community should have at least 3 species and more species than traits or axes (if axes > 0) to build convex hull hypervolumes.

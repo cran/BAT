@@ -7,7 +7,7 @@
 kernel.hotspots(comm, prop = 0.5)
 }
 \arguments{
-\item{comm}{A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.}
+\item{comm}{A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.}
 
 \item{prop}{Proportion of random points to be included.}
 }

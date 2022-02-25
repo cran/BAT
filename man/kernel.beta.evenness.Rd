@@ -7,7 +7,7 @@
 kernel.beta.evenness(comm)
 }
 \arguments{
-\item{comm}{A 'HypervolumesList' object, preferably built using function kernel.build.}
+\item{comm}{A 'HypervolumeList' object, preferably built using function kernel.build.}
 }
 \value{
 Distance matrix between sites.

@@ -7,7 +7,7 @@
 kernel.contribution(comm, func = "neighbor", relative = FALSE)
 }
 \arguments{
-\item{comm}{A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.}
+\item{comm}{A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.}
 
 \item{func}{Calculate contribution using either closest "neighbor" or leave "one out" approach.}
 

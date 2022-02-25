@@ -7,7 +7,7 @@
 kernel.beta(comm, func = "jaccard", comp = FALSE)
 }
 \arguments{
-\item{comm}{A 'HypervolumesList' object, preferably built using function kernel.build.}
+\item{comm}{A 'HypervolumeList' object, preferably built using function kernel.build.}
 
 \item{func}{Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is Jaccard.}
 

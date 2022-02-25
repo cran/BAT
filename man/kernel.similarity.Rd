@@ -7,7 +7,7 @@
 kernel.similarity(comm)
 }
 \arguments{
-\item{comm}{A 'HypervolumesList' object, preferably built using function kernel.build.}
+\item{comm}{A 'HypervolumeList' object, preferably built using function kernel.build.}
 }
 \value{
 Five pairwise distance matrices, one per each of the distance and similarity indices (in order: distance between centroids, minimum distance, Jaccard overlap, Soerensen-Dice overlap, and Intersection among hypervolumes).

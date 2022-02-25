@@ -7,7 +7,7 @@
 kernel.evenness.contribution(comm)
 }
 \arguments{
-\item{comm}{A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.}
+\item{comm}{A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.}
 }
 \value{
 A vector or matrix with the contribution values of each species or individual for each community or species respectively.

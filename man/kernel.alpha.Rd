@@ -7,7 +7,7 @@
 kernel.alpha(comm)
 }
 \arguments{
-\item{comm}{A 'Hypervolume' or 'HypervolumesList' object, preferably built using function kernel.build.}
+\item{comm}{A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.}
 }
 \value{
 A value or vector of alpha diversity values for each site.

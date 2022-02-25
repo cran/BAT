@@ -7,6 +7,7 @@
 kernel.build(
   comm,
   trait,
+  distance = "gower",
   method = "gaussian",
   abund = TRUE,
   weight = NULL,
@@ -21,6 +22,8 @@ kernel.build(
 
 \item{trait}{A species x traits matrix or data.frame.}
 
+\item{distance}{One of "gower" or "euclidean".}
+
 \item{method}{Method for constructing the 'Hypervolume' object. One of "gaussian" (Gaussian kernel density estimation, default), "box" (box kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details.}
 
 \item{abund}{A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method = "gaussian".}
@@ -28,7 +31,7 @@ kernel.build(
 \item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.}
 
 \item{axes}{If 0, no transformation of data is done.
-If 0 < axes <= 1 a PCoA is done with Gower distances and as many axes as needed to achieve this proportion of variance explained are selected.
+If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
 If axes > 1 these many axes are selected.}
 
 \item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.}
@@ -44,7 +47,7 @@ A 'Hypervolume' or 'HypervolumeList', representing the hypervolumes of each comm
 Builds kernel density hypervolumes from trait data.
 }
 \details{
-The hypervolumes can be constructed with the given data or data can be transformed using PCoA over Gower distances (Pavoine et al. 2009) after traits are dummyfied (if needed) and standardized (always).
+The hypervolumes can be constructed with the given data or data can be transformed using PCoA after traits are dummyfied (if needed) and standardized (always).
 Beware that if transformations are required, all communities to be compared should be built simultaneously to guarantee comparability. In such case, one might want to first run hyper.build and use the resulting data in different runs of kernel.build.
 See function hyper.build for more details.
 }
