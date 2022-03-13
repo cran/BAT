@@ -1,12 +1,11 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.8.0 (2022-02-25)
+#####Version 2.8.1 (2022-03-11)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.7.1:
-#####Added *.quality and tree.zero functions
-#####Improved raster.beta, dispersion, and ses
+#####Changed from v2.8.0:
+#####Corrected dispersion and originality
 
 library("ape")
 library("geometry")
@@ -1235,13 +1234,15 @@ originality <- function(comm, tree, distance, abund = TRUE, relative = TRUE){
 
   original <- matrix(NA,nrow(comm),ncol(comm))
   for (r in 1:nrow(comm)){    					                  #cycle through all sites/samples
-    present <- which(comm[r,]>0)                          #which species exist in this site
-    nSpp <- length(present)                               #how many species are present in this site
-    proportion <- comm[r,present]/sum(comm[r,present])                  #proportion incidence/abundance of species in this site
+    present <- which(comm[r,] > 0)                        #which species exist in this site
+    if(abund)
+      n <- sum(comm[r, present])                          #how many individuals are present in this site
+    else
+      n <- length(present)                                #how many species are present in this site
+    proportion <- comm[r,present]/sum(comm[r,present])    #proportion incidence/abundance of species in this site
     for (c in present){
-    	original[r,c] <- sum(distance[present,c] * proportion, na.rm=T)
-    	if(!abund)
-    		original[r,c] <- original[r,c] * nSpp / (nSpp-1) #correct not to take distance to self into account
+    	original[r,c] <- sum(distance[present,c] * proportion, na.rm = TRUE)
+  		original[r,c] <- original[r,c] * n / (n - 1) #correct not to take distance to self into account
     }
   }
   if(relative)
@@ -1416,13 +1417,17 @@ dispersion <- function(comm, tree, distance, func = "originality", abund = TRUE,
 		comm <- matrix(comm, nrow = 1)
 	if(!abund)
 	  comm = ifelse(comm > 0, 1, 0)
-
+	
+	#reorder comm
+	if(!missing(tree))
+	  comm = reorderComm(comm, tree)
+	  
 	if(func == "originality")
-		funcValue <- originality(comm, tree, distance, abund = TRUE, relative)
+		funcValue <- originality(comm, tree, distance, abund, relative)
 	else if (func == "uniqueness")
 		funcValue <- uniqueness(comm, tree, distance, relative)
 	else if (func == "contribution")
-		funcValue <- contribution(comm, tree, abund = TRUE, relative)
+		funcValue <- contribution(comm, tree, abund, relative)
 	else
     stop(sprintf("Function %s not recognized.", func))
 
@@ -4196,7 +4201,12 @@ hyper.build <- function(trait, distance = "gower", weight = NULL, axes = 1, conv
     trait = ape::pcoa(trait)
 
     if(axes <= 1){
-      axes = which(trait$values$Cumul_eig >= axes)[1]
+      selAxes = cumVar = 0
+      while(cumVar < axes){
+        selAxes = selAxes + 1
+        cumVar = cumVar + trait$values$Relative_eig[selAxes]
+      }
+      axes = selAxes
     } else {
       axes = min(axes, ncol(trait$vectors))
     }
