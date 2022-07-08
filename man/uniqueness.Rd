@@ -4,7 +4,7 @@
 \alias{uniqueness}
 \title{Phylogenetic/functional uniqueness of species.}
 \usage{
-uniqueness(comm, tree, distance, relative = TRUE)
+uniqueness(comm, tree, distance, relative = FALSE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data. If missing, the uniqueness using the full tree or distance matrix is calculated.}
@@ -25,9 +25,10 @@ Dissimilarity between each species and the single closest in a community.
 This is equivalent to the originality measure of Mouillot et al. (2013).
 }
 \examples{
-comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
+comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,0,1), nrow = 4, byrow = TRUE)
 distance <- dist(c(1:5), method="euclidean")
 tree <- hclust(distance, method="average")
+
 uniqueness(tree = tree)
 uniqueness(distance = distance)
 uniqueness(comm, tree)

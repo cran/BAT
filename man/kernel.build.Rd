@@ -8,7 +8,7 @@ kernel.build(
   comm,
   trait,
   distance = "gower",
-  method = "gaussian",
+  method.hv = "gaussian",
   abund = TRUE,
   weight = NULL,
   axes = 0,
@@ -24,9 +24,9 @@ kernel.build(
 
 \item{distance}{One of "gower" or "euclidean".}
 
-\item{method}{Method for constructing the 'Hypervolume' object. One of "gaussian" (Gaussian kernel density estimation, default), "box" (box kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details.}
+\item{method.hv}{Method for constructing the 'Hypervolume' object. One of "gaussian" (Gaussian kernel density estimation, default), "box" (box kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details.}
 
-\item{abund}{A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method = "gaussian".}
+\item{abund}{A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method.hv = "gaussian".}
 
 \item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.}
 
@@ -64,7 +64,7 @@ hv = kernel.build(comm[1,], trait)
 plot(hv)
 hvlist = kernel.build(comm, trait, abund = FALSE, cores = 2)
 plot(hvlist)
-hvlist = kernel.build(comm, trait, method = "box", weight = c(1,2), axes = 2)
+hvlist = kernel.build(comm, trait, method.hv = "box", weight = c(1,2), axes = 2)
 plot(hvlist)
 }
 }

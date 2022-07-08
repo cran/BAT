@@ -11,9 +11,9 @@ ses(obs, est, param = TRUE, p = TRUE)
 
 \item{est}{A vector with estimated values.}
 
-\item{param}{Value is calculated with parametric or non-parametric method. The later is preferable when distribution of estimated values is not normally distributed.}
+\item{param}{Value is calculated with parametric or non-parametric method. Because standardized effect sizes may lead to biased conclusions if null values show an asymmetric distribution or deviate from normality, non-parametric effect sizes use probit transformed p-values (Lhotsky et al., 2016).}
 
-\item{p}{Boolean indicating whether the p-value should be calculated based on the rank of 'obs' in 'est'. As the test is two-sided, usual significance is indicated by p < 0.025 or p > 0.975.}
+\item{p}{Boolean indicating whether the p-value should be calculated based on the rank of 'obs' in 'est'.}
 }
 \value{
 The ses value or a vector with ses and p-value.
@@ -30,4 +30,7 @@ ses(500, est)
 ses(500, est, param = FALSE)
 ses(900, est, p = TRUE)
 ses(900, est, param = FALSE, p = TRUE)
+}
+\references{
+Lhotsky et al. (2016) Changes in assembly rules along a stress gradient from open dry grasslands to wetlands. Journal of Ecology, 104: 507-517.
 }

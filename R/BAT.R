@@ -1,11 +1,14 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.8.1 (2022-03-11)
+#####Version 2.9.0 (2022-07-08)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.8.0:
-#####Corrected dispersion and originality
+#####Changed from v2.8.1:
+#####Added *.sad, *.gamma, mixture functions
+#####Improved tree.build to allow euclidean, mst and nj trees and choose best tree based on tree.quality
+#####Improved the output of originality, uniqueness and contribution.
+#####Improved the text for some of the functions explanations.
 
 library("ape")
 library("geometry")
@@ -37,14 +40,14 @@ library("vegan")
 
 #####auxiliary functions
 prep <- function(comm, xtree, abund = TRUE){
-	len <- xtree[[1]] 							## length of each branch
-	A <- xtree[[2]]									## matrix species X branches
-	minBranch <- min(len[colSums(A)==1]) 	## minimum branch length of terminal branches
-	if(is.data.frame(comm))
-		comm = as.matrix(comm)
-	BA <- comm%*%A 												## matrix samples X branches
-	if (!abund)	BA = ifelse(BA >= 1, 1, 0)
-	return (list(lenBranch = len, sampleBranch = BA, speciesBranch = A, minBranch = minBranch))
+  len <- xtree[[1]] 							## length of each branch
+  A <- xtree[[2]]									## matrix species X branches
+  minBranch <- min(len[colSums(A)==1]) 	## minimum branch length of terminal branches
+  if(is.data.frame(comm))
+    comm = as.matrix(comm)
+  BA <- comm%*%A 												## matrix samples X branches
+  if (!abund)	BA = ifelse(BA >= 1, 1, 0)
+  return (list(lenBranch = len, sampleBranch = BA, speciesBranch = A, minBranch = minBranch))
 }
 
 clean <- function(comm, tree = NA){
@@ -62,10 +65,10 @@ reorderComm <- function(comm, tree = NULL){
   
   if(is.vector(comm))
     comm = as.matrix(comm, nrow = 1)
-  if (is(tree, "hclust"))
+  if(is(tree, "hclust"))
     tree = ape::as.phylo(tree)
-
-  if (is(tree, "phylo")){
+  
+  if(is(tree, "phylo")){
     if(!is.null(tree$tip.label) && !is.null(colnames(comm))){ ##if both tree and comm have species names match and reorder species (columns) in comm
       
       #if some species are missing from comm add 0s
@@ -82,7 +85,7 @@ reorderComm <- function(comm, tree = NULL){
       if (any(tree$tip.label != colnames(comm)))
         warning("Species names of comm and tree do not match!")
     }
-  } else if (is(tree, "dist")){
+  } else if(is(tree, "dist")){
     if(!is.null(colnames(tree)) && !is.null(colnames(comm))){ ##if both tree and comm have species names match and reorder species (columns) in comm
       comm <- comm[,match(colnames(tree), colnames(comm))]
       if (any(colnames(tree) != colnames(comm)))
@@ -93,55 +96,55 @@ reorderComm <- function(comm, tree = NULL){
 }
 
 nMin <- function(comm){
-	n <- sum(comm)
-	for (s in 1:nrow(comm))
-		n <- min(n, sum(comm[s,]))
-	return(n)
+  n <- sum(comm)
+  for (s in 1:nrow(comm))
+    n <- min(n, sum(comm[s,]))
+  return(n)
 }
 
 rss <- function(x, y){
-	return (sum((x-y)^2))
+  return (sum((x-y)^2))
 }
 
 logit <- function(x){
-	return(log(x/(1-x)))
+  return(log(x/(1-x)))
 }
 
 revLogit <- function(x){
-	return(exp(x)/(1+exp(x)))
+  return(exp(x)/(1+exp(x)))
 }
 
 euclid <- function(x, y){
-	return(sqrt(sum((x - y) ^ 2)))
+  return(sqrt(sum((x - y) ^ 2)))
 }
 
 #####xTree function partly adapted from http://owenpetchey.staff.shef.ac.uk/Code/Code/calculatingfd_assets/Xtree.r
 #####by Jens Schumacher (described in Petchey & Gaston 2002, 2006)
 xTree <- function(tree) {
-  if (is(tree, "hclust")){
-  	nSpp <- nrow(as.data.frame(tree['order']))
-  	sppEdges <- matrix(0, nSpp, 2 * nSpp - 2)
-  	lenEdges <- vector("numeric", 2 * nSpp - 2)
-  	for(i in 1:(nSpp - 1)) {
-  		if(tree$merge[i, 1] < 0) {
-  			lenEdges[2 * i - 1] <- tree$height[order(tree$height)[i]]
-  			sppEdges[ - tree$merge[i, 1], 2 * i - 1] <- 1
-  		} else {
-  			lenEdges[2 * i - 1] <- tree$height[order(tree$height)[i]] - tree$height[order(tree$height)[tree$merge[i, 1]]]
-  			sppEdges[, 2 * i - 1] <- sppEdges[, 2 * tree$merge[i, 1] - 1] + sppEdges[ , 2 * tree$merge[i, 1]]
-  		}
-  		if(tree$merge[i, 2] < 0) {
-  			lenEdges[2 * i] <- tree$height[order(tree$height)[i]]
-  			sppEdges[ - tree$merge[i, 2], 2 * i] <- 1
-  		} else {
-  			lenEdges[2 * i] <- tree$height[order(tree$height)[i]] - tree$height[order(tree$height)[tree$merge[i, 2]]]
-  			sppEdges[, 2 * i] <- sppEdges[, 2 * tree$merge[i, 2] - 1] + sppEdges[, 2 *tree$merge[i, 2]]
-  		}
-  	}
-  	rownames(sppEdges) <- tree$labels
-  	return(list(lenEdges, sppEdges))
-  	
-  } else if (is(tree, "phylo")){
+  if(is(tree, "hclust")){
+    nSpp <- nrow(as.data.frame(tree['order']))
+    sppEdges <- matrix(0, nSpp, 2 * nSpp - 2)
+    lenEdges <- vector("numeric", 2 * nSpp - 2)
+    for(i in 1:(nSpp - 1)) {
+      if(tree$merge[i, 1] < 0) {
+        lenEdges[2 * i - 1] <- tree$height[order(tree$height)[i]]
+        sppEdges[ - tree$merge[i, 1], 2 * i - 1] <- 1
+      } else {
+        lenEdges[2 * i - 1] <- tree$height[order(tree$height)[i]] - tree$height[order(tree$height)[tree$merge[i, 1]]]
+        sppEdges[, 2 * i - 1] <- sppEdges[, 2 * tree$merge[i, 1] - 1] + sppEdges[ , 2 * tree$merge[i, 1]]
+      }
+      if(tree$merge[i, 2] < 0) {
+        lenEdges[2 * i] <- tree$height[order(tree$height)[i]]
+        sppEdges[ - tree$merge[i, 2], 2 * i] <- 1
+      } else {
+        lenEdges[2 * i] <- tree$height[order(tree$height)[i]] - tree$height[order(tree$height)[tree$merge[i, 2]]]
+        sppEdges[, 2 * i] <- sppEdges[, 2 * tree$merge[i, 2] - 1] + sppEdges[, 2 *tree$merge[i, 2]]
+      }
+    }
+    rownames(sppEdges) <- tree$labels
+    return(list(lenEdges, sppEdges))
+    
+  } else if(is(tree, "phylo")){
     
     # old code
     # lenEdges <- tree$edge.length
@@ -185,15 +188,15 @@ xTree <- function(tree) {
 
 #####observed diversity
 sobs <- function(comm, xtree){
-	if (is.vector(comm))
-		comm = matrix(comm, nrow = 1)
-	if (missing(xtree)){
-		return(length(colSums(comm)[colSums(comm) > 0]))
-	} else {
-		data <- prep(comm, xtree)
-		value <- ifelse (colSums(data$sampleBranch) > 0, 1, 0) # vector of observed branches
-		return (sum(value*data$lenBranch))
-	}
+  if (is.vector(comm))
+    comm = matrix(comm, nrow = 1)
+  if (missing(xtree)){
+    return(length(colSums(comm)[colSums(comm) > 0]))
+  } else {
+    data <- prep(comm, xtree)
+    value <- ifelse (colSums(data$sampleBranch) > 0, 1, 0) # vector of observed branches
+    return (sum(value*data$lenBranch))
+  }
 }
 
 #####observed abundance
@@ -239,101 +242,101 @@ raoobs <- function(comm, distance){
 
 #####diversity of rare species for abundance - singletons, doubletons, tripletons, etc
 srare <- function(comm, xtree, n = 1){
-	if(missing(xtree)){
-		return(length(colSums(comm)[colSums(comm) == n]))
-	} else {
-		data <- prep(comm, xtree)
-		value <- ifelse (colSums(data$sampleBranch) == n, 1, 0) # vector of branches with given abundance
-		return (sum(value*data$lenBranch))
-	}
+  if(missing(xtree)){
+    return(length(colSums(comm)[colSums(comm) == n]))
+  } else {
+    data <- prep(comm, xtree)
+    value <- ifelse (colSums(data$sampleBranch) == n, 1, 0) # vector of branches with given abundance
+    return (sum(value*data$lenBranch))
+  }
 }
 
 #####diversity of rare species for incidence - uniques, duplicates, triplicates, etc
 qrare <- function(comm, xtree, n = 1){
-	if(missing(xtree)){
-		comm <- ifelse(comm > 0, 1, 0)
-		return(length(colSums(comm)[colSums(comm) == n]))
-	} else {
-		data <- prep(comm, xtree, FALSE)
-		value <- ifelse (colSums(data$sampleBranch) == n, 1, 0) # vector of branches with given incidence
-		return (sum(value*data$lenBranch))
-	}
+  if(missing(xtree)){
+    comm <- ifelse(comm > 0, 1, 0)
+    return(length(colSums(comm)[colSums(comm) == n]))
+  } else {
+    data <- prep(comm, xtree, FALSE)
+    value <- ifelse (colSums(data$sampleBranch) == n, 1, 0) # vector of branches with given incidence
+    return (sum(value*data$lenBranch))
+  }
 }
 
 #####minimum terminal branch length, = 1 in case of TD
 minBranch <- function(comm, xtree){
-	if (missing(xtree)){
-		return(1)
-	} else {
-		data <- prep(comm, xtree)
-		return(data$minBranch)
-	}
+  if (missing(xtree)){
+    return(1)
+  } else {
+    data <- prep(comm, xtree)
+    return(data$minBranch)
+  }
 }
 
 #####non-parametric estimators
 chao <- function(obs, s1, s2, mb){
-	return(obs + (s1*(s1-mb))/(2*(s2+mb)))
+  return(obs + (s1*(s1-mb))/(2*(s2+mb)))
 }
 
 jack1ab <- function(obs, s1){
-	return(obs + s1)
+  return(obs + s1)
 }
 
 jack1in <- function(obs, q1, q){
-	return(obs + q1 * ((q-1)/q))
+  return(obs + q1 * ((q-1)/q))
 }
 
 jack2ab <- function(obs, s1, s2){
-	return(obs + 2*s1 - s2)
+  return(obs + 2*s1 - s2)
 }
 
 jack2in <- function(obs, q1, q2, q){
-	if (q > 1)	return(obs + (q1*(2*q-3)/q - q2*(q-2)^2/(q*(q-1))))
-	else return(obs + 2*q1 - q2)
+  if (q > 1)	return(obs + (q1*(2*q-3)/q - q2*(q-2)^2/(q*(q-1))))
+  else return(obs + 2*q1 - q2)
 }
 
 pcorr <- function(obs, s1){
-	return(1+(s1/obs)^2)
+  return(1+(s1/obs)^2)
 }
 
 #####observed beta (a = shared species/edges, b/c = species/edges exclusive to either site, comm is a 2sites x species matrix)
 betaObs <- function(comm, xtree, func = "jaccard", abund = TRUE, comp = FALSE){
   if(sum(comm) == 0)                                ##if no species on any community return 0
     return(list(Btotal = 0, Brepl = 0, Brich = 0))
-	if (!abund || max(comm) == 1) {										##if incidence data
-		obs1 <- sobs(comm[1,,drop=FALSE], xtree)
-		obs2 <- sobs(comm[2,,drop=FALSE], xtree)
-		obsBoth <- sobs(comm, xtree)
-		a <- obs1 + obs2 - obsBoth
-		b <- obsBoth - obs2
-		c <- obsBoth - obs1
-	} else if (abund & missing(xtree)){								##if abundance data
-		a <- 0
-		b <- 0
-		c <- 0
-		for (i in 1:ncol(comm)){
-		  minComm <- min(comm[1,i], comm[2,i])
-		  a <- a + minComm
-		  b <- b + comm[1,i] - minComm
-		  c <- c + comm[2,i] - minComm
-		}
-	} else {																					##if abundance and tree
-		##due to the way Soerensen doubles the weight of the a component, using a tree or not will be the same with abundance data.
-		data <- prep(comm, xtree)
-		a = sum(data$lenBranch * apply(data$sampleBranch,2,min))
-		diff = data$lenBranch * (data$sampleBranch[1,] - data$sampleBranch[2,])
-		b = sum(replace(diff, diff < 0, 0))
-		c = sum(replace(diff, diff > 0, 0) * -1)
-	}
-	denominator <- a + b + c
-	if(tolower(substr(func, 1, 1)) == "s")
-		denominator <- denominator + a
-	betaValues = (list(Btotal = (b+c)/denominator, Brepl = 2*min(b,c)/denominator, Brich = abs(b-c)/denominator))
-	if(comp){
-	  betaValues$Shared = a
-	  betaValues$Unique1 = b
-	  betaValues$Unique2 = c
-	}
+  if (!abund || max(comm) == 1) {										##if incidence data
+    obs1 <- sobs(comm[1,,drop=FALSE], xtree)
+    obs2 <- sobs(comm[2,,drop=FALSE], xtree)
+    obsBoth <- sobs(comm, xtree)
+    a <- obs1 + obs2 - obsBoth
+    b <- obsBoth - obs2
+    c <- obsBoth - obs1
+  } else if (abund & missing(xtree)){								##if abundance data
+    a <- 0
+    b <- 0
+    c <- 0
+    for (i in 1:ncol(comm)){
+      minComm <- min(comm[1,i], comm[2,i])
+      a <- a + minComm
+      b <- b + comm[1,i] - minComm
+      c <- c + comm[2,i] - minComm
+    }
+  } else {																					##if abundance and tree
+    ##due to the way Soerensen doubles the weight of the a component, using a tree or not will be the same with abundance data.
+    data <- prep(comm, xtree)
+    a = sum(data$lenBranch * apply(data$sampleBranch,2,min))
+    diff = data$lenBranch * (data$sampleBranch[1,] - data$sampleBranch[2,])
+    b = sum(replace(diff, diff < 0, 0))
+    c = sum(replace(diff, diff > 0, 0) * -1)
+  }
+  denominator <- a + b + c
+  if(tolower(substr(func, 1, 1)) == "s")
+    denominator <- denominator + a
+  betaValues = (list(Btotal = (b+c)/denominator, Brepl = 2*min(b,c)/denominator, Brich = abs(b-c)/denominator))
+  if(comp){
+    betaValues$Shared = a
+    betaValues$Unique1 = b
+    betaValues$Unique2 = c
+  }
   return(betaValues)
 }
 
@@ -362,13 +365,13 @@ msd <- function(dist1, dist2){
   
   #rescale
   qual = (qual - minQual) / (1 - minQual)
-
+  
   return(qual)
 }
 
 #####Auxiliary function doing most work for sad.*
-sad.core <- function(comm, contr = NULL, octaves = TRUE, raref = 0, runs = 100){
-
+sad.core <- function(comm, contr = NULL, octaves = TRUE, scale = FALSE, raref = 0, runs = 100){
+  
   #prepare data
   if(is.vector(comm))
     comm = matrix(comm, 1)
@@ -409,8 +412,32 @@ sad.core <- function(comm, contr = NULL, octaves = TRUE, raref = 0, runs = 100){
       }
     }
   }
+  
+  if(scale)
+    res = t(apply(res, 1, function(x) x/sum(x)))
+
   return(res)
 }
+
+#auxiliary function to resample from any number of sites in mixture
+resample <- function(comm, size, replace = FALSE){
+  
+  if(is.vector(comm))
+    comm = as.matrix(comm, nrow = 1)
+  if(length(size) == 1)
+    size = rep(size, length(size))
+  
+  newComm = comm
+  newComm[] = 0
+  for(i in 1:nrow(comm)){
+    thisComm = sample(colnames(comm), size[i], prob = comm[i, ], replace = replace)
+    thisComm = table(thisComm)
+    newComm[i, names(thisComm)] = thisComm
+  }
+  
+  return(newComm)
+}      
+
 
 ##################################################################################
 ##################################MAIN FUNCTIONS##################################
@@ -449,38 +476,38 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
-
+  
   #first organize the data
   if(!missing(tree)){
     cleanData = clean(comm, tree)
     comm = cleanData[[1]]
     tree = cleanData[[2]]
   }
-
+  
   #now let's go for what matters
   nComm <- nrow(comm)
-	if(raref < 1){						# no rarefaction if 0 or negative
-		results <- matrix(0, nComm, 1)
-		for (s in 1:nComm){
-			results[s,1] <- sobs(comm[s,, drop=FALSE], tree)
-		}
-		rownames(results) <- rownames(comm)
-		colnames(results) <- "Richness"
-		return (results)
-	}
-	if (raref == 1)
-		raref <- nMin(comm)				# rarefy by minimum n among all communities
-	results <- matrix(0, nComm, 6)
-	for (s in 1:nComm){
-		res <- c()
-		for (r in 1:runs){
-			res <- c(res,sobs(rrarefy(comm[s,], raref), tree))
-		}
-		results[s,] <- c(mean(res), quantile(res, 0.5), min(res), quantile(res, 0.025), quantile(res, 0.975), max(res))
-	}
-	rownames(results) <- rownames(comm)
-	colnames(results) <- c("Mean", "Median", "Min", "LowerCL", "UpperCL", "Max")
-	return (results)
+  if(raref < 1){						# no rarefaction if 0 or negative
+    results <- matrix(0, nComm, 1)
+    for (s in 1:nComm){
+      results[s,1] <- sobs(comm[s,, drop=FALSE], tree)
+    }
+    rownames(results) <- rownames(comm)
+    colnames(results) <- "Richness"
+    return (results)
+  }
+  if (raref == 1)
+    raref <- nMin(comm)				# rarefy by minimum n among all communities
+  results <- matrix(0, nComm, 6)
+  for (s in 1:nComm){
+    res <- c()
+    for (r in 1:runs){
+      res <- c(res,sobs(rrarefy(comm[s,], raref), tree))
+    }
+    results[s,] <- c(mean(res), quantile(res, 0.5), min(res), quantile(res, 0.025), quantile(res, 0.975), max(res))
+  }
+  rownames(results) <- rownames(comm)
+  colnames(results) <- c("Mean", "Median", "Min", "LowerCL", "UpperCL", "Max")
+  return (results)
 }
 
 #' Alpha diversity accumulation curves (observed and estimated).
@@ -546,7 +573,7 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 #' alpha.accum(comm, target = -1)
 #' @export
 alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 100, prog = TRUE){
-
+  
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
@@ -557,176 +584,176 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
     comm = cleanData[[1]]
     tree = cleanData[[2]]
   }
-
+  
   #####function options:
-	#####nonparametric (TD/PD/FD with non-parametric estimators)
-	#####completeness (PD/FD with TD completeness correction)
-	#####curve (TD/PD/FD with curve fitting)
-	func <- match.arg(func, c("nonparametric", "completeness", "curve"))
-
-	#####nonparametric (TD/PD/FD with non-parametric estimators)
-	switch(func, nonparametric = {
-		resultsArray <- array(0, dim = c(nrow(comm), 19, runs))
-		if(target > -2){
-		  smse <- matrix(0, runs, 19)
-		  smsew <-  smse
-		}
-		if (prog) pb <- txtProgressBar(0, runs, style = 3)
-		for (r in 1:runs){
-			comm <- comm[sample(nrow(comm)),, drop=FALSE]			#shuffle rows (sampling units)
-			data <- matrix(0,1,ncol(comm))
-			runData <- matrix(0,nrow(comm),19)
-			colnames(data) = colnames(comm)
-			for (q in 1:nrow(comm)){
-				data <- rbind(data, comm[q,])
-				n <- sum(rowSums(data))
-				obs <- sobs(data, tree)
-				s1 <- srare(data, tree, 1)
-				s2 <- srare(data, tree, 2)
-				q1 <- qrare(data, tree, 1)
-				q2 <- qrare(data, tree, 2)
-				mb <- minBranch(data, tree)
-				j1ab <- jack1ab(obs, s1)
-				j1abP <- j1ab * pcorr(obs, s1)
-				j1in <- jack1in(obs, q1, q)
-				j1inP <- j1in * pcorr(obs, q1)
-				j2ab <- jack2ab(obs, s1, s2)
-				j2abP <- j2ab * pcorr(obs, s1)
-				j2in <- jack2in(obs, q1, q2, q)
-				j2inP <- j2in * pcorr(obs, q1)
-				c1 <- chao(obs, s1, s2, mb)
-				c1P <- c1 * pcorr(obs, s1)
-				c2 <- chao(obs, q1, q2, mb)
-				c2P <- c2 * pcorr(obs, q1)
-				runData[q,] <- c(q, n, obs, s1, s2, q1, q2, j1ab, j1abP, j1in, j1inP, j2ab, j2abP, j2in, j2inP, c1, c1P, c2, c2P)
-			}
-			resultsArray[,,r] <- runData
-			if(exists("smse")){					##if accuracy is to be calculated
-				if(r == 1){
-					if(target == -1){
-						truediv <- runData[nrow(runData),3]
-					}else{
-						truediv <- target
-					}
-				}
-				s <- accuracy(runData, truediv)
-				smse[r,3] <- s[1,1]
-				smse[r,8:19] <- s[1,-1]
-				smsew[r,3] <- s[2,1]
-				smsew[r,8:19] <- s[2,-1]
-			}
-			if (prog) setTxtProgressBar(pb, r)
-		}
-		if (prog) close(pb)
-
-		#####calculate averages or medians of all runs
-		results <- matrix(0,nrow(comm),19)
-		v <- array(0, dim = c(runs))
-		for (i in 1:nrow(comm)){
-			for (j in 1:19){
-				for (k in 1:runs){
-					v[k] <- resultsArray[i,j,k]
-				}
-				if (j < 16 || missing(tree))
-					results[i,j] <- mean(v)
-				else
-					results[i,j] <- median(v)
-			}
-		}
-		if(exists("smse")){						##calculate accuracy
-			smse <- colMeans(smse)
-			smsew <- colMeans(smsew)
-		}
-
-		#####completeness (PD/FD with TD completeness correction)
-	}, completeness = {
-		if (missing(tree))
-			stop("Completeness option not available without a tree...")
-		results <- alpha.accum(comm, runs = runs)
-		obs <- matrix(0,nrow(comm),1)
-		for (r in 1:runs){
-			comm <- comm[sample(nrow(comm)),, drop=FALSE]			#shuffle rows (sampling units)
-			for (s in 1:nrow(comm)){
-				obs[s,1] <- obs[s,1] + sobs(comm[1:s,], tree)
-			}
-		}
-		obs <- obs / runs
-		for (i in 8:19)
-			results[,i] <- obs * (results[,i] / results[,3])
-		results[,3] <- obs
-
-		#####curve (TD/PD/FD with curve fitting)
-	}, curve = {
+  #####nonparametric (TD/PD/FD with non-parametric estimators)
+  #####completeness (PD/FD with TD completeness correction)
+  #####curve (TD/PD/FD with curve fitting)
+  func <- match.arg(func, c("nonparametric", "completeness", "curve"))
+  
+  #####nonparametric (TD/PD/FD with non-parametric estimators)
+  switch(func, nonparametric = {
+    resultsArray <- array(0, dim = c(nrow(comm), 19, runs))
+    if(target > -2){
+      smse <- matrix(0, runs, 19)
+      smsew <-  smse
+    }
+    if (prog) pb <- txtProgressBar(0, runs, style = 3)
+    for (r in 1:runs){
+      comm <- comm[sample(nrow(comm)),, drop=FALSE]			#shuffle rows (sampling units)
+      data <- matrix(0,1,ncol(comm))
+      runData <- matrix(0,nrow(comm),19)
+      colnames(data) = colnames(comm)
+      for (q in 1:nrow(comm)){
+        data <- rbind(data, comm[q,])
+        n <- sum(rowSums(data))
+        obs <- sobs(data, tree)
+        s1 <- srare(data, tree, 1)
+        s2 <- srare(data, tree, 2)
+        q1 <- qrare(data, tree, 1)
+        q2 <- qrare(data, tree, 2)
+        mb <- minBranch(data, tree)
+        j1ab <- jack1ab(obs, s1)
+        j1abP <- j1ab * pcorr(obs, s1)
+        j1in <- jack1in(obs, q1, q)
+        j1inP <- j1in * pcorr(obs, q1)
+        j2ab <- jack2ab(obs, s1, s2)
+        j2abP <- j2ab * pcorr(obs, s1)
+        j2in <- jack2in(obs, q1, q2, q)
+        j2inP <- j2in * pcorr(obs, q1)
+        c1 <- chao(obs, s1, s2, mb)
+        c1P <- c1 * pcorr(obs, s1)
+        c2 <- chao(obs, q1, q2, mb)
+        c2P <- c2 * pcorr(obs, q1)
+        runData[q,] <- c(q, n, obs, s1, s2, q1, q2, j1ab, j1abP, j1in, j1inP, j2ab, j2abP, j2in, j2inP, c1, c1P, c2, c2P)
+      }
+      resultsArray[,,r] <- runData
+      if(exists("smse")){					##if accuracy is to be calculated
+        if(r == 1){
+          if(target == -1){
+            truediv <- runData[nrow(runData),3]
+          }else{
+            truediv <- target
+          }
+        }
+        s <- accuracy(runData, truediv)
+        smse[r,3] <- s[1,1]
+        smse[r,8:19] <- s[1,-1]
+        smsew[r,3] <- s[2,1]
+        smsew[r,8:19] <- s[2,-1]
+      }
+      if (prog) setTxtProgressBar(pb, r)
+    }
+    if (prog) close(pb)
+    
+    #####calculate averages or medians of all runs
+    results <- matrix(0,nrow(comm),19)
+    v <- array(0, dim = c(runs))
+    for (i in 1:nrow(comm)){
+      for (j in 1:19){
+        for (k in 1:runs){
+          v[k] <- resultsArray[i,j,k]
+        }
+        if (j < 16 || missing(tree))
+          results[i,j] <- mean(v)
+        else
+          results[i,j] <- median(v)
+      }
+    }
+    if(exists("smse")){						##calculate accuracy
+      smse <- colMeans(smse)
+      smsew <- colMeans(smsew)
+    }
+    
+    #####completeness (PD/FD with TD completeness correction)
+  }, completeness = {
+    if (missing(tree))
+      stop("Completeness option not available without a tree...")
+    results <- alpha.accum(comm, runs = runs)
+    obs <- matrix(0,nrow(comm),1)
+    for (r in 1:runs){
+      comm <- comm[sample(nrow(comm)),, drop=FALSE]			#shuffle rows (sampling units)
+      for (s in 1:nrow(comm)){
+        obs[s,1] <- obs[s,1] + sobs(comm[1:s,], tree)
+      }
+    }
+    obs <- obs / runs
+    for (i in 8:19)
+      results[,i] <- obs * (results[,i] / results[,3])
+    results[,3] <- obs
+    
+    #####curve (TD/PD/FD with curve fitting)
+  }, curve = {
     results <- matrix(NA,nrow(comm),7)
     results[,1] <- seq(1,nrow(comm))  ##fill samples column
     results[,2] <- seq(sum(comm)/nrow(comm),sum(comm), sum(comm)/nrow(comm))  ##fill individuals column
     runObs <- rep(0,nrow(comm))
     if (prog) pb <- txtProgressBar(0, runs, style = 3)
     for (r in 1:runs){
- 		  comm <- comm[sample(nrow(comm)),, drop=FALSE]		#shuffle rows (sampling units)
- 		  for (s in 1:nrow(comm)){
- 		    runObs[s] <- runObs[s] + sobs(comm[1:s,,drop=FALSE], tree)
- 		  }
- 		  if (prog) setTxtProgressBar(pb, r)
+      comm <- comm[sample(nrow(comm)),, drop=FALSE]		#shuffle rows (sampling units)
+      for (s in 1:nrow(comm)){
+        runObs[s] <- runObs[s] + sobs(comm[1:s,,drop=FALSE], tree)
+      }
+      if (prog) setTxtProgressBar(pb, r)
     }
     if (prog) close(pb)
-		results[,3] <- runObs / runs
-
+    results[,3] <- runObs / runs
+    
     rich <- results[nrow(comm),3]
-
-		for (s in 3:nrow(results)){				##fit curves only with 3 or more sampling units
-		  ## curve fitting
+    
+    for (s in 3:nrow(results)){				##fit curves only with 3 or more sampling units
+      ## curve fitting
       x <- results[1:s,1]
-			y <- results[1:s,3]
-			##Clench
-			stlist <- data.frame(a = rich, b = c(0.1, 0.5, 1))
-			form <- y ~ (a*x)/(b+x)
-			mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
-			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
-			if (!is(curve, "try-error")){
-				a <- coef(curve)[1]
-				results[s,5] <- a
-			}
-			##Negative exponential
-      form <- y ~ a*(1-exp(-b*x))
-			mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
-			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
-			if (!is(curve, "try-error")){
-				a <- coef(curve)[1]
-				results[s,6] <- a
-			}
-			##Rational
-			stlist <- data.frame(a = rich, b = c(0.1, 0.5, 1, 5, 10), c = c(1, 10, 100, 1000, 10000))
-			form <- y ~ (c+(a*x))/(b+x)
-			mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
-			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
-			if (!is(curve, "try-error")){
-				a <- coef(curve)[1]
-				results[s,4] <- a
-			}
-			##Weibull
- 			stlist <- data.frame(a = rich, b = c(0,1,10), c = c(0,0.1,1))
- 			form <- y ~ a*(1-exp(-b*(x^c)))
+      y <- results[1:s,3]
+      ##Clench
+      stlist <- data.frame(a = rich, b = c(0.1, 0.5, 1))
+      form <- y ~ (a*x)/(b+x)
       mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
- 			curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
-  			if (!is(curve, "try-error")){
-  				a <- coef(curve)[1]
-  				results[s,7] <- a
-  			}
-		}
-		colnames(results) <- c("Sampl", "Ind", "Obs", "Clench", "Exponential", "Rational", "Weibull")
-		return (results)
-	})
-	colnames(results) <- c("Sampl", "Ind", "Obs", "S1", "S2", "Q1", "Q2", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
-	if(exists("smse")){
-		smse <- rbind(smse, smsew)
-		colnames(smse) <- colnames(results)
-		rownames(smse) <- c("Raw", "Weighted")
-		smse <- smse[,-c(1:2,4:7)]
-		return(list(results, smse))
-	}	else {
-		return(results)
-	}
+      curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
+      if(!is(curve, "try-error")){
+        a <- coef(curve)[1]
+        results[s,5] <- a
+      }
+      ##Negative exponential
+      form <- y ~ a*(1-exp(-b*x))
+      mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
+      curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
+      if(!is(curve, "try-error")){
+        a <- coef(curve)[1]
+        results[s,6] <- a
+      }
+      ##Rational
+      stlist <- data.frame(a = rich, b = c(0.1, 0.5, 1, 5, 10), c = c(1, 10, 100, 1000, 10000))
+      form <- y ~ (c+(a*x))/(b+x)
+      mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
+      curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
+      if(!is(curve, "try-error")){
+        a <- coef(curve)[1]
+        results[s,4] <- a
+      }
+      ##Weibull
+      stlist <- data.frame(a = rich, b = c(0,1,10), c = c(0,0.1,1))
+      form <- y ~ a*(1-exp(-b*(x^c)))
+      mod <- try(nls2(form, start = stlist, algorithm = "random-search"), silent = TRUE)
+      curve <- try(nls2(form, start = mod, algorithm = "default"), silent = TRUE)
+      if(!is(curve, "try-error")){
+        a <- coef(curve)[1]
+        results[s,7] <- a
+      }
+    }
+    colnames(results) <- c("Sampl", "Ind", "Obs", "Clench", "Exponential", "Rational", "Weibull")
+    return (results)
+  })
+  colnames(results) <- c("Sampl", "Ind", "Obs", "S1", "S2", "Q1", "Q2", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
+  if(exists("smse")){
+    smse <- rbind(smse, smsew)
+    colnames(smse) <- colnames(results)
+    rownames(smse) <- c("Raw", "Weighted")
+    smse <- smse[,-c(1:2,4:7)]
+    return(list(results, smse))
+  }	else {
+    return(results)
+  }
 }
 
 #' Alpha diversity estimates.
@@ -771,67 +798,67 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 #' alpha.estimate(comm, tree, func = "completeness")
 #' @export
 alpha.estimate <- function(comm, tree, func = "nonparametric"){
-
-	if (max(comm) == 1)
-		stop("No estimates are possible without abundance or incidence frequency data")
-
+  
+  if (max(comm) == 1)
+    stop("No estimates are possible without abundance or incidence frequency data")
+  
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
   
-	#####function options:
-	#####nonparametric (TD/PD/FD with non-parametric estimators)
-	#####completeness (PD/FD with TD completeness correction)
-	func <- match.arg(func, c("nonparametric", "completeness"))
-
-	#####nonparametric (TD/PD/FD with non-parametric estimators)
-	switch(func, nonparametric = {
-	  #first organize the data
-	  if(!missing(tree)){
-	    cleanData = clean(comm, tree)
-	    comm = cleanData[[1]]
-	    tree = cleanData[[2]]
-	  }
-	  
-	  #now let's go for what matters
-	  results <- matrix(0,0,10)
-		for (s in 1:nrow(comm)){
-			data <- comm[s,,drop = FALSE]
-			obs <- sobs(data, tree)
-			n <- sum(data)
-			s1 <- srare(data, tree, 1)
-			s2 <- srare(data, tree, 2)
-			mb <- minBranch(data, tree)
-			j1ab <- jack1ab(obs, s1)
-			j1abP <- j1ab * pcorr(obs, s1)
-			j2ab <- jack2ab(obs, s1, s2)
-			j2abP <- j2ab * pcorr(obs, s1)
-			c1 <- chao(obs, s1, s2, mb)
-			c1P <- c1 * pcorr(obs, s1)
-			results <- rbind(results, c(n, obs, s1, s2, j1ab, j1abP, j2ab, j2abP, c1, c1P))
-		}
-
-		#####completeness (PD/FD with TD completeness correction)
-	}, completeness = {
-	  if(is.vector(comm))
-	    comm <- matrix(comm, nrow = 1)
-	  comm <- as.matrix(comm)
-		if (missing(tree))
-			stop("Completeness option not available without a tree...")
-		results <- alpha.estimate(comm, tree, "nonparametric")
-	  if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-	    comm <- comm[,match(tree$labels, colnames(comm))]
-	  tree <- xTree(tree)
-		obs <- matrix(0,nrow(comm),1)
-		for (s in 1:nrow(comm))
-			obs[s,1] <- obs[s,1] + sobs(comm[s,], tree)
-		for (i in 5:10)
-			results[,i] <- obs[,1] * (results[,i] / results[,2])
-		results[,2] <- obs[,1]
-	})
-	rownames(results) <- rownames(comm)
-	colnames(results) <- c("Ind", "Obs", "S1", "S2", "Jack1ab", "Jack1abP", "Jack2ab", "Jack2abP", "Chao1", "Chao1P")
-	return(results)
+  #####function options:
+  #####nonparametric (TD/PD/FD with non-parametric estimators)
+  #####completeness (PD/FD with TD completeness correction)
+  func <- match.arg(func, c("nonparametric", "completeness"))
+  
+  #####nonparametric (TD/PD/FD with non-parametric estimators)
+  switch(func, nonparametric = {
+    #first organize the data
+    if(!missing(tree)){
+      cleanData = clean(comm, tree)
+      comm = cleanData[[1]]
+      tree = cleanData[[2]]
+    }
+    
+    #now let's go for what matters
+    results <- matrix(0,0,10)
+    for (s in 1:nrow(comm)){
+      data <- comm[s,,drop = FALSE]
+      obs <- sobs(data, tree)
+      n <- sum(data)
+      s1 <- srare(data, tree, 1)
+      s2 <- srare(data, tree, 2)
+      mb <- minBranch(data, tree)
+      j1ab <- jack1ab(obs, s1)
+      j1abP <- j1ab * pcorr(obs, s1)
+      j2ab <- jack2ab(obs, s1, s2)
+      j2abP <- j2ab * pcorr(obs, s1)
+      c1 <- chao(obs, s1, s2, mb)
+      c1P <- c1 * pcorr(obs, s1)
+      results <- rbind(results, c(n, obs, s1, s2, j1ab, j1abP, j2ab, j2abP, c1, c1P))
+    }
+    
+    #####completeness (PD/FD with TD completeness correction)
+  }, completeness = {
+    if(is.vector(comm))
+      comm <- matrix(comm, nrow = 1)
+    comm <- as.matrix(comm)
+    if (missing(tree))
+      stop("Completeness option not available without a tree...")
+    results <- alpha.estimate(comm, tree, "nonparametric")
+    if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+      comm <- comm[,match(tree$labels, colnames(comm))]
+    tree <- xTree(tree)
+    obs <- matrix(0,nrow(comm),1)
+    for (s in 1:nrow(comm))
+      obs[s,1] <- obs[s,1] + sobs(comm[s,], tree)
+    for (i in 5:10)
+      results[,i] <- obs[,1] * (results[,i] / results[,2])
+    results[,2] <- obs[,1]
+  })
+  rownames(results) <- rownames(comm)
+  colnames(results) <- c("Ind", "Obs", "S1", "S2", "Jack1ab", "Jack1abP", "Jack2ab", "Jack2abP", "Chao1", "Chao1P")
+  return(results)
 }
 
 #' Rao quadratic entropy.
@@ -859,7 +886,7 @@ rao <- function(comm, tree, distance, raref = 0, runs = 100){
   #convert traits to distance if needed
   if(!missing(distance) && (is.matrix(distance) || is.data.frame(distance) || is.vector(distance)))
     distance = gower(distance)
-
+  
   if(!missing(tree))
     distance = cophenetic(tree)
   else if(missing(distance))
@@ -939,6 +966,66 @@ hill <- function(comm, q = 0, raref = 0, runs = 100){
   return (results)
 }
 
+#' Mixture model.
+#' @description Mixture model by Hilario et al. subm.
+#' @param comm A sites x species matrix, with abundance data.
+#' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree. Will only be used if q = 0, in which case phylogenetic or functional richness are calculated instead of species richness.
+#' @param q Hill number order: q(0) = species richness, q(1) ~ Shannon diversity, q(2) ~ Simpson diversity.
+#' @param precision Precision of the proportion of each habitat type to be tested.
+#' @param alpha alpha value for significance level.
+#' @param param Value is calculated with parametric or non-parametric method. The later is preferable when distribution of estimated values is not normally distributed.
+#' @param runs Number of runs for the bootstrap providing confidence limits.
+#' @details A tool to assess biodiversity in landscapes containing varying proportions of n environments.
+#' @return A matrix with expected diversity at each proportion of different habitats in a landscape.
+#' @references Chao et al. (2019) Proportional mixture of two rarefaction/extrapolation curves to forecast biodiversity changes under landscape transformation. Ecology Letters, 22: 1913-1922. https://doi.org/10.1111/ele.13322
+#' @references Hilario et al. (subm.) Function ‘mixture’: A new tool to quantify biodiversity change under landscape transformation.
+#' @author Renato Hilario & Pedro Cardoso
+#' @examples comm <- matrix(c(20,20,20,20,20,9,1,0,0,0,1,1,1,1,1), nrow = 3, ncol = 5, byrow = TRUE)
+#' tree = hclust(dist(1:5))
+#' 
+#' hill(comm)
+#' alpha(comm, tree)
+#' 
+#' mixture(comm)
+#' @export
+mixture <- function(comm, tree, q = 0, precision = 0.1, alpha = 0.05, param = TRUE, runs = 100){
+  
+  if(is.null(colnames(comm)))
+    colnames(comm) = 1:ncol(comm)
+  
+  #convert traits to a tree if needed
+  if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
+    tree = tree.build(tree)
+  
+  #create matrix of different habitat proportions
+  prop = expand.grid(as.list(as.data.frame(matrix(rep(seq(0, 1, precision), nrow(comm)), nrow = (1/precision) + 1, ncol = nrow(comm)))))
+  prop = prop[rowSums(prop) == 1, ]
+  colnames(prop) = rownames(comm)
+  rownames(prop) = 1:nrow(prop)
+  
+  res = matrix(NA, nrow = nrow(prop), ncol = runs)
+  for(i in 1:nrow(prop)){
+    for(j in 1:runs){
+      abund = resample(comm, round(rowSums(comm) * unlist(prop[i, ])), replace = TRUE)
+      abund = matrix(colSums(abund), nrow = 1)
+      if(missing(tree))
+        res[i, j] = BAT::hill(abund, q)
+      else
+        res[i, j] = alpha(abund, tree)
+    }
+  }
+  
+  cl = c(alpha / 2, 0.5, 1 - alpha / 2)
+  if(param){
+    res = t(apply(res, 1, function(x) c(mean(x) + sd(x) * qnorm(cl))))
+    colnames(res) = cl
+  } else {
+    res = t(apply(res, 1, quantile, cl))
+  }
+  
+  return(cbind(prop, res))
+}
+
 #' Beta diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).
 #' @description Beta diversity with possible rarefaction, multiple sites simultaneously.
 #' @param comm A sites x species matrix, with either abundance or incidence data.
@@ -973,11 +1060,11 @@ hill <- function(comm, q = 0, raref = 0, runs = 100){
 #' beta(comm, tree, "s", abund = FALSE, raref = 2)
 #' @export
 beta <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 100, comp = FALSE){
-
+  
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
-
+  
   #first organize the data
   if(!missing(tree)){
     cleanData = clean(comm, tree)
@@ -987,57 +1074,57 @@ beta <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 1
   
   #now let's go for what matters
   nComm <- nrow(comm)
-
-	if(raref < 1){						# no rarefaction if 0 or negative
-		results <- array(0, dim=c(nComm, nComm, 3))
-		rownames(results) = colnames(results) = rownames(comm)
-		comps <- results
-		for (i in 1:(nComm-1)){
-			for (j in (i+1):nComm){
-				commBoth <- as.matrix(rbind(comm[i,], comm[j,]))
-				betaValues <- betaObs(commBoth, tree, func, abund, comp)
-				results[j,i,] <- unlist(betaValues)[1:3]
-				if(comp)
-				  comps[j,i,] <- unlist(betaValues)[4:6]
-			}
-		}
-		results <- list(Btotal = as.dist(results[,,1]),Brepl = as.dist(results[,,2]),Brich = as.dist(results[,,3]))
-		if (comp){
-		  results$Shared = round(as.dist(comps[,,1]),3)
-		  results$Unique_to_Cols = round(as.dist(comps[,,2]),3)
-		  results$Unique_to_Rows = round(as.dist(comps[,,3]),3)
-		}
-		return(results)
-	}
-	if (raref == 1)
-		raref <- nMin(comm)				# rarefy by minimum n among all communities
-	results <- array(0, dim=c(nComm, nComm, 3, 6))
-
-	for (i in 1:(nComm-1)){
-		for (j in (i+1):nComm){
-			run <- matrix(0, runs, 3)
-			for (r in 1:runs){
-				commBoth <- as.matrix(rbind(rrarefy(comm[i,], raref), rrarefy(comm[j,], raref)))
-				betaValues <- betaObs(commBoth, tree, func, abund)
-				run[r,1] <- betaValues$Btotal
-				run[r,2] <- betaValues$Brepl
-				run[r,3] <- betaValues$Brich
-			}
-			for (b in 1:3){
-			  results[j,i,b,1] <- mean(run[,b])
-			  results[j,i,b,2] <- quantile(run[,b], 0.5)
-				results[j,i,b,3] <- min(run[,b])
-				results[j,i,b,4] <- quantile(run[,b], 0.025)
-				results[j,i,b,5] <- quantile(run[,b], 0.975)
-				results[j,i,b,6] <- max(run[,b])
-			}
-		}
-	}
-	results.total <- list(Btotal.mean = as.dist(results[,,1,1]), Btotal.median = as.dist(results[,,1,2]), Btotal.min = as.dist(results[,,1,3]), Btotal.lowCL = as.dist(results[,,1,4]), Btotal.upCL = as.dist(results[,,1,5]), Btotal.max = as.dist(results[,,1,6]))
-	results.repl <- list(Brepl.mean = as.dist(results[,,2,1]), Brepl.median = as.dist(results[,,2,2]), Brepl.min = as.dist(results[,,2,3]), Brepl.lowCL = as.dist(results[,,2,4]), Brepl.upCL = as.dist(results[,,2,5]), Brepl.max = as.dist(results[,,2,6]))
-	results.rich <- list(Brich.mean = as.dist(results[,,3,1]), Brich.median = as.dist(results[,,3,2]), Brich.min = as.dist(results[,,3,3]), Brich.lowCL = as.dist(results[,,3,4]), Brich.upCL = as.dist(results[,,3,5]), Brich.max = as.dist(results[,,3,6]))
-	results <- c(results.total, results.repl, results.rich)
-	return (results)
+  
+  if(raref < 1){						# no rarefaction if 0 or negative
+    results <- array(0, dim=c(nComm, nComm, 3))
+    rownames(results) = colnames(results) = rownames(comm)
+    comps <- results
+    for (i in 1:(nComm-1)){
+      for (j in (i+1):nComm){
+        commBoth <- as.matrix(rbind(comm[i,], comm[j,]))
+        betaValues <- betaObs(commBoth, tree, func, abund, comp)
+        results[j,i,] <- unlist(betaValues)[1:3]
+        if(comp)
+          comps[j,i,] <- unlist(betaValues)[4:6]
+      }
+    }
+    results <- list(Btotal = as.dist(results[,,1]),Brepl = as.dist(results[,,2]),Brich = as.dist(results[,,3]))
+    if (comp){
+      results$Shared = round(as.dist(comps[,,1]),3)
+      results$Unique_to_Cols = round(as.dist(comps[,,2]),3)
+      results$Unique_to_Rows = round(as.dist(comps[,,3]),3)
+    }
+    return(results)
+  }
+  if (raref == 1)
+    raref <- nMin(comm)				# rarefy by minimum n among all communities
+  results <- array(0, dim=c(nComm, nComm, 3, 6))
+  
+  for (i in 1:(nComm-1)){
+    for (j in (i+1):nComm){
+      run <- matrix(0, runs, 3)
+      for (r in 1:runs){
+        commBoth <- as.matrix(rbind(rrarefy(comm[i,], raref), rrarefy(comm[j,], raref)))
+        betaValues <- betaObs(commBoth, tree, func, abund)
+        run[r,1] <- betaValues$Btotal
+        run[r,2] <- betaValues$Brepl
+        run[r,3] <- betaValues$Brich
+      }
+      for (b in 1:3){
+        results[j,i,b,1] <- mean(run[,b])
+        results[j,i,b,2] <- quantile(run[,b], 0.5)
+        results[j,i,b,3] <- min(run[,b])
+        results[j,i,b,4] <- quantile(run[,b], 0.025)
+        results[j,i,b,5] <- quantile(run[,b], 0.975)
+        results[j,i,b,6] <- max(run[,b])
+      }
+    }
+  }
+  results.total <- list(Btotal.mean = as.dist(results[,,1,1]), Btotal.median = as.dist(results[,,1,2]), Btotal.min = as.dist(results[,,1,3]), Btotal.lowCL = as.dist(results[,,1,4]), Btotal.upCL = as.dist(results[,,1,5]), Btotal.max = as.dist(results[,,1,6]))
+  results.repl <- list(Brepl.mean = as.dist(results[,,2,1]), Brepl.median = as.dist(results[,,2,2]), Brepl.min = as.dist(results[,,2,3]), Brepl.lowCL = as.dist(results[,,2,4]), Brepl.upCL = as.dist(results[,,2,5]), Brepl.max = as.dist(results[,,2,6]))
+  results.rich <- list(Brich.mean = as.dist(results[,,3,1]), Brich.median = as.dist(results[,,3,2]), Brich.min = as.dist(results[,,3,3]), Brich.lowCL = as.dist(results[,,3,4]), Brich.upCL = as.dist(results[,,3,5]), Brich.max = as.dist(results[,,3,6]))
+  results <- c(results.total, results.repl, results.rich)
+  return (results)
 }
 
 #' Beta diversity accumulation curves.
@@ -1073,16 +1160,16 @@ beta <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 1
 #' beta.accum(comm1, comm2, tree,, FALSE)
 #' @export
 beta.accum <- function(comm1, comm2, tree, func = "jaccard", abund = TRUE, runs = 100, prog = TRUE){
-
+  
   if(nrow(comm1) < 2 || nrow(comm1) != nrow(comm2))
-		stop("Both communities should have multiple and the same number of sampling units")
+    stop("Both communities should have multiple and the same number of sampling units")
   comm1 <- as.matrix(comm1)
   comm2 <- as.matrix(comm2)
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
-
+  
   #first organize the data
   if(!missing(tree)){
     cleanData = clean(comm1, tree)
@@ -1093,26 +1180,26 @@ beta.accum <- function(comm1, comm2, tree, func = "jaccard", abund = TRUE, runs 
   }
   
   #now let's go for what matters
-	nSamples <- nrow(comm1)
-	results <- matrix(0,nSamples, 4)
-	colnames(results) <- c("Sampl", "Btotal", "Brepl", "Brich")
-	if (prog) pb <- txtProgressBar(0, runs, style = 3)
-	for (r in 1:runs){
-		comm1 <- comm1[sample(nSamples),, drop=FALSE]			#shuffle sampling units of first community
-		comm2 <- comm2[sample(nSamples),, drop=FALSE]			#shuffle sampling units of second community
-		for (q in 1:nSamples){
-			commBoth <- as.matrix(rbind(colSums(comm1[1:q,,drop=FALSE]),colSums(comm2[1:q,,drop=FALSE])))
-			results[q,1] <- results[q,1] + q
-			betaValues <- betaObs(commBoth, tree, func, abund)
-			results[q,2] <- results[q,2] + betaValues$Btotal
-			results[q,3] <- results[q,3] + betaValues$Brepl
-			results[q,4] <- results[q,4] + betaValues$Brich
-		}
-		if (prog) setTxtProgressBar(pb, r)
-	}
-	if (prog) close(pb)
-	results <- results/runs
-	return(results)
+  nSamples <- nrow(comm1)
+  results <- matrix(0,nSamples, 4)
+  colnames(results) <- c("Sampl", "Btotal", "Brepl", "Brich")
+  if (prog) pb <- txtProgressBar(0, runs, style = 3)
+  for (r in 1:runs){
+    comm1 <- comm1[sample(nSamples),, drop=FALSE]			#shuffle sampling units of first community
+    comm2 <- comm2[sample(nSamples),, drop=FALSE]			#shuffle sampling units of second community
+    for (q in 1:nSamples){
+      commBoth <- as.matrix(rbind(colSums(comm1[1:q,,drop=FALSE]),colSums(comm2[1:q,,drop=FALSE])))
+      results[q,1] <- results[q,1] + q
+      betaValues <- betaObs(commBoth, tree, func, abund)
+      results[q,2] <- results[q,2] + betaValues$Btotal
+      results[q,3] <- results[q,3] + betaValues$Brepl
+      results[q,4] <- results[q,4] + betaValues$Brich
+    }
+    if (prog) setTxtProgressBar(pb, r)
+  }
+  if (prog) close(pb)
+  results <- results/runs
+  return(results)
 }
 
 #' Beta diversity among multiple communities.
@@ -1149,17 +1236,17 @@ beta.accum <- function(comm1, comm2, tree, func = "jaccard", abund = TRUE, runs 
 #' beta.multi(comm, tree, "s", FALSE, raref = 2)
 #' @export
 beta.multi <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 100){
-	pairwise <- beta(comm, tree, func, abund, raref, runs)
-	Btotal.avg <- mean(pairwise$Btotal)
-	Brepl.avg <- mean(pairwise$Brepl)
-	Brich.avg <- mean(pairwise$Brich)
-	Btotal.var <- sum(pairwise$Btotal)/(ncol(comm)*(ncol(comm)-1))
-	Brepl.var <- sum(pairwise$Brepl)/(ncol(comm)*(ncol(comm)-1))
-	Brich.var <- sum(pairwise$Brich)/(ncol(comm)*(ncol(comm)-1))
-	results <- matrix(c(Btotal.avg, Brepl.avg, Brich.avg, Btotal.var, Brepl.var, Brich.var), nrow = 3, ncol = 2)
-	colnames(results) <- c("Average", "Variance")
-	rownames(results) <- c("Btotal", "Brepl", "Brich")
-	return(results)
+  pairwise <- beta(comm, tree, func, abund, raref, runs)
+  Btotal.avg <- mean(pairwise$Btotal)
+  Brepl.avg <- mean(pairwise$Brepl)
+  Brich.avg <- mean(pairwise$Brich)
+  Btotal.var <- sum(pairwise$Btotal)/(ncol(comm)*(ncol(comm)-1))
+  Brepl.var <- sum(pairwise$Brepl)/(ncol(comm)*(ncol(comm)-1))
+  Brich.var <- sum(pairwise$Brich)/(ncol(comm)*(ncol(comm)-1))
+  results <- matrix(c(Btotal.avg, Brepl.avg, Brich.avg, Btotal.var, Brepl.var, Brich.var), nrow = 3, ncol = 2)
+  colnames(results) <- c("Average", "Variance")
+  rownames(results) <- c("Btotal", "Brepl", "Brich")
+  return(results)
 }
 
 #' Beta diversity evenness (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).
@@ -1199,40 +1286,44 @@ beta.evenness <- function(comm, tree, distance, method = "expected", func = "cam
 #' @references Pavoine, S., Ollier, S. & Dufour, A.-B. (2005) Is the originality of a species measurable? Ecology Letters, 8: 579-586.
 #' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
 #' distance <- dist(c(1:5), method="euclidean")
-#' tree <- tree.build(1:5)
+#' tree = hclust(distance)
+#' 
 #' originality(tree = tree)
 #' originality(distance = distance)
 #' originality(comm, tree)
-#' originality(comm, tree, abund = FALSE)
-#' originality(comm, tree, abund = FALSE, relative = FALSE)
+#' originality(comm, tree, abund = TRUE)
+#' originality(comm, tree, relative = TRUE)
 #' @export
-originality <- function(comm, tree, distance, abund = TRUE, relative = TRUE){
+originality <- function(comm, tree, distance, abund = FALSE, relative = FALSE){
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
   
   if(missing(comm)){
-		if(!missing(distance))
-			comm = rep(1, attributes(distance)$Size)
-		if(!missing(tree))
-			comm = rep(1, length(tree$order))
-	}
-	if(is.vector(comm))
-		comm <- matrix(comm, nrow = 1)
-	
-	if(!missing(tree)){
-	  comm = reorderComm(comm, tree)
-	  distance <- cophenetic(tree)			     								#cophenetic distances of species
-	}else if(missing(distance)){
-		return(warning("Need one of tree or distance!"))
-	}
-	distance <- as.matrix(distance)													#convert distance to matrix
-  if(!abund){
-  	comm <- ifelse(comm > 0, 1, 0)
+    if(!missing(distance))
+      comm = rep(1, attributes(distance)$Size)
+    if(!missing(tree))
+      comm = rep(1, length(tree$order))
   }
-
-  original <- matrix(NA,nrow(comm),ncol(comm))
+  if(is.vector(comm))
+    comm <- matrix(comm, nrow = 1)
+  
+  if(!missing(tree)){
+    comm = reorderComm(comm, tree)
+    distance <- cophenetic(tree)			     								#cophenetic distances of species
+  }else if(missing(distance)){
+    return(warning("Need one of tree or distance!"))
+  }
+  distance <- as.matrix(distance)													#convert distance to matrix
+  if(!abund){
+    comm <- ifelse(comm > 0, 1, 0)
+  }
+  
+  original <- matrix(NA, nrow(comm), ncol(comm))
+  colnames(original) <- colnames(comm)
+  rownames(original) <- rownames(comm)
+  
   for (r in 1:nrow(comm)){    					                  #cycle through all sites/samples
     present <- which(comm[r,] > 0)                        #which species exist in this site
     if(abund)
@@ -1241,13 +1332,14 @@ originality <- function(comm, tree, distance, abund = TRUE, relative = TRUE){
       n <- length(present)                                #how many species are present in this site
     proportion <- comm[r,present]/sum(comm[r,present])    #proportion incidence/abundance of species in this site
     for (c in present){
-    	original[r,c] <- sum(distance[present,c] * proportion, na.rm = TRUE)
-  		original[r,c] <- original[r,c] * n / (n - 1) #correct not to take distance to self into account
+      original[r,c] <- sum(distance[present,c] * proportion, na.rm = TRUE)
+      original[r,c] <- original[r,c] * n / (n - 1) #correct not to take distance to self into account
     }
   }
   if(relative)
     original <- original / max(distance, na.rm=T)
-	return(original)
+  
+  return(original)
 }
 
 #' Phylogenetic/functional uniqueness of species.
@@ -1259,52 +1351,55 @@ originality <- function(comm, tree, distance, abund = TRUE, relative = TRUE){
 #' @details This is equivalent to the originality measure of Mouillot et al. (2013).
 #' @return A matrix of sites x species values.
 #' @references Mouillot, D., Graham, N.A., Villeger, S., Mason, N.W. & Bellwood, D.R. (2013) A functional approach reveals community responses to disturbances. Trends in Ecology and Evolution, 28: 167-177.
-#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
+#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,0,1), nrow = 4, byrow = TRUE)
 #' distance <- dist(c(1:5), method="euclidean")
 #' tree <- hclust(distance, method="average")
+#' 
 #' uniqueness(tree = tree)
 #' uniqueness(distance = distance)
 #' uniqueness(comm, tree)
 #' @export
-uniqueness <- function(comm, tree, distance, relative = TRUE){
-	
+uniqueness <- function(comm, tree, distance, relative = FALSE){
+  
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
   
   if(missing(comm)){
-		if(!missing(distance))
-			comm = rep(1, attributes(distance)[1])
-		if(!missing(tree))
-			comm = rep(1, length(tree$order))
-	}
-	if(is.vector(comm))
-		comm <- matrix(comm, nrow = 1)
-	
-	if(!missing(tree)){
-	  comm = reorderComm(comm, tree)
-	  distance <- cophenetic(tree)			     								#cophenetic distances of species
-	}else if(missing(distance)){
-		return(warning("Need one of tree or distance!"))
-	}
-	distance <- as.matrix(distance)													#convert distance to matrix
-
-	comm <- ifelse(comm > 0, 1, 0)
-	for(i in 1:nrow(distance))
-		distance[i,i] = NA
-	
-	unique <- matrix(NA,nrow(comm),ncol(comm))
-	
-	for (r in 1:nrow(comm)){    					                  #cycle through all sites/samples
-		present <- which(comm[r,]>0)                          #which species exist in this site
-		for (c in present){
-			unique[r,c] <- min(distance[present,c], na.rm=T)
-		}
-	}
-	if(relative){
-		unique <- unique / max(distance, na.rm = T)
-	}
-	return(unique)
+    if(!missing(distance))
+      comm = rep(1, attributes(distance)[1])
+    if(!missing(tree))
+      comm = rep(1, length(tree$order))
+  }
+  if(is.vector(comm))
+    comm <- matrix(comm, nrow = 1)
+  
+  if(!missing(tree)){
+    comm = reorderComm(comm, tree)
+    distance <- cophenetic(tree)			     								#cophenetic distances of species
+  }else if(missing(distance)){
+    return(warning("Need one of tree or distance!"))
+  }
+  distance <- as.matrix(distance)													#convert distance to matrix
+  
+  comm <- ifelse(comm > 0, 1, 0)
+  for(i in 1:nrow(distance))
+    distance[i,i] = NA
+  
+  unique <- matrix(NA, nrow(comm), ncol(comm))
+  colnames(unique) <- colnames(comm)
+  rownames(unique) <- rownames(comm)
+  
+  for (r in 1:nrow(comm)){    					                  #cycle through all sites/samples
+    present <- which(comm[r,]>0)                          #which species exist in this site
+    for (c in present){
+      unique[r,c] <- min(distance[present,c], na.rm=T)
+    }
+  }
+  if(relative){
+    unique <- unique / max(distance, na.rm = T)
+  }
+  return(unique)
 }
 
 #' Contribution of species or individuals to total phylogenetic/functional diversity.
@@ -1317,66 +1412,69 @@ uniqueness <- function(comm, tree, distance, relative = TRUE){
 #' @return A matrix of sites x species values (or values per species if no comm is given).
 #' @references Isaac, N.J.B., Turvey, S.T., Collen, B., Waterman, C. & Baillie, J.E.M. (2007) Mammals on the EDGE: conservation priorities based on threat and phylogeny. PLoS One, 2: e296.
 #' @references Cadotte, M.W., Davies, T.J., Regetz, J., Kembel, S.W., Cleland, E. & Oakley, T.H. (2010) Phylogenetic diversity metrics for ecological communities: integrating species richness, abundance and evolutionary history. Ecology Letters, 13: 96-105.
-#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
-#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
-#' contribution(tree = tree)
+#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,0,1), nrow = 4, byrow = TRUE)
+#' tree = tree.build(1:5)
+#' 
 #' contribution(comm, tree)
-#' contribution(comm, tree, FALSE)
-#' contribution(comm, tree, abund = FALSE, relative = FALSE)
+#' contribution(comm, tree, TRUE)
+#' contribution(comm, tree, relative = TRUE)
 #' @export
-contribution <- function(comm, tree, abund = TRUE, relative = FALSE){
+contribution <- function(comm, tree, abund = FALSE, relative = FALSE){
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
   
   if(missing(comm))
-		comm = rep(1, length(tree$order))
-	if(is.vector(comm))
-		comm <- matrix(comm, nrow = 1)
-	comm <- as.matrix(comm)
-	if(!abund)
-		comm <- ifelse(comm > 0, 1, 0)
-	
-	if (!missing(tree)){
-		if (is(tree, "phylo")){
-			nEdges <- length(tree$edge.length)
-			if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-				comm <- comm[,match(tree$tip.label, colnames(comm))]
-		} else {
-			nEdges <- length(tree$merge)
-			if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-				comm <- comm[,match(tree$labels, colnames(comm))]
-		}
-	} else {
-		tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
-	}
-	
-	contrib <- matrix(0,nrow(comm),ncol(comm))
-	for (i in 1:nrow(comm)){											#cycle through all sites/samples
-		dataSample <- prep(comm[i,], xTree(tree), TRUE)
-		valueBranch <- dataSample$lenBranch / dataSample$sampleBranch
-		valueBranch <- ifelse(valueBranch == Inf, 0, valueBranch)
-		valueBranch <- ifelse(is.na(valueBranch), 0, valueBranch)
-		for (j in 1:ncol(comm)){										#cycle through all species
-			for (k in 1:nEdges){	            				#cycle through all branches
-				contrib[i,j] <- contrib[i,j] + (dataSample$speciesBranch[j,k] * valueBranch[k] * comm[i,j])
-			}
-		}
-	}
-	if(relative){
-	  for(r in 1:nrow(comm))
-	    contrib[r,] <- contrib[r,] / c(alpha(comm[r,], tree))
-	}
-	if(abund){                      #contribution weighted by abundance
-	  for (r in 1:nrow(comm)){											#cycle through all sites/samples
-	    relAbund = comm[r,] / sum(comm[r,])
-	    contrib[r,] = (contrib[r,] * relAbund) / sum(contrib[r,] * relAbund)
-	  }
-	}
-	
-	contrib[comm[] == 0] = NA
-	return(contrib)
+    comm = rep(1, length(tree$order))
+  if(is.vector(comm))
+    comm <- matrix(comm, nrow = 1)
+  comm <- as.matrix(comm)
+  if(!abund)
+    comm <- ifelse(comm > 0, 1, 0)
+  
+  if(!missing(tree)){
+    if(is(tree, "phylo")){
+      nEdges <- length(tree$edge.length)
+      if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+        comm <- comm[,match(tree$tip.label, colnames(comm))]
+    } else {
+      nEdges <- length(tree$merge)
+      if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+        comm <- comm[,match(tree$labels, colnames(comm))]
+    }
+  } else {
+    tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
+  }
+  
+  contrib <- matrix(0, nrow(comm), ncol(comm))
+  colnames(contrib) <- colnames(comm)
+  rownames(contrib) <- rownames(comm)
+  
+  for (i in 1:nrow(comm)){											#cycle through all sites/samples
+    dataSample <- prep(comm[i,], xTree(tree), TRUE)
+    valueBranch <- dataSample$lenBranch / dataSample$sampleBranch
+    valueBranch <- ifelse(valueBranch == Inf, 0, valueBranch)
+    valueBranch <- ifelse(is.na(valueBranch), 0, valueBranch)
+    for (j in 1:ncol(comm)){										#cycle through all species
+      for (k in 1:nEdges){	            				#cycle through all branches
+        contrib[i,j] <- contrib[i,j] + (dataSample$speciesBranch[j,k] * valueBranch[k] * comm[i,j])
+      }
+    }
+  }
+  if(relative){
+    for(r in 1:nrow(comm))
+      contrib[r,] <- contrib[r,] / c(alpha(comm[r,], tree))
+  }
+  if(abund){                      #contribution weighted by abundance
+    for (r in 1:nrow(comm)){											#cycle through all sites/samples
+      relAbund = comm[r,] / sum(comm[r,])
+      contrib[r,] = (contrib[r,] * relAbund) / sum(contrib[r,] * relAbund)
+    }
+  }
+  
+  contrib[comm[] == 0] = NA
+  return(contrib)
 }
 
 #' Phylogenetic/functional dispersion of species or individuals.
@@ -1408,41 +1506,41 @@ dispersion <- function(comm, tree, distance, func = "originality", abund = TRUE,
     tree = tree.build(tree)
   
   if(missing(comm)){
-		if(!missing(distance))
-			comm = rep(1, attributes(distance)[1])
-		if(!missing(tree))
-			comm = rep(1, length(tree$order))
-	}
-	if(is.vector(comm))
-		comm <- matrix(comm, nrow = 1)
-	if(!abund)
-	  comm = ifelse(comm > 0, 1, 0)
-	
-	#reorder comm
-	if(!missing(tree))
-	  comm = reorderComm(comm, tree)
-	  
-	if(func == "originality")
-		funcValue <- originality(comm, tree, distance, abund, relative)
-	else if (func == "uniqueness")
-		funcValue <- uniqueness(comm, tree, distance, relative)
-	else if (func == "contribution")
-		funcValue <- contribution(comm, tree, abund, relative)
-	else
+    if(!missing(distance))
+      comm = rep(1, attributes(distance)[1])
+    if(!missing(tree))
+      comm = rep(1, length(tree$order))
+  }
+  if(is.vector(comm))
+    comm <- matrix(comm, nrow = 1)
+  if(!abund)
+    comm = ifelse(comm > 0, 1, 0)
+  
+  #reorder comm
+  if(!missing(tree))
+    comm = reorderComm(comm, tree)
+  
+  if(func == "originality")
+    funcValue <- originality(comm, tree, distance, abund, relative)
+  else if (func == "uniqueness")
+    funcValue <- uniqueness(comm, tree, distance, relative)
+  else if (func == "contribution")
+    funcValue <- contribution(comm, tree, abund, relative)
+  else
     stop(sprintf("Function %s not recognized.", func))
-
-	disp <- rep(0,nrow(comm))
-	
-	for (r in 1:nrow(comm)){  						                         #cycle through all sites/samples
-		present <- which(comm[r,]>0)                                 #which species exist in this site
-		proportion <- comm[r,present]/sum(comm[r,present])           #proportion incidence/abundance of species in this site
-		disp[r] <- sum(funcValue[r,present]*proportion)
-	}
-	
-	disp = matrix(disp, ncol = 1)
-	rownames(disp) <- rownames(comm)
-	colnames(disp) <- "Dispersion"
-	return(disp)
+  
+  disp <- rep(0,nrow(comm))
+  
+  for (r in 1:nrow(comm)){  						                         #cycle through all sites/samples
+    present <- which(comm[r,]>0)                                 #which species exist in this site
+    proportion <- comm[r,present]/sum(comm[r,present])           #proportion incidence/abundance of species in this site
+    disp[r] <- sum(funcValue[r,present]*proportion)
+  }
+  
+  disp = matrix(disp, ncol = 1)
+  rownames(disp) <- rownames(comm)
+  colnames(disp) <- "Dispersion"
+  return(disp)
 }
 
 #' Taxonomic/phylogenetic/functional evenness of species or individuals.
@@ -1473,85 +1571,85 @@ evenness <- function(comm, tree, distance, method = "expected", func = "camargo"
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
-
-	if(missing(comm))
-		comm = rep(1, length(tree$order))
-	if(is.vector(comm))
-		comm <- matrix(comm, nrow = 1)
-	if(!abund)
-		comm <- ifelse(comm > 0, 1, 0)
-	comm[is.na(comm)] = 0
-	
-	if(!missing(tree)){
-	  comm = reorderComm(comm, tree)
-	} else if (!missing(distance)){
-			tree = hclust(distance, method = "average")
-	} else {
-		tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
-		tree$labels = colnames(comm)
-	}
-	
-	evenness <- rep(0, nrow(comm))
-	for (i in 1:nrow(comm)){								#cycle through all sites/samples
-	  thisComm = comm[i,comm[i,] > 0]			  #redo this comm
-	  if(length(thisComm) < 2){             #if comm has less than 2 species evenness is NA
-	    evenness[i] = NA
-	    next
-	  }              
-	  thisTree = as.matrix(cophenetic(tree))[comm[i,] > 0, comm[i,] > 0]    #redo this tree
-	  thisTree = hclust(as.dist(thisTree))
-	  if(method == "expected"){               #if expected
-	    thisTree = prep(thisComm, xTree(thisTree), abund)
-	    thisEdges = which(thisTree$lenBranch > 0 & thisTree$sampleBranch > 0)
-		  thisObs = c()
-		  for(j in thisEdges){											    			#cycle through all edges of this site/sample
-		    #calculate the observed values as avg abundance per species of edge / length of edge 
-		    thisObs = c(thisObs, (thisTree$sampleBranch[j] / sum(thisTree$speciesBranch[,j]) / thisTree$lenBranch[j]))
-		  }
-		  thisObs = thisObs / sum(thisObs)
-		  if(func == "bulla"){
-		    ##calculate the expected values as avg length of tree edges
-		    thisExp = 1 / length(thisEdges)
-		    #calculate evenness as the sum of minimum values between observed and expected with correction from Bulla, 1994
-		    evenness[i] = (sum(apply(cbind(thisObs, rep(thisExp, length(thisObs))), 1, min)) - (1/length(thisEdges))) / (1-1/length(thisEdges))
-		  } else if(func == "camargo"){      #if Camargo
-		    nEdges = length(thisObs)
-		    for(j in 1:(nEdges-1)){
-		      for(k in (j+1):nEdges){
-		        evenness[i] = evenness[i] + abs(thisObs[j] - thisObs[k])
-		      } 
-		    }
-		    evenness[i] = 1 - (evenness[i] / (nEdges*(nEdges-1)/2))
-		  } else {
-		    stop(sprintf("Function %s not recognized.", func))
-		  }
-		} else if (method == "contribution") {          #if using the contribution of species
-		  contrib = contribution(thisComm, thisTree, abund = abund)
-		  nSp = length(thisComm)
-		  if(func == "bulla"){
-		    ##calculate the expected contribution as 1/nSp
-		    thisExp = 1 / nSp
-		    #calculate evenness as the sum of minimum values between observed and expected with correction from Bulla, 1994
-		    evenness[i] = (sum(apply(cbind(contrib, rep(thisExp, nSp)), 1, min)) - (1/nSp)) / (1-1/nSp)
-		  } else if(func == "camargo"){      #if Camargo
-		    for(j in 1:(nSp-1)){
-		      for(k in (j+1):nSp){
-		        evenness[i] = evenness[i] + abs(contrib[j] - contrib[k])
-		      } 
-		    }
-		    evenness[i] = 1 - (evenness[i] / (nSp*(nSp-1)/2))
-		  } else {
-		    stop(sprintf("Function %s not recognized.", func))
-		  }
-		} else {
-		  stop(sprintf("Method %s not recognized.", method))
-		}
-	}
-	
-	evenness = matrix(evenness, ncol = 1)
-	rownames(evenness) <- rownames(comm)
-	colnames(evenness) <- "Evenness"
-	return(evenness)
+  
+  if(missing(comm))
+    comm = rep(1, length(tree$order))
+  if(is.vector(comm))
+    comm <- matrix(comm, nrow = 1)
+  if(!abund)
+    comm <- ifelse(comm > 0, 1, 0)
+  comm[is.na(comm)] = 0
+  
+  if(!missing(tree)){
+    comm = reorderComm(comm, tree)
+  } else if (!missing(distance)){
+    tree = hclust(distance, method = "average")
+  } else {
+    tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
+    tree$labels = colnames(comm)
+  }
+  
+  evenness <- rep(0, nrow(comm))
+  for (i in 1:nrow(comm)){								#cycle through all sites/samples
+    thisComm = comm[i,comm[i,] > 0]			  #redo this comm
+    if(length(thisComm) < 2){             #if comm has less than 2 species evenness is NA
+      evenness[i] = NA
+      next
+    }              
+    thisTree = as.matrix(cophenetic(tree))[comm[i,] > 0, comm[i,] > 0]    #redo this tree
+    thisTree = hclust(as.dist(thisTree))
+    if(method == "expected"){               #if expected
+      thisTree = prep(thisComm, xTree(thisTree), abund)
+      thisEdges = which(thisTree$lenBranch > 0 & thisTree$sampleBranch > 0)
+      thisObs = c()
+      for(j in thisEdges){											    			#cycle through all edges of this site/sample
+        #calculate the observed values as avg abundance per species of edge / length of edge 
+        thisObs = c(thisObs, (thisTree$sampleBranch[j] / sum(thisTree$speciesBranch[,j]) / thisTree$lenBranch[j]))
+      }
+      thisObs = thisObs / sum(thisObs)
+      if(func == "bulla"){
+        ##calculate the expected values as avg length of tree edges
+        thisExp = 1 / length(thisEdges)
+        #calculate evenness as the sum of minimum values between observed and expected with correction from Bulla, 1994
+        evenness[i] = (sum(apply(cbind(thisObs, rep(thisExp, length(thisObs))), 1, min)) - (1/length(thisEdges))) / (1-1/length(thisEdges))
+      } else if(func == "camargo"){      #if Camargo
+        nEdges = length(thisObs)
+        for(j in 1:(nEdges-1)){
+          for(k in (j+1):nEdges){
+            evenness[i] = evenness[i] + abs(thisObs[j] - thisObs[k])
+          } 
+        }
+        evenness[i] = 1 - (evenness[i] / (nEdges*(nEdges-1)/2))
+      } else {
+        stop(sprintf("Function %s not recognized.", func))
+      }
+    } else if (method == "contribution") {          #if using the contribution of species
+      contrib = contribution(thisComm, thisTree, abund = abund)
+      nSp = length(thisComm)
+      if(func == "bulla"){
+        ##calculate the expected contribution as 1/nSp
+        thisExp = 1 / nSp
+        #calculate evenness as the sum of minimum values between observed and expected with correction from Bulla, 1994
+        evenness[i] = (sum(apply(cbind(contrib, rep(thisExp, nSp)), 1, min)) - (1/nSp)) / (1-1/nSp)
+      } else if(func == "camargo"){      #if Camargo
+        for(j in 1:(nSp-1)){
+          for(k in (j+1):nSp){
+            evenness[i] = evenness[i] + abs(contrib[j] - contrib[k])
+          } 
+        }
+        evenness[i] = 1 - (evenness[i] / (nSp*(nSp-1)/2))
+      } else {
+        stop(sprintf("Function %s not recognized.", func))
+      }
+    } else {
+      stop(sprintf("Method %s not recognized.", method))
+    }
+  }
+  
+  evenness = matrix(evenness, ncol = 1)
+  rownames(evenness) <- rownames(comm)
+  colnames(evenness) <- "Evenness"
+  return(evenness)
 }
 
 #' Contribution of each species or individual to the total taxonomic/phylogenetic/functional evenness.
@@ -1603,7 +1701,7 @@ evenness.contribution <- function(comm, tree, distance, method = "expected", fun
   
   #extract total evenness
   tot_evenness <- evenness(comm = comm, tree = tree, distance = distance, method = method, func = func, abund = abund)
-
+  
   #leave-one-out
   evenness.contrib <- comm
   evenness.contrib[] <- NA
@@ -1647,15 +1745,15 @@ evenness.contribution <- function(comm, tree, distance, method = "expected", fun
 #' hull.alpha(hvlist)
 #' @export
 hull.alpha <- function(comm){
-
+  
   #check if right data is provided
   if (!(class(comm) %in% c("list", "convhulln")))
     stop("A convhulln or list is needed as input data.")
   
   #if single comm
-  if (is(comm, "convhulln"))
+  if(is(comm, "convhulln"))
     return(comm$vol)
-
+  
   #if multiple comm
   alphaValues <- c()
   for (i in 1:length(comm))
@@ -1758,7 +1856,7 @@ hull.contribution = function(comm, relative = FALSE){
     stop("A convhulln or list is needed as input data.")
   
   #if a convex hull is provided go for it.
-  if (is(comm, "convhulln")){
+  if(is(comm, "convhulln")){
     contrib <- c()
     for (i in 1:nrow(comm$p))
       contrib <- c(contrib, (comm$vol - geometry::convhulln(comm$p[-i,], options = "FA")$vol))
@@ -1766,7 +1864,7 @@ hull.contribution = function(comm, relative = FALSE){
     if(relative)
       contrib = contrib/sum(contrib)
     
-  #if a list is provided just call this same function using hypervolumes.
+    #if a list is provided just call this same function using hypervolumes.
   } else {
     
     #get species names from hypervolumes and order them alphabetically
@@ -1815,15 +1913,18 @@ hull.contribution = function(comm, relative = FALSE){
 #' }
 #' @export
 kernel.alpha <- function(comm){
-
+  
   #check if right data is provided
   if (!(class(comm) %in% c("HypervolumeList", "Hypervolume")))
     stop("A Hypervolume or HypervolumeList is needed as input data.")
-
+  
   #convert data if needed
-  if (is(comm, "Hypervolume"))
-    return(get_volume(comm))
-
+  if(is(comm, "Hypervolume")){
+    alphaValues = get_volume(comm)
+    names(alphaValues) = "Richness"
+    return(alphaValues)
+  }
+  
   #calculate alpha values and give them a name
   alphaValues <- c()
   for (i in 1:length(comm@HVList)){
@@ -1870,7 +1971,7 @@ kernel.beta = function(comm, func = "jaccard", comp = FALSE){
   #create matrices to store results
   nComm <- length(comm@HVList)
   Btotal <- Brepl <- Brich <- compA <- compB <- compC <- matrix(NA, nrow = nComm, ncol = nComm)
-
+  
   #calculate beta values and give them a name
   commNames <- c()
   commNames[nComm] <- comm@HVList[[nComm]]@Name
@@ -1932,9 +2033,9 @@ kernel.beta = function(comm, func = "jaccard", comp = FALSE){
 #' }
 #' @export
 kernel.beta.evenness <- function(comm){
-    if (!(class(comm) %in% c("HypervolumeList")))
-      stop("A HypervolumeList is needed as input data.")
-    return(dist(kernel.evenness(comm)))
+  if (!(class(comm) %in% c("HypervolumeList")))
+    stop("A HypervolumeList is needed as input data.")
+  return(dist(kernel.evenness(comm)))
 }
 
 #' Functional originality of observations in kernel density hypervolumes.
@@ -1966,7 +2067,7 @@ kernel.beta.evenness <- function(comm){
 #' }
 #' @export
 kernel.originality = function(comm, frac = 0.1, relative = FALSE){
-
+  
   #check if right data is provided
   if (!(class(comm) %in% c("Hypervolume", "HypervolumeList")))
     stop("A Hypervolume or HypervolumeList is needed as input data.")
@@ -1974,8 +2075,8 @@ kernel.originality = function(comm, frac = 0.1, relative = FALSE){
   #check if right frac parameter is provided
   if (frac < 0.01 | frac > 1)
     stop("The frac parameter should be a number between 0.01 and 1.")
-
-  if (is(comm, "Hypervolume")) {    
+  
+  if(is(comm, "Hypervolume")) {    
     
     sample.points <- comm@RandomPoints[sample(1:nrow(comm@RandomPoints), nrow(comm@RandomPoints)*frac), ]
     
@@ -1989,7 +2090,7 @@ kernel.originality = function(comm, frac = 0.1, relative = FALSE){
     }
     names(originality) = rownames(comm@Data)
     
-  } else if (is(comm, "HypervolumeList")) {
+  } else if (is(comm, "HypervolumeList")){
     if (all(rownames(comm@HVList[[1]]@Data) == 1:nrow(comm@HVList[[1]]@Data)))
       warning("Species names are probably missing from hypervolumes, consider renaming them.")
     spp = c()
@@ -2123,7 +2224,7 @@ kernel.contribution = function(comm, func = "neighbor", relative = FALSE){
       contrib[i, which(spp %in% rownames(comm@HVList[[i]]@Data))] <- kernel.contribution(comm = comm@HVList[[i]], func = func)
     }
   }
-
+  
   #finalize
   if(relative){
     if(is.matrix(contrib))
@@ -2168,7 +2269,7 @@ kernel.dispersion = function(comm, func = 'dissimilarity', frac = 0.1) {
   #check if right frac parameter is provided
   if (frac < 0.01 | frac > 1)
     stop("Frac parameter should be a number between 0.01 and 1.")
-
+  
   if (is(comm, "Hypervolume")){
     
     random_points = comm@RandomPoints[sample(1:nrow(comm@RandomPoints), nrow(comm@RandomPoints)*frac), ]
@@ -2234,7 +2335,7 @@ kernel.evenness = function(comm) {
   #check if right data is provided
   if (!(class(comm) %in% c("HypervolumeList", "Hypervolume")))
     stop("A Hypervolume or HypervolumeList is needed as input data.")
-
+  
   #if hypervolume is provided go for it
   if (is(comm, "Hypervolume")) {
     
@@ -2296,10 +2397,10 @@ kernel.evenness.contribution = function(comm){
   #check if right data is provided
   if (!(class(comm) %in% c("Hypervolume", "HypervolumeList")))
     stop("A Hypervolume or HypervolumeList is needed as input data.")
-
+  
   #if hypervolume is provided go for it.
   if (is(comm, "Hypervolume")){
-
+    
     #extract total evenness:
     comm.evenness <- kernel.evenness(comm)
     
@@ -2315,7 +2416,7 @@ kernel.evenness.contribution = function(comm){
     }
     
     names(contrib) = rownames(comm@Data)
-
+    
   }	else if (is(comm, "HypervolumeList")){
     if (all(rownames(comm@HVList[[1]]@Data) == 1:nrow(comm@HVList[[1]]@Data)))
       warning("Species names are probably missing from hypervolumes, consider renaming them.")
@@ -2335,7 +2436,7 @@ kernel.evenness.contribution = function(comm){
       contrib[i, which(spp %in% rownames(comm@HVList[[i]]@Data))] <- kernel.evenness.contribution(comm = comm@HVList[[i]])
     }
   }
-
+  
   return(contrib)
 }
 
@@ -2440,7 +2541,7 @@ kernel.hotspots <- function(comm, prop = 0.5){
     hot = hypervolume_threshold(comm, num.thresholds = 1000, quantile.requested = prop, quantile.requested.type = "probability", plot = FALSE, verbose = FALSE)
     hot = hot$HypervolumesThresholded
     hot@Name = comm@Name
-
+    
   } else if (is(comm, "HypervolumeList")) {
     #if list call this same function
     for (i in 1:length(comm@HVList)){
@@ -2453,9 +2554,103 @@ kernel.hotspots <- function(comm, prop = 0.5){
       }
     }
   }
-
+  
   #return hot
   return(hot)
+}
+
+#' Gamma diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).
+#' @description Observed richness among multiple sites.
+#' @param comm A sites x species matrix, with either abundance or incidence data.
+#' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
+#' @details TD is equivalent to species richness. Calculations of PD and FD are based on Faith (1992) and Petchey & Gaston (2002, 2006), which measure PD and FD of a community as the total branch length of a tree linking all species represented in such community.
+#' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
+#' The number and order of species in comm must be the same as in tree.
+#' @return A single value of gamma.
+#' @references Faith, D.P. (1992) Conservation evaluation and phylogenetic diversity. Biological Conservation, 61, 1-10.
+#' @references Petchey, O.L. & Gaston, K.J. (2002) Functional diversity (FD), species richness and community composition. Ecology Letters, 5, 402-411.
+#' @references Petchey, O.L. & Gaston, K.J. (2006) Functional diversity: back to basics and looking forward. Ecology Letters, 9, 741-758.
+#' @examples comm <- matrix(c(0,0,1,1,0,0,2,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
+#' trait = 1:5
+#' tree <- hclust(dist(c(1:5), method = "euclidean"), method = "average")
+#' alpha(comm)
+#' gamma(comm)
+#' gamma(comm, trait)
+#' gamma(comm, tree)
+#' @export
+gamma <- function(comm, tree){
+  comm = matrix(colSums(comm), nrow = 1)
+  return(alpha(comm, tree))
+}
+
+#' Gamma diversity using convex hull hypervolumes.
+#' @description Estimation of functional richness of multiple sites, based on convex hull hypervolumes.
+#' @param comm A 'convhulln' object or list, preferably built with function hull.build.
+#' @details Estimates the functional richness (gamma FD) of multiple communities using convex hull hypervolumes.
+#' Functional richness is expressed as the total volume of the convex hull.
+#' @return A single value of gamma.
+#' @examples comm = rbind(c(1,3,0,5,3), c(3,2,5,0,0))
+#' colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+#' rownames(comm) = c("Site 1", "Site 2")
+#' 
+#' trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
+#' rownames(trait) = colnames(comm)
+#' 
+#' hv = hull.build(comm[1,], trait)
+#' hull.alpha(hv)
+#' hull.gamma(hv)
+#' hvlist = hull.build(comm, trait, axes = 2)
+#' hull.alpha(hvlist)
+#' hull.gamma(hvlist)
+#' @export
+hull.gamma <- function(comm){
+  if(is(comm, "convhulln"))
+    return(hull.alpha(comm))
+  if(is.list(comm)){
+    traits = c()
+    for(i in 1:length(comm))
+      traits = rbind(traits, comm[[i]]$p)
+    traits = unique(traits)
+    comm = hull.build(comm = rep(1, nrow(traits)), trait = traits)
+    return(hull.alpha(comm))
+  }
+}
+
+#' Gamma diversity using kernel density hypervolumes.
+#' @description Estimation of functional richness of multiple sites, based on n-dimensional hypervolumes.
+#' @param comm A 'Hypervolume' or 'HypervolumeList' object, preferably built using function kernel.build.
+#' @details Estimates the functional richness (gamma FD) of multiple communities using kernel density hypervolumes, as implemented in Blonder et al. (2014, 2018).
+#' Functional richness is expressed as the total volume of the n-dimensional hypervolume (Mammola & Cardoso, 2020). Note that the hypervolume is dimensionless, and that only hypervolumes with the same number of dimensions can be compared in terms of functional richness.
+#' Given that the density and positions of stochastic points in the hypervolume are probabilistic, the functional richness of the trait space will intimately depend on the quality of input hypervolumes (details in Mammola & Cardoso, 2020).
+#' @return A single value of gamma.
+#' @references Blonder, B., Lamanna, C., Violle, C. & Enquist, B.J. (2014) The n-dimensional hypervolume. Global Ecology and Biogeography, 23: 595-609.
+#' @references Blonder, B., Morrow, C.B., Maitner, B., Harris, D.J., Lamanna, C., Violle, C., ... & Kerkhoff, A.J. (2018) New approaches for delineating n-dimensional hypervolumes. Methods in Ecology and Evolution, 9: 305-319.
+#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
+#' @examples \dontrun{
+#' comm = rbind(c(1,3,2,2,2), c(0,0,0,2,2))
+#' colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+#' rownames(comm) = c("Site 1", "Site 2")
+#' 
+#' trait = data.frame(body = c(1,2,3,4,5), beak = c(1,2,3,4,5))
+#' rownames(trait) = colnames(comm)
+#' 
+#' hv = kernel.build(comm[1,], trait)
+#' kernel.alpha(hv)
+#' kernel.gamma(hv)
+#' hvlist = kernel.build(comm, trait)
+#' kernel.alpha(hvlist)
+#' kernel.gamma(hvlist)
+#' }
+#' @export
+kernel.gamma <- function(comm){
+  if(is(comm, "Hypervolume"))
+    return(kernel.alpha(comm))
+  if(is(comm, "HypervolumeList")){
+    for(i in 2:length(comm@HVList))
+      comm@HVList[[1]]@RandomPoints = rbind(comm@HVList[[1]]@RandomPoints, comm@HVList[[i]]@RandomPoints)
+    comm = hypervolume_threshold(comm[[1]], num.thresholds = 1000, quantile.requested = comm[[1]]@Parameters$quantile.requested, quantile.requested.type = comm[[1]]@Parameters$quantile.requested.type, plot = FALSE, verbose = FALSE)
+    return(comm$HypervolumesThresholded@Volume)
+  }
 }
 
 #' Community Weighted Mean.
@@ -2477,7 +2672,7 @@ kernel.hotspots <- function(comm, prop = 0.5){
 cwm <- function(comm, trait, abund = TRUE, na.rm = FALSE){
   trait = dummy(trait)
   if(!abund)
-      comm[comm > 1] = 1
+    comm[comm > 1] = 1
   nSites = nrow(comm)
   nTraits = ncol(trait)
   nSp = rowSums(comm)
@@ -2557,7 +2752,7 @@ cwe <- function(comm, trait, func = "camargo", abund = TRUE, na.rm = FALSE){
   
   for (s in 1:nSites){
     for (t in 1:nTraits){
-
+      
       #clean stuff for this run
       thisComm = comm[s, comm[s,] > 0]		                   #filter comm
       thisTrait = trait[comm[s,] > 0, t]                     #filter trait values
@@ -2579,7 +2774,7 @@ cwe <- function(comm, trait, func = "camargo", abund = TRUE, na.rm = FALSE){
       #if only 1 functional category skip, as evenness does not make sense
       nDist = length(thisComm) - 1                           #number of links
       if(nDist == 0) next
-
+      
       #if only 2 categories use regular evenness without the functional part
       if(nDist == 1){
         #calculate the observed values as proportional abundance per species
@@ -2592,14 +2787,14 @@ cwe <- function(comm, trait, func = "camargo", abund = TRUE, na.rm = FALSE){
         }
         next
       }
-
+      
       #if more than 2 categories proceed with the functional part
-
+      
       #calculate distances between trait values
       disTraits = c()                                        
       for(i in 1:nDist)
         disTraits[i] = thisTrait[i+1] - thisTrait[i]
-
+      
       #calculate the observed values as proportional abundance per species / distance
       thisObs = c()
       for(i in 1:nDist)											   #cycle through all distances of this site/sample
@@ -2619,13 +2814,13 @@ cwe <- function(comm, trait, func = "camargo", abund = TRUE, na.rm = FALSE){
           }
         }
         results[s,t] = 1 - (results[s,t] / (nDist * (nDist - 1) / 2))
-
+        
       } else {
         stop(sprintf("Function %s not recognized.", func))
       }
     }
   }
-
+  
   return(results)
 }
 
@@ -2654,53 +2849,53 @@ cwe <- function(comm, trait, func = "camargo", abund = TRUE, na.rm = FALSE){
 #' @export
 accuracy <- function(accum, target = -1){
   if(ncol(accum) > 5 || accum[nrow(accum), 3] > 1){		#if alpha
-		if (target == -1)
-			target <- accum[nrow(accum), 3]
-		intensTotal = accum[nrow(accum), 2] / accum[nrow(accum), 3]	#sampling intensity = final n / final S
-		if(ncol(accum) > 10){              #if non-parametric
+    if (target == -1)
+      target <- accum[nrow(accum), 3]
+    intensTotal = accum[nrow(accum), 2] / accum[nrow(accum), 3]	#sampling intensity = final n / final S
+    if(ncol(accum) > 10){              #if non-parametric
       smse <- matrix(0, 13, nrow = 2)
       for (i in 1:nrow(accum)){
-      	intensity = accum[i, 2] / accum[i, 3] / intensTotal
-      	error = (accum[i,3] - target)^2 / (target^2 * nrow(accum))
-      	smse[1,1] <- smse[1,1] + error
-      	smse[2,1] <- smse[2,1] + error * intensity
-      	for (j in 2:13){
-      		error = (accum[i,j+6] - target)^2 / (target^2 * nrow(accum))
-      		smse[1,j] <- smse[1,j] + error
-      		smse[2,j] <- smse[2,j] + error * intensity
-      	}
+        intensity = accum[i, 2] / accum[i, 3] / intensTotal
+        error = (accum[i,3] - target)^2 / (target^2 * nrow(accum))
+        smse[1,1] <- smse[1,1] + error
+        smse[2,1] <- smse[2,1] + error * intensity
+        for (j in 2:13){
+          error = (accum[i,j+6] - target)^2 / (target^2 * nrow(accum))
+          smse[1,j] <- smse[1,j] + error
+          smse[2,j] <- smse[2,j] + error * intensity
+        }
       }
       rownames(smse) <- c("Raw", "Weighted")
-     	colnames(smse) <- c("Obs", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
+      colnames(smse) <- c("Obs", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
     }
     else{                              #if curve
       smse <- matrix(0, 5, nrow = 2)
       for (i in 3:nrow(accum)){
-      	intensity = accum[i, 2] / accum[i, 3] / intensTotal
-      	for (j in 1:5){
+        intensity = accum[i, 2] / accum[i, 3] / intensTotal
+        for (j in 1:5){
           if (!is.na(accum[i,j+2])){
-          	error = (accum[i,j+2] - target)^2 / (target^2 * nrow(accum))
-          	smse[1,j] <- smse[1,j] + error
-          	smse[2,j] <- smse[2,j] + error * intensity
+            error = (accum[i,j+2] - target)^2 / (target^2 * nrow(accum))
+            smse[1,j] <- smse[1,j] + error
+            smse[2,j] <- smse[2,j] + error * intensity
           }
-      	}
+        }
       }
       rownames(smse) <- c("Raw", "Weighted")
       colnames(smse) <- c("Obs", "Clench", "Exponential", "Rational", "Weibull")
     }
-	} else {																						#if beta
-		if (target[1] == -1)
-			target <- accum[nrow(accum), 2:4]
-		smse <- rep(0, 3)
-		for (i in 1:nrow(accum)){
-			for (j in 1:3)
-				smse[j] <- smse[j] + (accum[i,j+1] - target[j])^2
-		}
-		smse <- smse / nrow(accum)
-		smse <- list(Btotal=smse[1], Brepl=smse[2], Brich=smse[3])
-		smse <- c(unlist(smse))
-	}
-	return(smse)
+  } else {																						#if beta
+    if (target[1] == -1)
+      target <- accum[nrow(accum), 2:4]
+    smse <- rep(0, 3)
+    for (i in 1:nrow(accum)){
+      for (j in 1:3)
+        smse[j] <- smse[j] + (accum[i,j+1] - target[j])^2
+    }
+    smse <- smse / nrow(accum)
+    smse <- list(Btotal=smse[1], Brepl=smse[2], Brich=smse[3])
+    smse <- c(unlist(smse))
+  }
+  return(smse)
 }
 
 #' Slope of accumulation curves.
@@ -2719,26 +2914,26 @@ accuracy <- function(accum, target = -1){
 #' slope(acc.beta)
 #' @export
 slope <- function(accum){
-	if(ncol(accum) > 5 || accum[nrow(accum), 3] > 1){			#if alpha
-		sl <- accum[,-2]
-		accum <- rbind(rep(0,ncol(accum)), accum)
-		for (i in 1:nrow(sl)){
-			sl[i,1] <- i
-			for (j in 2:ncol(sl)){
-				sl[i,j] <- (accum[i+1,j+1]-accum[i,j+1])/(accum[i+1,2]-accum[i,2])
-			}
-		}
-	} else {																							#if beta
-		sl <- accum
-		sl[1,] <- 0
-		sl[1,1] <- 1
-		for (i in 2:nrow(sl)){
-			for (j in 2:ncol(sl)){
-				sl[i,j] <- (accum[i,j]-accum[i-1,j])
-			}
-		}
-	}
-	return(sl)
+  if(ncol(accum) > 5 || accum[nrow(accum), 3] > 1){			#if alpha
+    sl <- accum[,-2]
+    accum <- rbind(rep(0,ncol(accum)), accum)
+    for (i in 1:nrow(sl)){
+      sl[i,1] <- i
+      for (j in 2:ncol(sl)){
+        sl[i,j] <- (accum[i+1,j+1]-accum[i,j+1])/(accum[i+1,2]-accum[i,2])
+      }
+    }
+  } else {																							#if beta
+    sl <- accum
+    sl[1,] <- 0
+    sl[1,1] <- 1
+    for (i in 2:nrow(sl)){
+      for (j in 2:ncol(sl)){
+        sl[i,j] <- (accum[i,j]-accum[i-1,j])
+      }
+    }
+  }
+  return(sl)
 }
 
 #' Coverage of datasets.
@@ -2754,7 +2949,7 @@ slope <- function(accum){
 #' coverage(comm, tree)
 #' @export
 coverage <- function(comm, tree){
-
+  
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
@@ -2762,7 +2957,7 @@ coverage <- function(comm, tree){
   if(!missing(tree))
     tree = xTree(tree)
   cover = comm[,1,drop = FALSE]
-
+  
   for(r in 1:nrow(comm)){
     data <- comm[r,,drop = FALSE]
     n <- nobs(data, tree)
@@ -2798,56 +2993,56 @@ coverage <- function(comm, tree){
 #' optim.alpha(comm,, methods = methods, base = c(0,0,1), runs = 100)
 #' @export
 optim.alpha <- function(comm, tree, methods, base, runs = 0, prog = TRUE){
-
+  
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
-
-	##preliminary stats
-	methods <- as.vector(t(methods))
-	nSamples <- length(methods)							          ##number of samples
-	metUnique <- as.vector(t(unique(methods)))				##list of methods
-	metNum <- length(metUnique)							          ##number of methods
-	if (missing(base))										            ##if no samples to start with for complementarity analysis
-		samples <- rep(0,metNum)
-	else
-		samples <- base
-	nMiss <- nSamples - sum(samples)          				##number of samples missing
-	nSamplesMet <- rep(0,metNum)						          ##samples per method
-	for (m in 1:metNum)
-		nSamplesMet[m] <- sum(methods == metUnique[m])
-
-	##accumulation process
-	if (prog)
-	  pb <- txtProgressBar(max = nMiss + 1, style = 3)
-	div <- rep(0, nMiss + 1)									      	##diversity along the optimal accumulation curve
-	if (sum(samples) > 0)
-		div[1] <- optim.alpha.stats(comm, tree, methods, samples, runs)
-	if (prog)
-	  setTxtProgressBar(pb, 1)
-	for (s in 2:(nMiss+1)){
-		samples <- rbind (samples, rep(0,metNum))
-		samples[s,] <- samples[s-1,]
-		metValue <- rep(0, metNum)										  #diversity when adding each method
-		for (m in 1:metNum){
-			if (samples[s,m] < nSamplesMet[m]){
-				samples[s,m] <- samples[s,m] + 1
-				metValue[m] <- optim.alpha.stats(comm, tree, methods, samples[s,], runs)
-				samples[s,m] <- samples[s,m] - 1
-			}
-		}
-		div[s] <- max(metValue)
-		best <- which(metValue == div[s])
-		if (length(best) > 1)
-			best = best[sample(1:length(best),1)]					#if tie, choose one of the best methods randomly
-		samples[s, best] <- samples[s, best] + 1
-		if (prog) setTxtProgressBar(pb, s)
-	}
-	if (prog) close(pb)
-	colnames(samples) <- metUnique
-	rownames(samples) <- (0:nMiss+sum(samples[1,]))
-	samples <- cbind(samples, div)
-	return(samples)
+  
+  ##preliminary stats
+  methods <- as.vector(t(methods))
+  nSamples <- length(methods)							          ##number of samples
+  metUnique <- as.vector(t(unique(methods)))				##list of methods
+  metNum <- length(metUnique)							          ##number of methods
+  if (missing(base))										            ##if no samples to start with for complementarity analysis
+    samples <- rep(0,metNum)
+  else
+    samples <- base
+  nMiss <- nSamples - sum(samples)          				##number of samples missing
+  nSamplesMet <- rep(0,metNum)						          ##samples per method
+  for (m in 1:metNum)
+    nSamplesMet[m] <- sum(methods == metUnique[m])
+  
+  ##accumulation process
+  if (prog)
+    pb <- txtProgressBar(max = nMiss + 1, style = 3)
+  div <- rep(0, nMiss + 1)									      	##diversity along the optimal accumulation curve
+  if (sum(samples) > 0)
+    div[1] <- optim.alpha.stats(comm, tree, methods, samples, runs)
+  if (prog)
+    setTxtProgressBar(pb, 1)
+  for (s in 2:(nMiss+1)){
+    samples <- rbind (samples, rep(0,metNum))
+    samples[s,] <- samples[s-1,]
+    metValue <- rep(0, metNum)										  #diversity when adding each method
+    for (m in 1:metNum){
+      if (samples[s,m] < nSamplesMet[m]){
+        samples[s,m] <- samples[s,m] + 1
+        metValue[m] <- optim.alpha.stats(comm, tree, methods, samples[s,], runs)
+        samples[s,m] <- samples[s,m] - 1
+      }
+    }
+    div[s] <- max(metValue)
+    best <- which(metValue == div[s])
+    if (length(best) > 1)
+      best = best[sample(1:length(best),1)]					#if tie, choose one of the best methods randomly
+    samples[s, best] <- samples[s, best] + 1
+    if (prog) setTxtProgressBar(pb, s)
+  }
+  if (prog) close(pb)
+  colnames(samples) <- metUnique
+  rownames(samples) <- (0:nMiss+sum(samples[1,]))
+  samples <- cbind(samples, div)
+  return(samples)
 }
 
 #' Efficiency statistics for alpha-sampling.
@@ -2872,47 +3067,47 @@ optim.alpha <- function(comm, tree, methods, base, runs = 0, prog = TRUE){
 #' optim.alpha.stats(comm, tree, methods = methods, samples = c(0,0,1), runs = 100)
 #' @export
 optim.alpha.stats <- function(comm, tree, methods, samples, runs = 0){
-
+  
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
-
-	##preliminary stats
-	if (!missing(tree)){
-	  comm = reorderComm(comm, tree)
-	  tree <- xTree(tree)
-	}
-	if(length(dim(comm)) == 3)					                          ##number of sites
-		nSites <- dim(comm)[3]
-	else
-		nSites <- 1
-	methods <- as.vector(t(methods))
-	metUnique <- as.vector(t(unique(methods)))				            ##list of methods
-	metNum <- length(metUnique)					                          ##number of methods
-	div <- 0														                          ##average diversity obtained using this particular combination of samples per method
-
-	for (i in 1:nSites){
-		if (nSites > 1){
-			site <- as.matrix(comm[,,i])
-			true <- sobs(site, tree) 			                          	##true diversity of each site
-		} else {
-			site <- as.matrix(comm)
-			true <- 1
-		}
-	  
+  
+  ##preliminary stats
+  if (!missing(tree)){
+    comm = reorderComm(comm, tree)
+    tree <- xTree(tree)
+  }
+  if(length(dim(comm)) == 3)					                          ##number of sites
+    nSites <- dim(comm)[3]
+  else
+    nSites <- 1
+  methods <- as.vector(t(methods))
+  metUnique <- as.vector(t(unique(methods)))				            ##list of methods
+  metNum <- length(metUnique)					                          ##number of methods
+  div <- 0														                          ##average diversity obtained using this particular combination of samples per method
+  
+  for (i in 1:nSites){
+    if (nSites > 1){
+      site <- as.matrix(comm[,,i])
+      true <- sobs(site, tree) 			                          	##true diversity of each site
+    } else {
+      site <- as.matrix(comm)
+      true <- 1
+    }
+    
     for (r in 1:runs){
-		 	addSample <- rep(0, ncol(comm))
-		 	for (m in 1:metNum){
-		 		if (samples[m] > 0){
-		 			filterList <- site[which(methods == metUnique[m]),,drop=F]						##filter by method m
-		 			filterList <- filterList[sample(nrow(filterList),samples[m]),,drop=F]	##randomly select rows
-		 			addSample <- rbind(addSample, filterList)															##add random samples
-		 		}
-		 	}
-		 	div <- div + sobs(addSample, tree) / runs / nSites / true
-		}
-	}
-	return(div)
+      addSample <- rep(0, ncol(comm))
+      for (m in 1:metNum){
+        if (samples[m] > 0){
+          filterList <- site[which(methods == metUnique[m]),,drop=F]						##filter by method m
+          filterList <- filterList[sample(nrow(filterList),samples[m]),,drop=F]	##randomly select rows
+          addSample <- rbind(addSample, filterList)															##add random samples
+        }
+      }
+      div <- div + sobs(addSample, tree) / runs / nSites / true
+    }
+  }
+  return(div)
 }
 
 #' Optimization of beta diversity sampling protocols.
@@ -2945,52 +3140,52 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 0){
 #' optim.beta(comm, tree, methods = methods, abund = FALSE, base = c(0,0,1), runs = 100)
 #' @export
 optim.beta <- function(comm, tree, methods, base, abund = TRUE, runs = 0, prog = TRUE){
-
-	##preliminary stats
-	methods <- as.vector(t(methods))
-	nSamples <- length(methods)							          ##number of samples
-	metUnique <- as.vector(t(unique(methods)))				##list of methods
-	metNum <- length(metUnique)						          	##number of methods
-
-	if (missing(base))										            ##if no samples to start with
-		samples <- rep(0,metNum)
-	else
-		samples <- base
-	nMiss <- nSamples - sum(samples)				          ##number of samples missing
-	nSamplesMet <- rep (0, metNum)					          ##samples per method
-	for (m in 1:metNum)
-		nSamplesMet[m] <- sum(methods == metUnique[m])
-
-	##accumulation process
-	if (prog) pb <- txtProgressBar(max = nMiss+1, style = 3)
-	diff <- rep(0,nMiss+1)														#absolute difference along the optimal accumulation curve
-	diff[1] <- optim.beta.stats(comm, tree, methods, samples, abund, runs)
-	if (prog) setTxtProgressBar(pb, 1)
-	if (diff[1] == "NaN")
-		diff[1] = 1
-	for (s in 2:(nMiss+1)){
-	  samples <- rbind (samples, rep(0,metNum))
-		samples[s,] <- samples[s-1,]
-		metValue <- rep(1, metNum)										  #absolute difference when adding each method
-		for (m in 1:metNum){
-			if (samples[s,m] < nSamplesMet[m]){
-				samples[s,m] <- samples[s,m] + 1
-				metValue[m] <- optim.beta.stats(comm, tree, methods, samples[s,], abund, runs)
-				samples[s,m] <- samples[s,m] - 1
-			}
-		}
-		diff[s] <- min(metValue)
-		best <- which(metValue == diff[s])
-		if (length(best) > 1)
-			best = best[sample(1:length(best),1)]					#if tie, choose one of the best methods randomly
-		samples[s, best] <- samples[s, best] + 1
-		if (prog) setTxtProgressBar(pb, s)
-	}
-	if (prog) close(pb)
-	colnames(samples) <- metUnique
-	rownames(samples) <- (0:nMiss+sum(samples[1,]))
-	samples <- cbind(samples, diff)
-	return(samples)
+  
+  ##preliminary stats
+  methods <- as.vector(t(methods))
+  nSamples <- length(methods)							          ##number of samples
+  metUnique <- as.vector(t(unique(methods)))				##list of methods
+  metNum <- length(metUnique)						          	##number of methods
+  
+  if (missing(base))										            ##if no samples to start with
+    samples <- rep(0,metNum)
+  else
+    samples <- base
+  nMiss <- nSamples - sum(samples)				          ##number of samples missing
+  nSamplesMet <- rep (0, metNum)					          ##samples per method
+  for (m in 1:metNum)
+    nSamplesMet[m] <- sum(methods == metUnique[m])
+  
+  ##accumulation process
+  if (prog) pb <- txtProgressBar(max = nMiss+1, style = 3)
+  diff <- rep(0,nMiss+1)														#absolute difference along the optimal accumulation curve
+  diff[1] <- optim.beta.stats(comm, tree, methods, samples, abund, runs)
+  if (prog) setTxtProgressBar(pb, 1)
+  if (diff[1] == "NaN")
+    diff[1] = 1
+  for (s in 2:(nMiss+1)){
+    samples <- rbind (samples, rep(0,metNum))
+    samples[s,] <- samples[s-1,]
+    metValue <- rep(1, metNum)										  #absolute difference when adding each method
+    for (m in 1:metNum){
+      if (samples[s,m] < nSamplesMet[m]){
+        samples[s,m] <- samples[s,m] + 1
+        metValue[m] <- optim.beta.stats(comm, tree, methods, samples[s,], abund, runs)
+        samples[s,m] <- samples[s,m] - 1
+      }
+    }
+    diff[s] <- min(metValue)
+    best <- which(metValue == diff[s])
+    if (length(best) > 1)
+      best = best[sample(1:length(best),1)]					#if tie, choose one of the best methods randomly
+    samples[s, best] <- samples[s, best] + 1
+    if (prog) setTxtProgressBar(pb, s)
+  }
+  if (prog) close(pb)
+  colnames(samples) <- metUnique
+  rownames(samples) <- (0:nMiss+sum(samples[1,]))
+  samples <- cbind(samples, diff)
+  return(samples)
 }
 
 #' Efficiency statistics for beta-sampling.
@@ -3017,50 +3212,50 @@ optim.beta <- function(comm, tree, methods, base, abund = TRUE, runs = 0, prog =
 #' optim.beta.stats(comm, tree, methods = methods, samples = c(0,0,1), runs = 100)
 #' @export
 optim.beta.stats <- function(comm, tree, methods, samples, abund = TRUE, runs = 0){
-
+  
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
-
-	##preliminary stats
-	if(length(dim(comm)) == 3){					              ##number of sites
-		nSites <- dim(comm)[3]
-	}else{
-		return(message("Need sample data from at least two sites to perform analyses."))
-	}
-	methods <- as.vector(t(methods))
-	metUnique <- as.vector(t(unique(methods)))				##list of methods
-	metNum <- length(metUnique)					              ##number of methods
-	diff <- 0													              	##average absolute difference between observed and true diversity obtained using this particular combination of samples per method
   
-	if(!missing(tree))
-  	comm = reorderComm(comm, tree)
-	
-	##calculate true beta values
-	sumComm <- matrix(0, nrow = nSites, ncol = ncol(comm))
-	for (i in 1:nSites){
-		sumComm[i,] <- colSums(comm[,,i])
-	}
-	true <- beta(sumComm, tree, abund)
-
-	##calculate absolute difference between sampled and true beta values
-	for (r in 1:runs){
-		sumComm <- matrix(0, nrow = nSites, ncol = ncol(comm))
-		for (m in 1:metNum){
-			if (samples[m] > 0){
-				filterList <- comm[which(methods == metUnique[m]),,,drop=F] 							##filter by method m
-				filterList <- filterList[sample(nrow(filterList),samples[m]),,,drop=F]		##randomly select rows
-				for (i in 1:nSites){
-					sumComm[i,] <- sumComm[i,] + colSums(filterList[,,i,drop=F])
-				}
-			}
-		}
-		sampleBeta <- beta(sumComm, tree, abund)
-		for(i in 1:3){
-			diff <- diff + mean(abs(sampleBeta[[i]] - true[[i]])) / 3 / runs
-		}
-	}
-	return(diff)
+  ##preliminary stats
+  if(length(dim(comm)) == 3){					              ##number of sites
+    nSites <- dim(comm)[3]
+  }else{
+    return(message("Need sample data from at least two sites to perform analyses."))
+  }
+  methods <- as.vector(t(methods))
+  metUnique <- as.vector(t(unique(methods)))				##list of methods
+  metNum <- length(metUnique)					              ##number of methods
+  diff <- 0													              	##average absolute difference between observed and true diversity obtained using this particular combination of samples per method
+  
+  if(!missing(tree))
+    comm = reorderComm(comm, tree)
+  
+  ##calculate true beta values
+  sumComm <- matrix(0, nrow = nSites, ncol = ncol(comm))
+  for (i in 1:nSites){
+    sumComm[i,] <- colSums(comm[,,i])
+  }
+  true <- beta(sumComm, tree, abund)
+  
+  ##calculate absolute difference between sampled and true beta values
+  for (r in 1:runs){
+    sumComm <- matrix(0, nrow = nSites, ncol = ncol(comm))
+    for (m in 1:metNum){
+      if (samples[m] > 0){
+        filterList <- comm[which(methods == metUnique[m]),,,drop=F] 							##filter by method m
+        filterList <- filterList[sample(nrow(filterList),samples[m]),,,drop=F]		##randomly select rows
+        for (i in 1:nSites){
+          sumComm[i,] <- sumComm[i,] + colSums(filterList[,,i,drop=F])
+        }
+      }
+    }
+    sampleBeta <- beta(sumComm, tree, abund)
+    for(i in 1:3){
+      diff <- diff + mean(abs(sampleBeta[[i]] - true[[i]])) / 3 / runs
+    }
+  }
+  return(diff)
 }
 
 #' Optimization of spatial sampling.
@@ -3078,33 +3273,33 @@ optim.spatial <- function(layers, n, latlong = TRUE, clusterMap = TRUE){
   for(i in 1:length(layers))              ##transform all layers to a scale [0,1]
     layers[[i]] <- (layers[[i]]-cellStats(layers[[i]], min))/(cellStats(layers[[i]], max)-cellStats(layers[[i]], min))
   dataMat <- as.matrix(layers)
-	dataMat <- dataMat[complete.cases(dataMat),]
-	dataMat <- cbind(dataMat, rasterToPoints(layers[[1]])[,1:2])					##add latlong
-	if (latlong)
-		res <- kmeans(dataMat, n)        ##do k-means
-	else
-		res <- kmeans(dataMat[,-c((ncol(dataMat)-1),ncol(dataMat))], n)        ##do k-means
-
-	cl = c()
-	for(c in 1:n){
-		cData <- dataMat[res$cluster==c,]           #filter to cluster c
-		cCenter <- res$centers[c,]
-		dist2centroid <- c()
-		for(r in 1:nrow(cData))
-			dist2centroid[r] = dist(rbind(cData[r,], cCenter))
-		cData <- cbind(rep(c, nrow(cData)), dist2centroid, cData[,ncol(cData)], cData[,(ncol(cData)-1)])
-		colnames(cData) <- c("cluster", "dist2centroid", "lat", "long")
-		cData <- cData[sort.list(cData[,2]), ]
-		cl <- rbind(cl, cData)
-	}
-
-	#output raster with clusters
-	if(clusterMap){
-		map <- rasterize(rasterToPoints(layers[[1]])[,1:2], layers[[1]], res$cluster)
-		names(map) <- "clusters"
-		cl <- list(cl, map)
-	}
-	return(cl)
+  dataMat <- dataMat[complete.cases(dataMat),]
+  dataMat <- cbind(dataMat, rasterToPoints(layers[[1]])[,1:2])					##add latlong
+  if (latlong)
+    res <- kmeans(dataMat, n)        ##do k-means
+  else
+    res <- kmeans(dataMat[,-c((ncol(dataMat)-1),ncol(dataMat))], n)        ##do k-means
+  
+  cl = c()
+  for(c in 1:n){
+    cData <- dataMat[res$cluster==c,]           #filter to cluster c
+    cCenter <- res$centers[c,]
+    dist2centroid <- c()
+    for(r in 1:nrow(cData))
+      dist2centroid[r] = dist(rbind(cData[r,], cCenter))
+    cData <- cbind(rep(c, nrow(cData)), dist2centroid, cData[,ncol(cData)], cData[,(ncol(cData)-1)])
+    colnames(cData) <- c("cluster", "dist2centroid", "lat", "long")
+    cData <- cData[sort.list(cData[,2]), ]
+    cl <- rbind(cl, cData)
+  }
+  
+  #output raster with clusters
+  if(clusterMap){
+    map <- rasterize(rasterToPoints(layers[[1]])[,1:2], layers[[1]], res$cluster)
+    names(map) <- "clusters"
+    cl <- list(cl, map)
+  }
+  return(cl)
 }
 
 #' Maps of alpha diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).
@@ -3129,16 +3324,16 @@ optim.spatial <- function(layers, n, latlong = TRUE, clusterMap = TRUE){
 #' raster.alpha(spp, tree)
 #' @export
 raster.alpha <- function(layers, tree){
-	res = raster::raster(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
-	for(r in 1:nrow(layers)){
-		for(c in 1:ncol(layers)){
-			if(is.na(sum(layers[r,c])))
-				res[r,c] = NA
-			else
-				res[r,c] = alpha(layers[r,c], tree)
-		}
-	}
-	return(res)
+  res = raster::raster(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  for(r in 1:nrow(layers)){
+    for(c in 1:ncol(layers)){
+      if(is.na(sum(layers[r,c])))
+        res[r,c] = NA
+      else
+        res[r,c] = alpha(layers[r,c], tree)
+    }
+  }
+  return(res)
 }
 
 #' Maps of beta diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).
@@ -3170,29 +3365,29 @@ raster.alpha <- function(layers, tree){
 #' raster.beta(spp, tree)
 #' @export
 raster.beta <- function(layers, tree, func = "jaccard", neighbour = 8, abund = FALSE){
-	resTotal = raster::raster(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
-	resRepl = resTotal
-	resRich = resTotal
-	for(c in 1:(raster::ncell(layers))){
-		if(is.na(sum(layers[c]))){
-			resTotal[c] = NA
-			resRepl[c] = NA
-			resRich[c] = NA
-		} else {
-			betaValue = matrix(ncol = 3)
-			adj = raster::adjacent(layers, c, neighbour)[, 2]
-			for(a in adj)
-				if(!is.na(sum(layers[a])))
-					betaValue = rbind(betaValue, beta(rbind(layers[c], layers[a]), tree, func = func, abund = abund))
-			betaValue = betaValue[-1, ,drop = FALSE]
-			resTotal[c] = mean(unlist(betaValue[, 1]))
-			resRepl[c] = mean(unlist(betaValue[, 2]))
-			resRich[c] = mean(unlist(betaValue[, 3]))
-		}
-	}
-	res = raster::stack(resTotal, resRepl, resRich)
-	names(res) = c("Btotal", "Brepl", "Brich")
-	return(res)
+  resTotal = raster::raster(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  resRepl = resTotal
+  resRich = resTotal
+  for(c in 1:(raster::ncell(layers))){
+    if(is.na(sum(layers[c]))){
+      resTotal[c] = NA
+      resRepl[c] = NA
+      resRich[c] = NA
+    } else {
+      betaValue = matrix(ncol = 3)
+      adj = raster::adjacent(layers, c, neighbour)[, 2]
+      for(a in adj)
+        if(!is.na(sum(layers[a])))
+          betaValue = rbind(betaValue, beta(rbind(layers[c], layers[a]), tree, func = func, abund = abund))
+      betaValue = betaValue[-1, ,drop = FALSE]
+      resTotal[c] = mean(unlist(betaValue[, 1]))
+      resRepl[c] = mean(unlist(betaValue[, 2]))
+      resRich[c] = mean(unlist(betaValue[, 3]))
+    }
+  }
+  res = raster::stack(resTotal, resRepl, resRich)
+  names(res) = c("Btotal", "Brepl", "Brich")
+  return(res)
 }
 
 #' Maps of phylogenetic/functional dispersion of species or individuals.
@@ -3218,16 +3413,16 @@ raster.beta <- function(layers, tree, func = "jaccard", neighbour = 8, abund = F
 #' raster.dispersion(spp, tree)
 #' @export
 raster.dispersion <- function(layers, tree, distance, func = "originality", abund = FALSE, relative = FALSE){
-	res = raster::raster(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
-	for(r in 1:nrow(layers)){
-		for(c in 1:ncol(layers)){
-			if(is.na(sum(layers[r,c])))
-				res[r,c] = NA
-			else
-				res[r,c] = dispersion(layers[r,c], tree, distance, func, abund, relative)
-		}
-	}
-	return(res)
+  res = raster::raster(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  for(r in 1:nrow(layers)){
+    for(c in 1:ncol(layers)){
+      if(is.na(sum(layers[r,c])))
+        res[r,c] = NA
+      else
+        res[r,c] = dispersion(layers[r,c], tree, distance, func, abund, relative)
+    }
+  }
+  return(res)
 }
 
 #' Maps of phylogenetic/functional evenness of species or individuals.
@@ -3252,68 +3447,166 @@ raster.dispersion <- function(layers, tree, distance, func = "originality", abun
 #' raster.evenness(spp, tree)
 #' @export
 raster.evenness <- function(layers, tree, distance, method = "expected", func = "camargo", abund = TRUE){
-	res = raster::raster(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
-	for(r in 1:nrow(layers)){
-		for(c in 1:ncol(layers)){
-			if(is.na(sum(layers[r,c])) || sum(ifelse(layers[r,c] > 0, 1, 0)) < 2)
-				res[r,c] = NA
-			else
-				res[r,c] = evenness(layers[r,c], tree, distance, method, func, abund)
-		}
-	}
-	return(res)
+  res = raster::raster(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  for(r in 1:nrow(layers)){
+    for(c in 1:ncol(layers)){
+      if(is.na(sum(layers[r,c])) || sum(ifelse(layers[r,c] > 0, 1, 0)) < 2)
+        res[r,c] = NA
+      else
+        res[r,c] = evenness(layers[r,c], tree, distance, method, func, abund)
+    }
+  }
+  return(res)
 }
 
 #' Species-abundance distribution (SAD).
-#' @description Fits the SAD to community abundance data with possible rarefaction.
+#' @description Fits the SAD to community abundance data, also using trees and with possible rarefaction.
 #' @param comm Either a vector with the abundance per species, or a sites x species matrix.
+#' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
+#' @param octaves a boolean indicating whether octaves should be calculated.
+#' @param scale scale y-axis to sum 1.
 #' @param raref An integer specifying the number of individuals for rarefaction (individual based).
 #' If raref < 1 no rarefaction is made.
 #' If raref = 1 rarefaction is made by the minimum abundance among all sites.
 #' If raref > 1 rarefaction is made by the abundance indicated.
 #' If not specified, default is 0.
 #' @param runs Number of resampling runs for rarefaction. If not specified, default is 100.
-#' @details Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
+#' @details The Species Abundance Distribution describes the commonness and rarity in ecological systems. It was recently expanded to accomodate phylegenetic and functional differences between species (Matthews et al., subm.). Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
 #' @return A vector or matrix with the different values per class per community.
+#' @references Matthews et al. (subm.) Phylogenetic and functional dimensions of the species abundance distribution.
 #' @examples comm1 <- c(20,1,3,100,30)
 #' comm2 <- c(1,2,12,0,45)
 #' comm <- rbind(comm1, comm2)
+#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
 #' sad(comm1)
 #' sad(comm)
+#' sad(comm, octaves = FALSE)
+#' sad(comm, tree, scale = TRUE)
 #' sad(comm, raref = 1)
 #' @export
-sad <- function(comm, raref = 0, runs = 100){
+sad <- function(comm, tree, octaves = TRUE, scale = FALSE, raref = 0, runs = 100){
   if(is.vector(comm))
     comm <- matrix(comm, nrow = 1)
-  if(raref == 1)
-    raref = min(rowSums(comm))
   
-  nClasses = as.integer(max(log(comm, 2))) + 1
-  res = matrix(0, nrow = nrow(comm), ncol = nClasses)
-  
-  for(i in 1:nrow(comm)){
-    #if rarefying data
-    if(raref > 0){
-      r = matrix(NA, nrow = runs, ncol = nClasses)
-      for(j in 1:runs){
-        samp = rrarefy(comm[i,], sample = raref)
-        samp = samp[samp > 0]
-        newSad = sad(samp)
-        r[j,1:length(newSad)] = newSad
-      }
-      res[i,] = apply(r, 2, median, na.rm = TRUE)
-      res[i, is.na(res[i,])] = 0
+  #SAD with no trees
+  if(missing(tree)){
+    contr = comm
+    contr = ifelse(contr > 0, 1, 0)
+    #SAD using trees
+  } else {
+    if(is(tree, "phylo")){
+      if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+        comm <- comm[,match(tree$tip.label, colnames(comm))]
     } else {
-      r = c()
-      thisComm = comm[i,]
-      thisComm = thisComm[thisComm > 0]
-      thisComm = as.integer(log(thisComm, 2)) + 1
-      for(j in 1:max(thisComm))
-        r[j] = sum(thisComm == j)
-      res[i,1:length(r)] = r
+      if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+        comm <- comm[,match(tree$labels, colnames(comm))]
     }
+    contr = contribution(comm, tree, abund = FALSE, relative = FALSE)
+    contr[is.na(contr)] = 0
   }
-  return(res)
+  
+  return(sad.core(comm, contr, octaves, scale, raref, runs))
+}
+
+#' Species-abundance distribution (SAD) using convex hulls.
+#' @description Fits the SAD to community abundance data using convex hulls.
+#' @param comm A 'convhulln' object or list, preferably built with function hull.build.
+#' @param octaves a boolean indicating whether octaves should be calculated.
+#' @param scale scale y-axis to sum 1.
+#' @param raref An integer specifying the number of individuals for rarefaction (individual based).
+#' If raref < 1 no rarefaction is made.
+#' If raref = 1 rarefaction is made by the minimum abundance among all sites.
+#' If raref > 1 rarefaction is made by the abundance indicated.
+#' If not specified, default is 0.
+#' @param runs Number of resampling runs for rarefaction. If not specified, default is 100.
+#' @details The Species Abundance Distribution describes the commonness and rarity in ecological systems. It was recently expanded to accomodate phylegenetic and functional differences between species (Matthews et al., subm.). Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
+#' @return A vector or matrix with the different values per class per community.
+#' @references Matthews et al. (subm.) Phylogenetic and functional dimensions of the species abundance distribution.
+#' @examples comm = rbind(c(1,3,0,5,3), c(3,2,5,1,0))
+#' colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+#' rownames(comm) = c("Site 1", "Site 2")
+#' 
+#' trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
+#' rownames(trait) = colnames(comm)
+#' 
+#' hv = hull.build(comm, trait)
+#' hull.sad(hv, scale = TRUE)
+#' hull.sad(hv, octaves = FALSE)
+#' hull.sad(hv, raref = TRUE)
+#' @export
+hull.sad <- function(comm, octaves = TRUE, scale = FALSE, raref = 0, runs = 100){
+  
+  #check if right data is provided
+  if (!(class(comm) %in% c("list", "convhulln")))
+    stop("A convhulln or list is needed as input data.")
+  
+  #if single comm
+  if(is(comm, "convhulln"))
+    comm = list(comm)
+  
+  #get contribution of each species from the convex hulls
+  contr = hull.contribution(comm)
+  contr[is.na(contr)] = 0
+  
+  #get abundance of each species from the convex hulls
+  ab = c()
+  for(i in 1:length(comm)){
+    ab = rbind(ab, comm[[i]]$comm)
+  }
+  comm = ab
+  
+  return(sad.core(comm, contr, octaves, scale, raref, runs))
+}
+
+#' Species-abundance distribution (SAD) using kernel density hypervolumes.
+#' @description Fits the SAD to community abundance data based on n-dimensional hypervolumes.
+#' @param comm A 'Hypervolume' or 'HypervolumeList' object necessarily built using function kernel.build.
+#' @param octaves a boolean indicating whether octaves should be calculated.
+#' @param scale scale y-axis to sum 1.
+#' @param raref An integer specifying the number of individuals for rarefaction (individual based).
+#' If raref < 1 no rarefaction is made.
+#' If raref = 1 rarefaction is made by the minimum abundance among all sites.
+#' If raref > 1 rarefaction is made by the abundance indicated.
+#' If not specified, default is 0.
+#' @param runs Number of resampling runs for rarefaction. If not specified, default is 100.
+#' @details The Species Abundance Distribution describes the commonness and rarity in ecological systems. It was recently expanded to accomodate phylegenetic and functional differences between species (Matthews et al., subm.). Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
+#' @return A vector or matrix with the different values per class per community.
+#' @references Matthews et al. (subm.) Phylogenetic and functional dimensions of the species abundance distribution.
+#' @examples \dontrun{
+#' comm = rbind(c(1,3,0,5,3), c(3,2,5,1,0))
+#' colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+#' rownames(comm) = c("Site 1", "Site 2")
+#' 
+#' trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
+#' rownames(trait) = colnames(comm)
+#' 
+#' hv = kernel.build(comm, trait)
+#' kernel.sad(hv, scale = TRUE)
+#' kernel.sad(hv, octaves = FALSE)
+#' kernel.sad(hv, raref = TRUE)
+#' }
+#' @export
+kernel.sad <- function(comm, octaves = TRUE, scale = FALSE, raref = 0, runs = 100){
+  
+  #check if right data is provided
+  if (!(class(comm) %in% c("Hypervolume", "HypervolumeList")))
+    stop("A Hypervolume or HypervolumeList is needed as input data.")
+  
+  #if single comm
+  if(is(comm, "Hypervolume")){
+    abund = attributes(comm)$comm
+    comm = hypervolume_join(comm)
+    attributes(comm)$comm = abund
+  }
+  
+  #get contribution of each species from the kernel hypervolumes
+  contr = kernel.contribution(comm)
+  contr[is.na(contr)] = 0
+  
+  #get abundance of each species from the kernel hypervolumes
+  comm = attributes(comm)$comm
+  
+  return(sad.core(comm, contr, octaves, scale, raref, runs))
 }
 
 #' Species-area relationship (SAR).
@@ -3344,46 +3637,46 @@ sar <- function(comm, tree, area){
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
   
-	if(is.vector(comm)){
-		div = comm
-	} else if (missing(tree)){
-		div = alpha(comm)
-	} else {
-		div = alpha(comm, tree)
-	}
+  if(is.vector(comm)){
+    div = comm
+  } else if (missing(tree)){
+    div = alpha(comm)
+  } else {
+    div = alpha(comm, tree)
+  }
   div = as.vector(div)
-	if (!missing(tree)){
-	  comm = reorderComm(comm, tree)
-	  tree <- xTree(tree)
-	}
-	results <- matrix(NA, 6, 7)
-	colnames(results) <- c("c", "z", "r2", "AIC", "\U0394 AIC", "AICc", "\U0394 AICc")
-	rownames(results) <- c("Linear", "Linear (origin)", "Exponential", "Exponential (origin)", "Power", "Power (origin)")
-	k <- c(3,2,3,2,3,2)
-	model <- list()
-	model[[1]] <- try(nls(div ~ c + z*area, start = data.frame(c = 0, z = 1)))
-	model[[2]] <- try(nls(div ~ z*area, start = data.frame(z = 1)))
-	model[[3]] <- try(nls(div ~ c + z*log(area), start = data.frame(c = 0, z = 1)))
-	model[[4]] <- try(nls(div ~ z*log(area), start = data.frame(z = 1)))
-	model[[5]] <- try(nls(div ~ c + area^z, start = data.frame(c = 0, z = 1)))
-	model[[6]] <- try(nls(div ~ area^z, start = data.frame(z = 1)))
-	for(m in 1:length(model)){
-		if(k[m] == 3){
-			results[m,1] <- coef(summary(model[[m]]))[1,1]
-			results[m,2] <- coef(summary(model[[m]]))[2,1]
-		} else {
-			results[m,2] <- coef(summary(model[[m]]))[1,1]
-		}
-		est <- predict(model[[m]], area=area)
-		results[m,3] <- r2(div, est)
-		results[m,4] <- aic(div, est, k[m])
-		results[m,6] <- aic(div, est, k[m], correct = TRUE)
-	}
-	for(m in 1:length(model)){
-		results[m,5] <- results[m,4] - min(results[,4])
-		results[m,7] <- results[m,6] - min(results[,6])
-	}
-	return(results)
+  if (!missing(tree)){
+    comm = reorderComm(comm, tree)
+    tree <- xTree(tree)
+  }
+  results <- matrix(NA, 6, 7)
+  colnames(results) <- c("c", "z", "r2", "AIC", "\U0394 AIC", "AICc", "\U0394 AICc")
+  rownames(results) <- c("Linear", "Linear (origin)", "Exponential", "Exponential (origin)", "Power", "Power (origin)")
+  k <- c(3,2,3,2,3,2)
+  model <- list()
+  model[[1]] <- try(nls(div ~ c + z*area, start = data.frame(c = 0, z = 1)))
+  model[[2]] <- try(nls(div ~ z*area, start = data.frame(z = 1)))
+  model[[3]] <- try(nls(div ~ c + z*log(area), start = data.frame(c = 0, z = 1)))
+  model[[4]] <- try(nls(div ~ z*log(area), start = data.frame(z = 1)))
+  model[[5]] <- try(nls(div ~ c + area^z, start = data.frame(c = 0, z = 1)))
+  model[[6]] <- try(nls(div ~ area^z, start = data.frame(z = 1)))
+  for(m in 1:length(model)){
+    if(k[m] == 3){
+      results[m,1] <- coef(summary(model[[m]]))[1,1]
+      results[m,2] <- coef(summary(model[[m]]))[2,1]
+    } else {
+      results[m,2] <- coef(summary(model[[m]]))[1,1]
+    }
+    est <- predict(model[[m]], area=area)
+    results[m,3] <- r2(div, est)
+    results[m,4] <- aic(div, est, k[m])
+    results[m,6] <- aic(div, est, k[m], correct = TRUE)
+  }
+  for(m in 1:length(model)){
+    results[m,5] <- results[m,4] - min(results[,4])
+    results[m,7] <- results[m,6] - min(results[,6])
+  }
+  return(results)
 }
 
 #' General dynamic model of oceanic island biogeography (GDM).
@@ -3416,45 +3709,45 @@ gdm <- function(comm, tree, area, time){
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
   
-	if(missing(time))
-		return(sar(comm,tree,area))
-	if(is.vector(comm)){
-		div = comm
-	} else if (missing(tree)){
-		div = alpha(comm)
-	} else {
-		div = alpha(comm, tree)
-	}
+  if(missing(time))
+    return(sar(comm,tree,area))
+  if(is.vector(comm)){
+    div = comm
+  } else if (missing(tree)){
+    div = alpha(comm)
+  } else {
+    div = alpha(comm, tree)
+  }
   div = as.vector(div)
-	if (!missing(tree)){
-	  comm = reorderComm(comm, tree)
-	  tree <- xTree(tree)
-	}
-
-	results <- matrix(NA, 4, 9)
-	colnames(results) <- c("c", "z", "x", "y", "r2", "AIC", "\U0394 AIC", "AICc", "\U0394 AICc")
-	rownames(results) <- c("Linear", "Exponential", "Power (area)", "Power (area, time)")
-	k <- 5
-	model <- list()
-	model[[1]] <- try(nls(div ~ c + z*area + x*time + y*time^2, start = data.frame(c=1, z=1, x=1, y=0)))
-	model[[2]] <- try(nls(div ~ c + z*log(area) + x*time + y*time^2, start = data.frame(c=1, z=1, x=1, y=0)))
-	model[[3]] <- try(nls(div ~ exp(c + z*log(area) + x*time + y*time^2), start = data.frame(c=1, z=1, x=1, y=0)))
-	model[[4]] <- try(nls(div ~ exp(c + z*log(area) + x*log(time) + y*log(time)^2), start = data.frame(c=1, z=1, x=1, y=0)))
-	for(m in 1:length(model)){
-		results[m,1] <- coef(summary(model[[m]]))[1,1]
-		results[m,2] <- coef(summary(model[[m]]))[2,1]
-		results[m,3] <- coef(summary(model[[m]]))[3,1]
-		results[m,4] <- coef(summary(model[[m]]))[4,1]
-		est <- predict(model[[m]], area=area, time=time)
-		results[m,5] <- r2(div, est)
-		results[m,6] <- aic(div, est, k)
-		results[m,8] <- aic(div, est, k, correct = TRUE)
-	}
-	for(m in 1:length(model)){
-		results[m,7] <- results[m,6] - min(results[,6])
-		results[m,9] <- results[m,8] - min(results[,8])
-	}
-	return(results)
+  if (!missing(tree)){
+    comm = reorderComm(comm, tree)
+    tree <- xTree(tree)
+  }
+  
+  results <- matrix(NA, 4, 9)
+  colnames(results) <- c("c", "z", "x", "y", "r2", "AIC", "\U0394 AIC", "AICc", "\U0394 AICc")
+  rownames(results) <- c("Linear", "Exponential", "Power (area)", "Power (area, time)")
+  k <- 5
+  model <- list()
+  model[[1]] <- try(nls(div ~ c + z*area + x*time + y*time^2, start = data.frame(c=1, z=1, x=1, y=0)))
+  model[[2]] <- try(nls(div ~ c + z*log(area) + x*time + y*time^2, start = data.frame(c=1, z=1, x=1, y=0)))
+  model[[3]] <- try(nls(div ~ exp(c + z*log(area) + x*time + y*time^2), start = data.frame(c=1, z=1, x=1, y=0)))
+  model[[4]] <- try(nls(div ~ exp(c + z*log(area) + x*log(time) + y*log(time)^2), start = data.frame(c=1, z=1, x=1, y=0)))
+  for(m in 1:length(model)){
+    results[m,1] <- coef(summary(model[[m]]))[1,1]
+    results[m,2] <- coef(summary(model[[m]]))[2,1]
+    results[m,3] <- coef(summary(model[[m]]))[3,1]
+    results[m,4] <- coef(summary(model[[m]]))[4,1]
+    est <- predict(model[[m]], area=area, time=time)
+    results[m,5] <- r2(div, est)
+    results[m,6] <- aic(div, est, k)
+    results[m,8] <- aic(div, est, k, correct = TRUE)
+  }
+  for(m in 1:length(model)){
+    results[m,7] <- results[m,6] - min(results[,6])
+    results[m,9] <- results[m,8] - min(results[,8])
+  }
+  return(results)
 }
 
 #' Interspecific abundance-occupancy relationship (IAOR).
@@ -3478,7 +3771,7 @@ iaor <- function(comm){
   k <- c(3,3,2,2)
   abund <- colMeans(comm)                   #mean abundance per species (including sites with 0 individuals)
   occup <- colMeans(ifelse(comm>0,1,0))     #proportion occupancy per species
-
+  
   model <- list()
   model[[1]] <- try(nls(logit(occup) ~ a+b*log(abund), start = data.frame(a = 1, b = 1))) #linear
   model[[2]] <- try(nls(occup ~ 1-exp(a*abund^b), start = data.frame(a = -1, b = 1))) #exponential
@@ -3518,25 +3811,25 @@ iaor <- function(comm){
 #' plot(linnean(taxa, c(2, 0.5, 0.3)))
 #' @export
 linnean <- function(taxa, distance = NULL){
-	if(is.null(distance))
-		distance = seq(from = 1, to = 1/ncol(taxa), by = -1*1/ncol(taxa))
-	nspp = nrow(taxa)
-	distTable = matrix(NA, nrow = nspp, ncol = nspp)
-	colnames(distTable) = rownames(distTable) = taxa[,ncol(taxa)]
-	for(i in 1:nspp){
-		for(j in 1:nspp){
-			level = 0
-			for(k in 1:ncol(taxa))
-				if(taxa[i,k] != taxa[j,k])
-					level = level + 1
-			if(level == 0)
-				distTable[i,j] = 0
-			else
-				distTable[i,j] = distance[length(distance) - level + 1]
-		}
-	}
-	tree = hclust(as.dist(distTable))
-	return(tree)
+  if(is.null(distance))
+    distance = seq(from = 1, to = 1/ncol(taxa), by = -1*1/ncol(taxa))
+  nspp = nrow(taxa)
+  distTable = matrix(NA, nrow = nspp, ncol = nspp)
+  colnames(distTable) = rownames(distTable) = taxa[,ncol(taxa)]
+  for(i in 1:nspp){
+    for(j in 1:nspp){
+      level = 0
+      for(k in 1:ncol(taxa))
+        if(taxa[i,k] != taxa[j,k])
+          level = level + 1
+      if(level == 0)
+        distTable[i,j] = 0
+      else
+        distTable[i,j] = distance[length(distance) - level + 1]
+    }
+  }
+  tree = hclust(as.dist(distTable))
+  return(tree)
 }
 
 #' Dummify variables.
@@ -3677,7 +3970,7 @@ fill <- function(trait, method = "regression", group = NULL, weight = NULL, step
     is.na(levels(x)) <- levels(x) == "NA"
     x
   })
-
+  
   #Check if there are rows with only missing data
   trait <- trait[rowSums(is.na(trait)) != ncol(trait),]  
   if(nrow(trait) != n_sp)
@@ -3800,9 +4093,9 @@ fill <- function(trait, method = "regression", group = NULL, weight = NULL, step
           #model formula 
           formula.lm <- as.formula(paste(colnames(trait)[i], " ~ ", paste(column_names, collapse=" + "), sep=""))
           #preparing the weight
-          if (is(weight, "dist"))
+          if(is(weight, "dist"))
             weight <- (1 / as.matrix(weight)[j,])
-          else if (is(weight, "phylo") || is(weight, "hclust"))
+          else if(is(weight, "phylo") || is(weight, "hclust"))
             weight <- (1 / as.matrix(cophenetic(weight))[j,])
           else
             weight <- (1 - as.matrix(gower(trait))[j,])
@@ -3884,7 +4177,7 @@ fill <- function(trait, method = "regression", group = NULL, weight = NULL, step
 #' standard(trait, method = "rank")
 #' @export
 standard <- function(trait, method = "standard", convert = NULL){
-
+  
   if(is.vector(trait))
     trait = matrix(trait, ncol = 1)
   if(is.null(convert))
@@ -3895,12 +4188,12 @@ standard <- function(trait, method = "standard", convert = NULL){
     #if standardization with mean 0 and sd 1 
     if(method == "standard"){
       trait[,i] = (trait[,i] - mean(trait[,i], na.rm = TRUE)) / sd(trait[,i], na.rm = TRUE)
-    
-    #if standardization with range 0-1  
+      
+      #if standardization with range 0-1  
     } else if(method == "range"){
       trait[,i] = (trait[,i] - min(trait[,i], na.rm = TRUE)) / (max(trait[,i], na.rm = TRUE) - min(trait[,i], na.rm = TRUE))
-    
-    #if standardization with ranking of values
+      
+      #if standardization with ranking of values
     } else if(method == "rank"){
       trait[,i] = rank(trait[,i], ties.method = "average", na.last = "keep")
       trait[,i] = standard(trait[,i], method = "range")
@@ -3939,7 +4232,7 @@ gower <- function(trait, convert = NULL, weight = NULL){
   trait = dummy(trait, convert, weight = weight)
   weight = trait$weight
   trait = standard(trait$trait, method = "range")
-
+  
   #calculate gower
   nSp = nrow(trait)
   res = matrix(0, nrow = nSp, ncol = nSp)
@@ -4042,9 +4335,10 @@ aic <- function(obs, est = NULL, param = 0, correct = FALSE){
 #' @description Calculates the standard effect size from observed and estimated values.
 #' @param obs A single observed value.
 #' @param est A vector with estimated values.
-#' @param param Value is calculated with parametric or non-parametric method. The later is preferable when distribution of estimated values is not normally distributed.
-#' @param p Boolean indicating whether the p-value should be calculated based on the rank of 'obs' in 'est'. As the test is two-sided, usual significance is indicated by p < 0.025 or p > 0.975.
+#' @param param Value is calculated with parametric or non-parametric method. Because standardized effect sizes may lead to biased conclusions if null values show an asymmetric distribution or deviate from normality, non-parametric effect sizes use probit transformed p-values (Lhotsky et al., 2016).
+#' @param p Boolean indicating whether the p-value should be calculated based on the rank of 'obs' in 'est'.
 #' @return The ses value or a vector with ses and p-value.
+#' @references Lhotsky et al. (2016) Changes in assembly rules along a stress gradient from open dry grasslands to wetlands. Journal of Ecology, 104: 507-517.
 #' @examples est = rnorm(1000, 500, 100)
 #' 
 #' ses(100, est)
@@ -4065,6 +4359,10 @@ ses <- function(obs, est, param = TRUE, p = TRUE){
   }
   
   if(p){
+    #convert from one-tailed to two-tailed test
+    pval = pval * 2
+    if(pval > 1)
+      pval = 1 - (pval - 1)
     res = c(res, pval)
     names(res) = c("ses", "p-value")
   }
@@ -4075,22 +4373,82 @@ ses <- function(obs, est, param = TRUE, p = TRUE){
 #' Build functional tree.
 #' @description Builds a functional tree from trait data.
 #' @param trait A species x traits matrix or data.frame.
+#' @param distance One of "gower" or "euclidean".
+#' @param func One of "upgma", "mst", "nj", "bionj" or "best".
+#' @param fs Only used for func = "nj" OR "bionj". Argument s of the agglomerative criterion: it is coerced as an integer and must at least equal to one. 
 #' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables.
 #' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait.
-#' @details The tree will be built using UPGMA over gower distances (Pavoine et al. 2009) after traits are dummyfied (if needed) and standardized (always).
-#' Gower distance allows continuous, ordinal, categorical or binary variables, with possible weighting.
-#' NAs are allowed as long as each pair of species has at least one trait value in common.
+#' @details The tree will be built using one of four algorithms after traits are dummyfied (if needed) and standardized (always):
+#' If func = "upgma" uses average linkage clustering (UPGMA, Cardoso et al. 2014).
+#' If func = "mst" uses minimum spanning trees, equivalent to single linkage clustering (Gower & Ross 1969).
+#' If func = "nj" uses the original neighbor-joining algorithm of Saitou & Nei (1987).
+#' If func = "bionj" uses the modified neighbor-joining algorithm of Gascuel (1997).
+#' Any of the neighbor-joining options is usually preferred as they keep distances between species better than UPGMA or MST (Cardoso et al. subm.).
+#' If func = "best", chooses the best of the options above based on maximum tree.quality values.
+#' Gower distance (Pavoine et al. 2009) allows continuous, ordinal, categorical or binary variables, with possible weighting.
+#' NAs are allowed as long as each pair of species has at least one trait value in common. For fs > 0 even if this condition is not met the Q* criterion by Criscuolo & Gascuel (2008) is used to fill missing data.
 #' If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters as values.
-#' @return An hclust object representing a functional tree.
+#' @return A phylo object representing a functional tree.
+#' @references Cardoso et al. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41: 749-761.
+#' @references Cardoso et al. (subm.) Using neighbor-joining trees for functional diversity analyses.
+#' @references Criscuolo & Gascuel (2008) Fast NJ-like algorithms to deal with incomplete distance matrices. BMC Bioinformatics, 9: 166.
+#' @references Gascuel (1997) BIONJ: an improved version of the NJ algorithm based on a simple model of sequence data. Molecular Biology and Evolution, 14: 685–695.
+#' @references Gower & Ross (1969) Minimum spanning trees and single linkage cluster analysis. Journal of the Royal Statistical Society, 18: 54-64.
 #' @references Pavoine et al. (2009) On the challenge of treating various types of variables: application for improving the measurement of functional diversity. Oikos, 118: 391-402.
+#' @references Saitou & Nei (1987) The neighbor-joining method: a new method for reconstructing phylogenetic trees. Molecular Biology and Evolution, 4, 406–425.
 #' @examples trait = data.frame(body = c(NA,2,3,4,4), beak = c(1,1,1,1,2))
 #' plot(tree.build(trait))
-#' plot(tree.build(trait, weight = c(0, 1)))
+#' plot(tree.build(trait, func = "bionj", fs = 1, weight = c(1, 0)), "u")
+#' plot(tree.build(trait, func = "best"))
 #' @export
-tree.build <- function(trait, convert = NULL, weight = NULL){
-  trait = gower(trait, convert, weight)
-  res = hclust(trait, method = "average")
-  return(res)
+tree.build <- function(trait, distance = "gower", func = "nj", fs = 0, convert = NULL, weight = NULL){
+  
+  #get distance matrix
+  if (distance == "gower"){
+    distmatrix = gower(trait, convert, weight)
+  } else if (distance == "euclidean"){
+    distmatrix = dist(trait, method = "euclidean")
+  } else {
+    stop("Distance should be one of gower or euclidean")
+  }
+  
+  #build tree
+  if(func == "upgma"){
+    tree = hclust(distmatrix, method = "average")
+  } else if(func == "mst"){
+    tree = hclust(distmatrix, method = "single")
+  } else if(func == "nj"){
+    if(fs < 1){
+      tree = nj(distmatrix)
+    } else {
+      tree = njs(distmatrix, fs)
+    }
+  } else if(func == "bionj"){
+    if(fs < 1){
+      tree = bionj(distmatrix)
+    } else {
+      tree = bionjs(distmatrix, fs)
+    }
+  } else if(func == "best"){
+    #build trees
+    trees = list()
+    methods = c("upgma", "mst", "nj", "bionj")
+    qual = c()
+    for(i in 1:4){
+      trees[[i]] = tree.build(trait, distance, func = methods[i], fs, convert, weight)
+      qual[i] = tree.quality(distmatrix, trees[[i]])
+    }
+    best_tree = which.max(qual)
+    cat("The best tree is given by", methods[best_tree],"with a quality of", qual[best_tree])
+    tree = trees[[best_tree]]
+  } else {
+    stop("func not recognized!")
+  }
+  
+  if(is(tree, "phylo") && !is.rooted(tree))
+    tree <- root(tree, which.min(originality(rep(1, length(tree$tip.label)), tree = tree)))
+  
+  return(tree)
 }
 
 #' Convert negative branches of tree.
@@ -4099,8 +4457,8 @@ tree.build <- function(trait, convert = NULL, weight = NULL){
 #' @details Converts branches with negative values to zero while shortening only the two branches immediately below it by the same absolute amount to ensure the tree remains with tips at same distances and there are no polytomies.
 #' @return A phylo object.
 #' @examples par(mfrow = c(1,2))
-#' tree <- ape::read.tree(text = 
-#' '(((A:3, B:3):1, (G:6, (H:5, I:5):1):-2):3, ((C:1, D:1):2, (E:4, F:4):-1):4);')
+#' tree <- ape::read.tree(text='(((A:3, B:3):1,
+#' (G:6, (H:5, I:5):1):-2):3, ((C:1, D:1):2, (E:4, F:4):-1):4);')
 #' plot(tree)
 #' 
 #' tree = tree.zero(tree)
@@ -4136,9 +4494,10 @@ tree.zero <- function (tree){
 
 #' Quality of tree.
 #' @description Assess the quality of a functional tree.
-#' @param distance A dist matrix representing the initial distances between species.
+#' @param distance A dist object representing the initial distances between species.
 #' @param tree A phylo or hclust object.
-#' @details The algorithm calculates the inverse of mean squared deviation between initial and cophenetic distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation. A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for a star tree.
+#' @details The algorithm calculates the inverse of mean squared deviation between initial and cophenetic distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation.
+#' A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for a star tree, where all pairwise distances are 1.
 #' @return A single value of quality.
 #' @references Maire et al. (2015) How many dimensions are needed to accurately assess functional diversity? A pragmatic approach for assessing the quality of functional spaces. Global Ecology and Biogeography, 24: 728:740.
 #' @examples trait = data.frame(body = c(1,2,3,4,4), beak = c(1,1,1,1,2))
@@ -4146,6 +4505,17 @@ tree.zero <- function (tree){
 #' 
 #' tree = tree.build(trait)
 #' tree.quality(distance, tree)
+#' 
+#' tree = tree.build(trait, func = "bionj")
+#' tree.quality(distance, tree)
+#' 
+#' tree = tree.build(trait, func = "upgma")
+#' tree.quality(distance, tree)
+#' 
+#' tree = tree.build(trait, func = "mst")
+#' tree.quality(distance, tree)
+#' 
+#' tree = tree.build(trait, func = "best")
 #' 
 #' distance1 = distance
 #' distance1[] = 1
@@ -4199,7 +4569,7 @@ hyper.build <- function(trait, distance = "gower", weight = NULL, axes = 1, conv
       stop("Distance should be one of gower or euclidean")
     }
     trait = ape::pcoa(trait)
-
+    
     if(axes <= 1){
       selAxes = cumVar = 0
       while(cumVar < axes){
@@ -4276,7 +4646,7 @@ hull.build <- function(comm, trait, distance = "gower", weight = NULL, axes = 0,
   trait = hyper.build(trait, distance, weight, axes, convert)
   if(is.vector(comm))
     comm = matrix(comm, nrow = 1)
-
+  
   #check if there are communities with less species than traits + 1 and remove them
   fewSpp = as.vector(which(rowSums(ifelse(comm > 0, 1, 0)) <= ncol(trait)))
   if(length(fewSpp) > 0){
@@ -4292,7 +4662,7 @@ hull.build <- function(comm, trait, distance = "gower", weight = NULL, axes = 0,
     colnames(comm) = rownames(trait)
   if(is.null(rownames(comm)))
     rownames(comm) = paste("Comm", 1:nrow(comm), sep = "")
-
+  
   #build the convex hulls for each community
   hull_list <- list()
   for (s in 1:nrow(comm)) {
@@ -4302,7 +4672,7 @@ hull.build <- function(comm, trait, distance = "gower", weight = NULL, axes = 0,
     hull_list[[s]]$comm = comm[s,]
   }
   names(hull_list) = rownames(comm)
-
+  
   #return
   if(length(hull_list) > 1){
     return(hull_list)
@@ -4316,8 +4686,8 @@ hull.build <- function(comm, trait, distance = "gower", weight = NULL, axes = 0,
 #' @param comm A sites x species matrix, data.frame or vector, with incidence or abundance data about the species in the community.
 #' @param trait A species x traits matrix or data.frame.
 #' @param distance One of "gower" or "euclidean".
-#' @param method Method for constructing the 'Hypervolume' object. One of "gaussian" (Gaussian kernel density estimation, default), "box" (box kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details.
-#' @param abund A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method = "gaussian".
+#' @param method.hv Method for constructing the 'Hypervolume' object. One of "gaussian" (Gaussian kernel density estimation, default), "box" (box kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details.
+#' @param abund A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method.hv = "gaussian".
 #' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.
 #' @param axes If 0, no transformation of data is done.
 #' If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
@@ -4341,16 +4711,16 @@ hull.build <- function(comm, trait, distance = "gower", weight = NULL, axes = 0,
 #' plot(hv)
 #' hvlist = kernel.build(comm, trait, abund = FALSE, cores = 2)
 #' plot(hvlist)
-#' hvlist = kernel.build(comm, trait, method = "box", weight = c(1,2), axes = 2)
+#' hvlist = kernel.build(comm, trait, method.hv = "box", weight = c(1,2), axes = 2)
 #' plot(hvlist)
 #' }
 #' @export
-kernel.build <- function(comm, trait, distance = "gower", method = "gaussian", abund = TRUE, weight = NULL, axes = 0, convert = NULL, cores = 1, ... ){
-
+kernel.build <- function(comm, trait, distance = "gower", method.hv = "gaussian", abund = TRUE, weight = NULL, axes = 0, convert = NULL, cores = 1, ... ){
+  
   trait = hyper.build(trait, distance, weight, axes, convert)
   if(is.vector(comm))
     comm = matrix(comm, nrow = 1)
-
+  
   #check if there are communities with no species
   fewSpp = as.vector(which(rowSums(comm) == 0))
   if(length(fewSpp) > 0){
@@ -4363,18 +4733,18 @@ kernel.build <- function(comm, trait, distance = "gower", method = "gaussian", a
   }
   
   #general function for lapply (serial), mcapply (Mac/Linux) or parLapply (Win)
-  parbuild <- function(i, commList, trait, method, abund, ... ){
+  parbuild <- function(i, commList, trait, method.hv, abund, ... ){
     subComm = commList[[i]]
     subTrait <- trait[subComm > 0, ] ##Select traits
     subComm <- subComm[subComm > 0]
     
     cat("Building hypervolume", i, "of", length(commList), "\n")
-     
-    if (method == "box"){
+    
+    if (method.hv == "box"){
       newHv <- hypervolume_box(subTrait, verbose = FALSE, ... )
-    } else if (method == "svm"){
+    } else if (method.hv == "svm"){
       newHv <- hypervolume_svm(subTrait, verbose = FALSE, ... )
-    } else if (method == "gaussian"){
+    } else if (method.hv == "gaussian"){
       if(abund){
         weight = subComm / sum(subComm)
         newHv <- hypervolume_gaussian(subTrait, weight = weight, verbose = FALSE, ... )
@@ -4382,7 +4752,7 @@ kernel.build <- function(comm, trait, distance = "gower", method = "gaussian", a
         newHv <- hypervolume_gaussian(subTrait, verbose = FALSE, ... )
       }
     } else {
-      stop(sprintf("Method %s not recognized.", method))
+      stop(sprintf("method.hv %s not recognized.", method.hv))
     }
     return(newHv)
   }
@@ -4397,17 +4767,17 @@ kernel.build <- function(comm, trait, distance = "gower", method = "gaussian", a
   #make list to go for parallel if required
   commList = as.list(as.data.frame(t(comm)))
   if(cores == 1 || Sys.info()[['sysname']] == 'Windows'){
-    hv = lapply(seq(commList), parbuild, commList = commList, trait = trait, method = method, abund = abund, ... )
-  #} else if (Sys.info()[['sysname']] == 'Windows'){
-  #  cl = makeCluster(cores)
-  #  func = paste("hypervolume", method, sep = "_")
-  #  clusterExport(cl, varlist = c("trait", "method", "abund", func))
-  #  hv = parLapply(cl, seq(commList), parbuild, commList = commList, trait = trait, method = method, abund = abund, ... )
-  #  stopCluster(cl)
+    hv = lapply(seq(commList), parbuild, commList = commList, trait = trait, method.hv = method.hv, abund = abund, ... )
+    #} else if (Sys.info()[['sysname']] == 'Windows'){
+    #  cl = makeCluster(cores)
+    #  func = paste("hypervolume", method, sep = "_")
+    #  clusterExport(cl, varlist = c("trait", "method", "abund", func))
+    #  hv = parLapply(cl, seq(commList), parbuild, commList = commList, trait = trait, method = method, abund = abund, ... )
+    #  stopCluster(cl)
   } else {
-    hv = mclapply(seq(commList), parbuild, commList = commList, trait = trait, method = method, abund = abund, mc.cores = cores, ... )
+    hv = mclapply(seq(commList), parbuild, commList = commList, trait = trait, method.hv = method.hv, abund = abund, mc.cores = cores, ... )
   }
-
+  
   #name hypervolumes and convert list to HypervolumeList
   if(length(hv) > 1){
     for(i in 1:length(hv)){
@@ -4417,10 +4787,10 @@ kernel.build <- function(comm, trait, distance = "gower", method = "gaussian", a
   } else {
     hv = hv[[1]]
   }
-
+  
   #add abundance data to hypervolumes (required for sad)
   attributes(hv)$comm = comm
-
+  
   return(hv)
   
 }
@@ -4442,45 +4812,45 @@ kernel.build <- function(comm, trait, distance = "gower", method = "gaussian", a
 #' hist(log(comm3$Freq))
 #' @export
 sim.sad <- function(n, s, sad = "lognormal", sd = 1) {
-	if (s > n)
-		stop("Number of species can't be larger than number of individuals")
-	sppnames = paste("Sp", 1:s, sep="") ##species names
-	sad <- match.arg(sad, c("lognormal", "uniform", "broken", "geometric"))
-
-	##lognormal distribution
-	switch(sad, lognormal = {
-		comm = sample(sppnames, size = n, replace = T, prob = c(rlnorm(s, sdlog = sd)))
-
-		##uniform distribution
-	}, uniform = {
-		comm = sample(sppnames, size = n, replace = T)
-
-		##broken stick distribution
-	}, broken = {
-		broken.stick <- function(p){
-			result = NULL
-			for(j in 1:p) {
-				E = 0
-				for(x in j:p)
-					E = E+(1/x)
-				result[j] = E/p
-			}
-			return(result)
-		}
-		broken.prob = broken.stick(s)
-		comm = sample(sppnames, size = n, replace = TRUE, prob = c(broken.prob))
-	}, geometric = {
-		geo.ser <- function(s, k = 0.3){
-			result = NULL
-			for (x in 1:s) {
-				result[x] = k*(1-k)^(x-1)/(1-(1-k)^s)
-			}
-			return(result)
-		}
-		geo.prob = geo.ser(s)
-		comm = sample(sppnames, size = n, replace = TRUE, prob = c(geo.prob))
-	})
-	return(as.data.frame(table(comm)))
+  if (s > n)
+    stop("Number of species can't be larger than number of individuals")
+  sppnames = paste("Sp", 1:s, sep="") ##species names
+  sad <- match.arg(sad, c("lognormal", "uniform", "broken", "geometric"))
+  
+  ##lognormal distribution
+  switch(sad, lognormal = {
+    comm = sample(sppnames, size = n, replace = T, prob = c(rlnorm(s, sdlog = sd)))
+    
+    ##uniform distribution
+  }, uniform = {
+    comm = sample(sppnames, size = n, replace = T)
+    
+    ##broken stick distribution
+  }, broken = {
+    broken.stick <- function(p){
+      result = NULL
+      for(j in 1:p) {
+        E = 0
+        for(x in j:p)
+          E = E+(1/x)
+        result[j] = E/p
+      }
+      return(result)
+    }
+    broken.prob = broken.stick(s)
+    comm = sample(sppnames, size = n, replace = TRUE, prob = c(broken.prob))
+  }, geometric = {
+    geo.ser <- function(s, k = 0.3){
+      result = NULL
+      for (x in 1:s) {
+        result[x] = k*(1-k)^(x-1)/(1-(1-k)^s)
+      }
+      return(result)
+    }
+    geo.prob = geo.ser(s)
+    comm = sample(sppnames, size = n, replace = TRUE, prob = c(geo.prob))
+  })
+  return(as.data.frame(table(comm)))
 }
 
 #' Simulation of species spatial distributions.
@@ -4507,70 +4877,70 @@ sim.sad <- function(n, s, sad = "lognormal", sd = 1) {
 #' }
 #' @export
 sim.spatial <- function(n, s, sad = "lognormal", sd = 1, distribution = "aggregated", clust = 1){
-	repeat{
-		simsad <- sim.sad(n, s, sad, sd)
-		coords <- matrix(ncol = 2)
-		for (j in 1:nrow(simsad)){	#species by species
-			spCoords <- matrix(c(runif(1),runif(1)), ncol=2)
-			if(simsad[j,2] > 1){
-				for(i in 2:simsad[j,2]){
-					repeat{
-						newcoords <- c(runif(1),runif(1))
-
-						##aggregated distribution
-						if(distribution == "aggregated"){
-							mindist = 1
-							for(r in 1:nrow(spCoords)){
-								mindist <- min(mindist, euclid(newcoords, spCoords[r,]))
-							}
-							thres = abs(rnorm(1, sd = 1/clust))/10
-							if(mindist < thres){
-								spCoords <- rbind(spCoords, newcoords)
-								break
-							}
-						
-						##random distribution
-						} else if (distribution == "random"){
-							spCoords <- rbind(spCoords, newcoords)
-							break
-						
-						##uniform distribution
-						} else if (distribution == "uniform"){
-							mindist = 1
-							for(r in 1:nrow(spCoords)){
-								mindist <- min(mindist, euclid(newcoords, spCoords[r,]))
-							}
-							thres = runif(1)
-							if(mindist > thres){
-								spCoords <- rbind(spCoords, newcoords)
-								break
-							}
-						
-						##gradient distribution
-						} else if (distribution == "gradient") {
-							thres = runif(1)^(1/clust)
-							if(newcoords[2] > thres){
-								spCoords <- rbind(spCoords, newcoords)
-								break
-							}
-							
-
-							
-						} else {
-						  return(message("distribution not recognized"))
-						} 
-					}
-				}
-			}
-			coords <- rbind(coords, spCoords)
-		}
-		spp <- rep(as.character(simsad[,1]), simsad[,2])
-		comm <- data.frame(Spp = spp, x = coords[-1,1], y = coords[-1,2])
-		if(nrow(comm) == n && length(which(is.na(comm$x))) == 0){
-			break
-		}
-	}
-	return(comm)
+  repeat{
+    simsad <- sim.sad(n, s, sad, sd)
+    coords <- matrix(ncol = 2)
+    for (j in 1:nrow(simsad)){	#species by species
+      spCoords <- matrix(c(runif(1),runif(1)), ncol=2)
+      if(simsad[j,2] > 1){
+        for(i in 2:simsad[j,2]){
+          repeat{
+            newcoords <- c(runif(1),runif(1))
+            
+            ##aggregated distribution
+            if(distribution == "aggregated"){
+              mindist = 1
+              for(r in 1:nrow(spCoords)){
+                mindist <- min(mindist, euclid(newcoords, spCoords[r,]))
+              }
+              thres = abs(rnorm(1, sd = 1/clust))/10
+              if(mindist < thres){
+                spCoords <- rbind(spCoords, newcoords)
+                break
+              }
+              
+              ##random distribution
+            } else if (distribution == "random"){
+              spCoords <- rbind(spCoords, newcoords)
+              break
+              
+              ##uniform distribution
+            } else if (distribution == "uniform"){
+              mindist = 1
+              for(r in 1:nrow(spCoords)){
+                mindist <- min(mindist, euclid(newcoords, spCoords[r,]))
+              }
+              thres = runif(1)
+              if(mindist > thres){
+                spCoords <- rbind(spCoords, newcoords)
+                break
+              }
+              
+              ##gradient distribution
+            } else if (distribution == "gradient") {
+              thres = runif(1)^(1/clust)
+              if(newcoords[2] > thres){
+                spCoords <- rbind(spCoords, newcoords)
+                break
+              }
+              
+              
+              
+            } else {
+              return(message("distribution not recognized"))
+            } 
+          }
+        }
+      }
+      coords <- rbind(coords, spCoords)
+    }
+    spp <- rep(as.character(simsad[,1]), simsad[,2])
+    comm <- data.frame(Spp = spp, x = coords[-1,1], y = coords[-1,2])
+    if(nrow(comm) == n && length(which(is.na(comm$x))) == 0){
+      break
+    }
+  }
+  return(comm)
 }
 
 #' Plots of simulated species spatial distributions.
@@ -4585,22 +4955,22 @@ sim.spatial <- function(n, s, sad = "lognormal", sd = 1, distribution = "aggrega
 #' sim.plot(comm, s = 9)
 #' @export
 sim.plot <- function(comm, sad = FALSE, s = 0){
-	spp <- length(unique(comm$Spp))
-	if(s < 1){
-		if(!sad)
-			side = ceiling(sqrt(spp))
-		else
-			side = ceiling(sqrt(spp+1))
-	}	else{
-		side = ceiling(sqrt(s))
-	}
-	par(mfrow = c(side,side), mar = c(1,1,2,1))
-	if(sad)
-		hist(log(table(comm[,1])), main = "All species", xlab = "Abundance (log)", xaxt = "n")
-	for(i in 1:spp){
-		sp <- comm[comm[1] == paste("Sp", i, sep=""), ]
-		plot(sp$x, sp$y, main = paste("Sp", i), xlim = c(0,1), ylim = c(0,1), xlab="", ylab="", xaxt="n", yaxt="n")
-	}
+  spp <- length(unique(comm$Spp))
+  if(s < 1){
+    if(!sad)
+      side = ceiling(sqrt(spp))
+    else
+      side = ceiling(sqrt(spp+1))
+  }	else{
+    side = ceiling(sqrt(s))
+  }
+  par(mfrow = c(side,side), mar = c(1,1,2,1))
+  if(sad)
+    hist(log(table(comm[,1])), main = "All species", xlab = "Abundance (log)", xaxt = "n")
+  for(i in 1:spp){
+    sp <- comm[comm[1] == paste("Sp", i, sep=""), ]
+    plot(sp$x, sp$y, main = paste("Sp", i), xlim = c(0,1), ylim = c(0,1), xlab="", ylab="", xaxt="n", yaxt="n")
+  }
 }
 
 #' Simulation of sampling from artificial communities.
@@ -4617,30 +4987,30 @@ sim.plot <- function(comm, sad = FALSE, s = 0){
 #' sim.sample(comm, cells = 10, samples = 5)
 #' @export
 sim.sample <- function(comm, cells = 100, samples = 0){
-	side <- round(sqrt(cells),0)
-	cells = side^2
-
-	comm$ind <- 0
-	xv <- cut(comm$x, seq(0, 1, 1/side))
-	yv <- cut(comm$y, seq(0, 1, 1/side))
-	grid1 <- data.frame(table(xv, yv))
-	grid1 <- grid1[,-3]
-
-	s <- 1:cells
-	for (i in 1:cells){
-		id <- NULL
-		id <- which (xv == grid1$xv[s[i]] & yv == grid1$yv[s[i]])
-		comm$ind[id] <- paste("Sample", i, sep="")
-	}
-	comm <- table(comm$ind, comm$Spp) ##entire community
-	comm <- comm[rownames(comm) != "0", ]
-	if (samples < 1 || samples > nrow(comm))
-		samples = nrow(comm)
-
-	##number of samples to take
-	samp <- comm[sample(nrow(comm), samples, replace = FALSE),] ## sampled community
-
-	return(samp)
+  side <- round(sqrt(cells),0)
+  cells = side^2
+  
+  comm$ind <- 0
+  xv <- cut(comm$x, seq(0, 1, 1/side))
+  yv <- cut(comm$y, seq(0, 1, 1/side))
+  grid1 <- data.frame(table(xv, yv))
+  grid1 <- grid1[,-3]
+  
+  s <- 1:cells
+  for (i in 1:cells){
+    id <- NULL
+    id <- which (xv == grid1$xv[s[i]] & yv == grid1$yv[s[i]])
+    comm$ind[id] <- paste("Sample", i, sep="")
+  }
+  comm <- table(comm$ind, comm$Spp) ##entire community
+  comm <- comm[rownames(comm) != "0", ]
+  if (samples < 1 || samples > nrow(comm))
+    samples = nrow(comm)
+  
+  ##number of samples to take
+  samp <- comm[sample(nrow(comm), samples, replace = FALSE),] ## sampled community
+  
+  return(samp)
 }
 
 #' Simulation of phylogenetic or functional tree.
@@ -4657,10 +5027,10 @@ sim.sample <- function(comm, cells = 100, samples = 0){
 #' plot(as.dendrogram(tree))
 #' @export
 sim.tree <- function(s, m = 100){
-	sim.matrix <- matrix(sample(0:m, ceiling(s*m/50), replace = TRUE), nrow = s, ncol = m)
-	tree <- hclust(dist(sim.matrix), method = "average")
-	tree$height <- tree$height / max(tree$height)
-	return(tree)
+  sim.matrix <- matrix(sample(0:m, ceiling(s*m/50), replace = TRUE), nrow = s, ncol = m)
+  tree <- hclust(dist(sim.matrix), method = "average")
+  tree$height <- tree$height / max(tree$height)
+  return(tree)
 }
 
 #' Sample data of spiders in Arrabida (Portugal)

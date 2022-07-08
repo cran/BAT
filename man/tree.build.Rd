@@ -4,32 +4,64 @@
 \alias{tree.build}
 \title{Build functional tree.}
 \usage{
-tree.build(trait, convert = NULL, weight = NULL)
+tree.build(
+  trait,
+  distance = "gower",
+  func = "nj",
+  fs = 0,
+  convert = NULL,
+  weight = NULL
+)
 }
 \arguments{
 \item{trait}{A species x traits matrix or data.frame.}
+
+\item{distance}{One of "gower" or "euclidean".}
+
+\item{func}{One of "upgma", "mst", "nj", "bionj" or "best".}
+
+\item{fs}{Only used for func = "nj" OR "bionj". Argument s of the agglomerative criterion: it is coerced as an integer and must at least equal to one.}
 
 \item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables.}
 
 \item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait.}
 }
 \value{
-An hclust object representing a functional tree.
+A phylo object representing a functional tree.
 }
 \description{
 Builds a functional tree from trait data.
 }
 \details{
-The tree will be built using UPGMA over gower distances (Pavoine et al. 2009) after traits are dummyfied (if needed) and standardized (always).
-Gower distance allows continuous, ordinal, categorical or binary variables, with possible weighting.
-NAs are allowed as long as each pair of species has at least one trait value in common.
+The tree will be built using one of four algorithms after traits are dummyfied (if needed) and standardized (always):
+If func = "upgma" uses average linkage clustering (UPGMA, Cardoso et al. 2014).
+If func = "mst" uses minimum spanning trees, equivalent to single linkage clustering (Gower & Ross 1969).
+If func = "nj" uses the original neighbor-joining algorithm of Saitou & Nei (1987).
+If func = "bionj" uses the modified neighbor-joining algorithm of Gascuel (1997).
+Any of the neighbor-joining options is usually preferred as they keep distances between species better than UPGMA or MST (Cardoso et al. subm.).
+If func = "best", chooses the best of the options above based on maximum tree.quality values.
+Gower distance (Pavoine et al. 2009) allows continuous, ordinal, categorical or binary variables, with possible weighting.
+NAs are allowed as long as each pair of species has at least one trait value in common. For fs > 0 even if this condition is not met the Q* criterion by Criscuolo & Gascuel (2008) is used to fill missing data.
 If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters as values.
 }
 \examples{
 trait = data.frame(body = c(NA,2,3,4,4), beak = c(1,1,1,1,2))
 plot(tree.build(trait))
-plot(tree.build(trait, weight = c(0, 1)))
+plot(tree.build(trait, func = "bionj", fs = 1, weight = c(1, 0)), "u")
+plot(tree.build(trait, func = "best"))
 }
 \references{
+Cardoso et al. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41: 749-761.
+
+Cardoso et al. (subm.) Using neighbor-joining trees for functional diversity analyses.
+
+Criscuolo & Gascuel (2008) Fast NJ-like algorithms to deal with incomplete distance matrices. BMC Bioinformatics, 9: 166.
+
+Gascuel (1997) BIONJ: an improved version of the NJ algorithm based on a simple model of sequence data. Molecular Biology and Evolution, 14: 685–695.
+
+Gower & Ross (1969) Minimum spanning trees and single linkage cluster analysis. Journal of the Royal Statistical Society, 18: 54-64.
+
 Pavoine et al. (2009) On the challenge of treating various types of variables: application for improving the measurement of functional diversity. Oikos, 118: 391-402.
+
+Saitou & Nei (1987) The neighbor-joining method: a new method for reconstructing phylogenetic trees. Molecular Biology and Evolution, 4, 406–425.
 }

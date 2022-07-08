@@ -4,7 +4,7 @@
 \alias{originality}
 \title{Phylogenetic/functional originality of species or individuals.}
 \usage{
-originality(comm, tree, distance, abund = TRUE, relative = TRUE)
+originality(comm, tree, distance, abund = FALSE, relative = FALSE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data. If missing, the originality using the full tree or distance matrix is calculated.}
@@ -29,12 +29,13 @@ This is the originality measure of Pavoine et al. (2005) without replacement.
 \examples{
 comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
 distance <- dist(c(1:5), method="euclidean")
-tree <- tree.build(1:5)
+tree = hclust(distance)
+
 originality(tree = tree)
 originality(distance = distance)
 originality(comm, tree)
-originality(comm, tree, abund = FALSE)
-originality(comm, tree, abund = FALSE, relative = FALSE)
+originality(comm, tree, abund = TRUE)
+originality(comm, tree, relative = TRUE)
 }
 \references{
 Pavoine, S., Ollier, S. & Dufour, A.-B. (2005) Is the originality of a species measurable? Ecology Letters, 8: 579-586.

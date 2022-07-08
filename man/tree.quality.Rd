@@ -7,7 +7,7 @@
 tree.quality(distance, tree)
 }
 \arguments{
-\item{distance}{A dist matrix representing the initial distances between species.}
+\item{distance}{A dist object representing the initial distances between species.}
 
 \item{tree}{A phylo or hclust object.}
 }
@@ -18,7 +18,8 @@ A single value of quality.
 Assess the quality of a functional tree.
 }
 \details{
-The algorithm calculates the inverse of mean squared deviation between initial and cophenetic distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation. A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for a star tree.
+The algorithm calculates the inverse of mean squared deviation between initial and cophenetic distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation.
+A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for a star tree, where all pairwise distances are 1.
 }
 \examples{
 trait = data.frame(body = c(1,2,3,4,4), beak = c(1,1,1,1,2))
@@ -26,6 +27,17 @@ distance = gower(trait)
 
 tree = tree.build(trait)
 tree.quality(distance, tree)
+
+tree = tree.build(trait, func = "bionj")
+tree.quality(distance, tree)
+
+tree = tree.build(trait, func = "upgma")
+tree.quality(distance, tree)
+
+tree = tree.build(trait, func = "mst")
+tree.quality(distance, tree)
+
+tree = tree.build(trait, func = "best")
 
 distance1 = distance
 distance1[] = 1

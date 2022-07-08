@@ -20,8 +20,8 @@ Converts branches with negative values to zero while shortening only the two bra
 }
 \examples{
 par(mfrow = c(1,2))
-tree <- ape::read.tree(text = 
-'(((A:3, B:3):1, (G:6, (H:5, I:5):1):-2):3, ((C:1, D:1):2, (E:4, F:4):-1):4);')
+tree <- ape::read.tree(text='(((A:3, B:3):1,
+(G:6, (H:5, I:5):1):-2):3, ((C:1, D:1):2, (E:4, F:4):-1):4);')
 plot(tree)
 
 tree = tree.zero(tree)

@@ -4,7 +4,7 @@
 \alias{contribution}
 \title{Contribution of species or individuals to total phylogenetic/functional diversity.}
 \usage{
-contribution(comm, tree, abund = TRUE, relative = FALSE)
+contribution(comm, tree, abund = FALSE, relative = FALSE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with either abundance or incidence data. If missing, the contribution of all species to the full tree is calculated.}
@@ -25,12 +25,12 @@ Contribution of each species or individual to the total PD or FD of a number of 
 Contribution is equivalent to the evolutionary distinctiveness index (ED) of Isaac et al. (2007) if done by species and to the abundance weighted evolutionary distinctiveness (AED) of Cadotte et al. (2010) if done by individual.
 }
 \examples{
-comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
-tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
-contribution(tree = tree)
+comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,0,1), nrow = 4, byrow = TRUE)
+tree = tree.build(1:5)
+
 contribution(comm, tree)
-contribution(comm, tree, FALSE)
-contribution(comm, tree, abund = FALSE, relative = FALSE)
+contribution(comm, tree, TRUE)
+contribution(comm, tree, relative = TRUE)
 }
 \references{
 Isaac, N.J.B., Turvey, S.T., Collen, B., Waterman, C. & Baillie, J.E.M. (2007) Mammals on the EDGE: conservation priorities based on threat and phylogeny. PLoS One, 2: e296.
