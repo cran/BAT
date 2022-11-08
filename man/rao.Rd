@@ -31,7 +31,7 @@ Rao quadratic entropy for Phylogenetic or Functional richness.
 Rao quadratic entropy (Rao, 1982) measures diversity based on the abundance of species and the dissimilarity between them.
 }
 \examples{
-comm <- matrix(c(0,0,1,1,0,0,100,1,2,0), nrow = 2, ncol = 5, byrow = TRUE)
+comm <- matrix(c(1,1,1,1,1,0,100,1,2,0), nrow = 2, ncol = 5, byrow = TRUE)
 distance = dist(1:5)
 rao(comm)
 rao(comm, , distance)

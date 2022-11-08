@@ -34,10 +34,10 @@ The rarefaction option is useful to compare communities with much different numb
 \examples{
 comm <- matrix(c(0,0,1,1,0,0,2,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
 trait = 1:5
-tree <- hclust(dist(c(1:5), method = "euclidean"), method = "average")
+tree <- tree.build(trait)
+plot(tree, "u")
 alpha(comm)
 alpha(comm, raref = 0)
-alpha(comm, trait)
 alpha(comm, tree)
 alpha(comm, tree, 2, 100)
 }

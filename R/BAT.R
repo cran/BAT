@@ -1,14 +1,12 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.9.0 (2022-07-08)
+#####Version 2.9.2 (2022-11-08)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.8.1:
-#####Added *.sad, *.gamma, mixture functions
-#####Improved tree.build to allow euclidean, mst and nj trees and choose best tree based on tree.quality
-#####Improved the output of originality, uniqueness and contribution.
-#####Improved the text for some of the functions explanations.
+#####Changed from v2.9.1:
+#####Corrected rao to change between 0 and 1
+#####Corrected evenness which was not working for nj
 
 library("ape")
 library("geometry")
@@ -48,6 +46,38 @@ prep <- function(comm, xtree, abund = TRUE){
   BA <- comm%*%A 												## matrix samples X branches
   if (!abund)	BA = ifelse(BA >= 1, 1, 0)
   return (list(lenBranch = len, sampleBranch = BA, speciesBranch = A, minBranch = minBranch))
+}
+
+#function to prepare data for all tree analyses, not implemented yet
+prepTree <- function(comm, tree, abund){
+  
+  #prepare tree if needed
+  if(missing(tree)){
+    if(missing(comm))
+      stop("One of comm OR tree must be provided")
+    tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
+    tree$labels = colnames(comm)
+  } else {
+    if(is.matrix(tree) || is.data.frame(tree))
+      tree = tree.build(tree)
+    else if (is(tree, "dist"))
+      tree = ape::nj(tree)
+  }
+  if(is(tree, "hclust")){
+    tree = ape::as.phylo(tree)
+  }
+
+  #prepare comm
+  if(missing(comm))
+    comm = rep(1, length(tree$tip.label))
+  if(is.vector(comm))
+    comm <- matrix(comm, nrow = 1)
+  if(!abund)
+    comm <- ifelse(comm > 0, 1, 0)
+  comm[is.na(comm)] = 0
+  comm = reorderComm(comm, tree)
+  
+  return(list(comm = comm, tree = tree))
 }
 
 clean <- function(comm, tree = NA){
@@ -230,10 +260,10 @@ raoobs <- function(comm, distance){
   #comm must be a vector
   s = length(comm)
   comm = comm / sum(comm)    #convert to proportions
-  distance = as.matrix(distance)
+  distance = sqrt(as.matrix(distance))
   res = 0
-  for(i in 1:(s-1)){
-    for(j in (i+1):s){
+  for(i in 1:s){
+    for(j in 1:s){
       res = res + (distance[i,j] * comm[i] * comm[j])
     }
   }
@@ -462,17 +492,18 @@ resample <- function(comm, size, replace = FALSE){
 #' @references Gotelli, N.J. & Colwell, R.K. (2001) Quantifying biodiversity: procedures and pitfalls in the measurement and comparison of species richness. Ecology Letters, 4, 379-391.
 #' @references Petchey, O.L. & Gaston, K.J. (2002) Functional diversity (FD), species richness and community composition. Ecology Letters, 5, 402-411.
 #' @references Petchey, O.L. & Gaston, K.J. (2006) Functional diversity: back to basics and looking forward. Ecology Letters, 9, 741-758.
-#' @examples comm <- matrix(c(0,0,1,1,0,0,2,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
+#' @examples
+#' comm <- matrix(c(0,0,1,1,0,0,2,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
 #' trait = 1:5
-#' tree <- hclust(dist(c(1:5), method = "euclidean"), method = "average")
+#' tree <- tree.build(trait)
+#' plot(tree, "u")
 #' alpha(comm)
 #' alpha(comm, raref = 0)
-#' alpha(comm, trait)
 #' alpha(comm, tree)
 #' alpha(comm, tree, 2, 100)
 #' @export
 alpha <- function(comm, tree, raref = 0, runs = 100){
-  
+
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
@@ -875,7 +906,8 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
 #' @details Rao quadratic entropy (Rao, 1982) measures diversity based on the abundance of species and the dissimilarity between them.
 #' @return A matrix of sites x diversity values (either "Rao" OR "Mean, Median, Min, LowerCL, UpperCL and Max").
 #' @references Rao, C.R. (1982). Diversity and dissimilarity coefficients: a unified approach. Theoretical Population Biology, 21: 24-43.
-#' @examples comm <- matrix(c(0,0,1,1,0,0,100,1,2,0), nrow = 2, ncol = 5, byrow = TRUE)
+#' @examples
+#' comm <- matrix(c(1,1,1,1,1,0,100,1,2,0), nrow = 2, ncol = 5, byrow = TRUE)
 #' distance = dist(1:5)
 #' rao(comm)
 #' rao(comm, , distance)
@@ -891,6 +923,9 @@ rao <- function(comm, tree, distance, raref = 0, runs = 100){
     distance = cophenetic(tree)
   else if(missing(distance))
     distance = as.dist(matrix(1, ncol(comm), ncol(comm)))
+  
+  #distance with max value of 1
+  distance = distance/max(distance)
   
   nComm <- nrow(comm)
   if(raref < 1){						# no rarefaction if 0 or negative
@@ -1444,7 +1479,7 @@ contribution <- function(comm, tree, abund = FALSE, relative = FALSE){
         comm <- comm[,match(tree$labels, colnames(comm))]
     }
   } else {
-    tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
+    tree = nj(as.dist(matrix(1,ncol(comm),ncol(comm))))
   }
   
   contrib <- matrix(0, nrow(comm), ncol(comm))
@@ -1557,7 +1592,8 @@ dispersion <- function(comm, tree, distance, func = "originality", abund = TRUE,
 #' @return A vector of values per site (or a single value if no comm is given).
 #' @references Bulla, L. (1994) An index of evenness and its associated diversity measure. Oikos, 70: 167-171.
 #' @references Camargo, J.A. (1993) Must dominance increase with the number of subordinate species in competitive interactions? Journal of Theoretical Biology, 161: 537-542.
-#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
+#' @examples
+#' comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
 #' distance <- dist(c(1:5), method = "euclidean")
 #' tree <- hclust(distance, method = "average")
 #' evenness(comm)
@@ -1583,21 +1619,23 @@ evenness <- function(comm, tree, distance, method = "expected", func = "camargo"
   if(!missing(tree)){
     comm = reorderComm(comm, tree)
   } else if (!missing(distance)){
-    tree = hclust(distance, method = "average")
+    tree = nj(distance)
   } else {
-    tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
+    tree = nj(as.dist(matrix(1,ncol(comm),ncol(comm))))
     tree$labels = colnames(comm)
   }
   
+  #calculate evenness
   evenness <- rep(0, nrow(comm))
   for (i in 1:nrow(comm)){								#cycle through all sites/samples
-    thisComm = comm[i,comm[i,] > 0]			  #redo this comm
-    if(length(thisComm) < 2){             #if comm has less than 2 species evenness is NA
+    thisSpp = which(comm[i,] > 0)
+    thisComm = comm[i, thisSpp]           #redo this comm
+    if(length(thisSpp) < 2){              #if comm has less than 2 species evenness is NA
       evenness[i] = NA
       next
-    }              
-    thisTree = as.matrix(cophenetic(tree))[comm[i,] > 0, comm[i,] > 0]    #redo this tree
-    thisTree = hclust(as.dist(thisTree))
+    }
+    thisTree = ape::as.phylo(tree)     #redo tree for thisComm
+    thisTree = keep.tip(thisTree, thisSpp)
     if(method == "expected"){               #if expected
       thisTree = prep(thisComm, xTree(thisTree), abund)
       thisEdges = which(thisTree$lenBranch > 0 & thisTree$sampleBranch > 0)
@@ -1693,9 +1731,9 @@ evenness.contribution <- function(comm, tree, distance, method = "expected", fun
   if(!missing(tree)){
     comm = reorderComm(comm, tree)
   } else if (!missing(distance)){
-    tree = hclust(distance, method = "average")
+    tree = nj(distance)
   } else {
-    tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
+    tree = nj(as.dist(matrix(1,ncol(comm),ncol(comm))))
     tree$labels = colnames(comm)
   }
   
@@ -4227,7 +4265,8 @@ gower <- function(trait, convert = NULL, weight = NULL){
   if(is.null(weight))
     weight = rep(1, ncol(trait))
   spNames = rownames(trait)
-  
+  trait = as.data.frame(trait)
+
   #dummify, standardize, and get weights
   trait = dummy(trait, convert, weight = weight)
   weight = trait$weight
@@ -4596,7 +4635,7 @@ hyper.build <- function(trait, distance = "gower", weight = NULL, axes = 1, conv
 #' @description Assess the quality of a functional hyperspace.
 #' @param distance A dist matrix representing the initial distances between species.
 #' @param hyper A matrix with trait data from function hyper.build.
-#' @details The algorithm calculates the inverse of the squared deviation between initial and euclidean distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation. A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for an hyperspace where all distances between species are 1.
+#' @details This is used for any representation using hyperspaces, including convex hull and kernel-density hypervolumes. The algorithm calculates the inverse of the squared deviation between initial and euclidean distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation. A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for an hyperspace where all distances between species are 1.
 #' @return A single value of quality.
 #' @references Maire et al. (2015) How many dimensions are needed to accurately assess functional diversity? A pragmatic approach for assessing the quality of functional spaces. Global Ecology and Biogeography, 24: 728:740.
 #' @examples trait = data.frame(body = c(1,2,3,4,4), beak = c(1,1,1,1,2))

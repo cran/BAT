@@ -18,7 +18,7 @@ A single value of quality.
 Assess the quality of a functional hyperspace.
 }
 \details{
-The algorithm calculates the inverse of the squared deviation between initial and euclidean distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation. A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for an hyperspace where all distances between species are 1.
+This is used for any representation using hyperspaces, including convex hull and kernel-density hypervolumes. The algorithm calculates the inverse of the squared deviation between initial and euclidean distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation. A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for an hyperspace where all distances between species are 1.
 }
 \examples{
 trait = data.frame(body = c(1,2,3,4,4), beak = c(1,1,1,1,2))
