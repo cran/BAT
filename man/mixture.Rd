@@ -9,6 +9,7 @@ mixture(
   tree,
   q = 0,
   precision = 0.1,
+  replace = FALSE,
   alpha = 0.05,
   param = TRUE,
   runs = 100
@@ -22,6 +23,8 @@ mixture(
 \item{q}{Hill number order: q(0) = species richness, q(1) ~ Shannon diversity, q(2) ~ Simpson diversity.}
 
 \item{precision}{Precision of the proportion of each habitat type to be tested.}
+
+\item{replace}{Boolean indicating whether simulations should be with or without (default) replacement.}
 
 \item{alpha}{alpha value for significance level.}
 
@@ -45,7 +48,8 @@ tree = hclust(dist(1:5))
 hill(comm)
 alpha(comm, tree)
 
-mixture(comm)
+mixture(comm, runs = 10)
+mixture(comm, tree, replace = TRUE, runs = 10)
 }
 \references{
 Chao et al. (2019) Proportional mixture of two rarefaction/extrapolation curves to forecast biodiversity changes under landscape transformation. Ecology Letters, 22: 1913-1922. https://doi.org/10.1111/ele.13322

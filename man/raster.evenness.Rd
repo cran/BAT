@@ -14,39 +14,41 @@ raster.evenness(
 )
 }
 \arguments{
-\item{layers}{A Raster* object of species distributions (typically a multi-layer type: RasterStack or RasterBrick).}
+\item{layers}{A SpatRaster object of species distributions from package terra.}
 
-\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
+\item{tree}{A phylo or hclust object or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
 \item{distance}{A dist object representing the phylogenetic or functional distance between species.}
 
 \item{method}{Calculate dispersion using "expected" values (default) or values based on "contribution" of species to the tree.}
 
-\item{func}{Calculate dispersion using "Camargo" (default) or "Bulla" index.}
+\item{func}{Calculate dispersion using "Camargo" (1993; default) or "Bulla" (1994) index.}
 
 \item{abund}{A boolean (T/F) indicating whether evenness should be calculated using abundance data.}
 }
 \value{
-A raster object representing evenness in space.
+A SpatRaster object representing evenness in space.
 }
 \description{
 Regularity of distance and abundance between any two species in a community using rasters of species distributions (presence/absence or abundance).
 }
 \details{
-Evenness is calculated based on the index of Bulla (1994) using the values of both edge lengths in the tree and their abundance.
-
 If no tree or distance is provided the result is the original index of Bulla with correction.
+Note that cells with less than two species cannot have evenness values.
 }
 \examples{
-sp1 <- raster::raster(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-sp2 <- raster::raster(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
-sp3 <- raster::raster(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-spp <- raster::stack(sp1, sp2, sp3)
+sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+sp2 <- terra::rast(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
+sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+spp <- c(sp1, sp2, sp3)
 tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 tree$labels = c("Sp1", "Sp2", "Sp3")
 names(spp) = tree$labels
+raster.evenness(spp)
 raster.evenness(spp, tree)
 }
 \references{
 Bulla, L. (1994) An index of evenness and its associated diversity measure. Oikos, 70: 167-171.
+
+Camargo, J.A. (1993) Must dominance increase with the number of subordinate species in competitive interactions? Journal of Theoretical Biology, 161: 537-542.
 }

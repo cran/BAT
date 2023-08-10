@@ -14,9 +14,9 @@ raster.dispersion(
 )
 }
 \arguments{
-\item{layers}{A Raster* object of species distributions (typically a multi-layer type: RasterStack or RasterBrick).}
+\item{layers}{A SpatRaster object of species distributions from package terra.}
 
-\item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
+\item{tree}{A phylo or hclust object or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
 \item{distance}{A dist object representing the phylogenetic or functional distance between species.}
 
@@ -27,7 +27,7 @@ raster.dispersion(
 \item{relative}{A boolean (T/F) indicating whether dispersion should be relative to the maximum distance between any two species in the tree or distance matrix.}
 }
 \value{
-A raster object representing dispersion in space.
+A SpatRaster object representing dispersion in space.
 }
 \description{
 Average dissimilarity between any two species or individuals randomly chosen in a community using rasters of species distributions (presence/absence or abundance).
@@ -35,12 +35,13 @@ Average dissimilarity between any two species or individuals randomly chosen in 
 \details{
 If abundance data is used and a tree is given, dispersion is the quadratic entropy of Rao (1982).
 If abundance data is not used but a tree is given, dispersion is the phylogenetic dispersion measure of Webb et al. (2002).
+Note that cells with less than two species cannot have dispersion values.
 }
 \examples{
-sp1 <- raster::raster(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-sp2 <- raster::raster(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
-sp3 <- raster::raster(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-spp <- raster::stack(sp1, sp2, sp3)
+sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+sp2 <- terra::rast(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
+sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+spp <- c(sp1, sp2, sp3)
 tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 tree$labels = c("Sp1", "Sp2", "Sp3")
 names(spp) = tree$labels

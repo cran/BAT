@@ -7,7 +7,7 @@
 raster.beta(layers, tree, func = "jaccard", neighbour = 8, abund = FALSE)
 }
 \arguments{
-\item{layers}{A Raster* object of species distributions (typically a multi-layer type: RasterStack or RasterBrick).}
+\item{layers}{A SpatRaster object of species distributions from package terra.}
 
 \item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
@@ -18,7 +18,7 @@ raster.beta(layers, tree, func = "jaccard", neighbour = 8, abund = FALSE)
 \item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis.}
 }
 \value{
-A raster.stack object representing Btotal, Brepl and Brich in space.
+A SpatRaster object with three layers representing Btotal, Brepl and Brich in space.
 }
 \description{
 Observed beta diversity using rasters of species distributions (presence/absence or abundance).
@@ -32,10 +32,10 @@ PD and FD are calculated based on a tree (hclust or phylo object, no need to be 
 The number and order of species in layers must be the same as in tree.
 }
 \examples{
-sp1 <- raster::raster(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-sp2 <- raster::raster(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
-sp3 <- raster::raster(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-spp <- raster::stack(sp1, sp2, sp3)
+sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,1,1,0), nrow = 3, ncol = 3, byrow = TRUE))
+sp2 <- terra::rast(matrix(c(0,0,0,1,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
+sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,1,1,0), nrow = 3, ncol = 3, byrow = TRUE))
+spp <- c(sp1, sp2, sp3)
 tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 tree$labels = c("Sp1", "Sp2", "Sp3")
 names(spp) = tree$labels

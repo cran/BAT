@@ -1,12 +1,12 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.9.2 (2022-11-08)
+#####Version 2.9.3 (2023-07-21)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.9.1:
-#####Corrected rao to change between 0 and 1
-#####Corrected evenness which was not working for nj
+#####Changed from v2.9.2:
+#####Improved mixture
+#####Changed all spatial analyses from raster to terra
 
 library("ape")
 library("geometry")
@@ -16,8 +16,8 @@ library("MASS")
 library("methods")
 library("nls2")
 library("parallel")
-library("raster")
 library("stats")
+library("terra")
 library("utils")
 library("vegan")
 #' @import ape
@@ -31,10 +31,7 @@ library("vegan")
 #' @import utils
 #' @import vegan
 #' @importFrom MASS stepAIC
-#' @importFrom raster cellStats
-#' @importFrom raster raster
-#' @importFrom raster rasterize
-#' @importFrom raster rasterToPoints
+#' @importFrom terra adjacent cells extract global rast rasterize
 
 #####auxiliary functions
 prep <- function(comm, xtree, abund = TRUE){
@@ -450,24 +447,31 @@ sad.core <- function(comm, contr = NULL, octaves = TRUE, scale = FALSE, raref = 
 }
 
 #auxiliary function to resample from any number of sites in mixture
-resample <- function(comm, size, replace = FALSE){
-  
+remix <- function(comm, size, replace){
+
   if(is.vector(comm))
     comm = as.matrix(comm, nrow = 1)
   if(length(size) == 1)
-    size = rep(size, length(size))
-  
+    size = rep(size, nrow(comm))
+
   newComm = comm
   newComm[] = 0
   for(i in 1:nrow(comm)){
-    thisComm = sample(colnames(comm), size[i], prob = comm[i, ], replace = replace)
-    thisComm = table(thisComm)
+    if (replace)
+      thisComm = sample(colnames(comm), size[i], prob = comm[i, ], replace = TRUE)
+    else
+      thisComm = sample(rep(colnames(comm), comm[i, ]), size[i], replace = FALSE)
+    if(length(thisComm) == 0){
+      thisComm = rep(0, ncol(newComm))
+      names(thisComm) = colnames(newComm)
+    } else {
+      thisComm = table(thisComm)
+    }
     newComm[i, names(thisComm)] = thisComm
   }
   
   return(newComm)
-}      
-
+}     
 
 ##################################################################################
 ##################################MAIN FUNCTIONS##################################
@@ -1007,6 +1011,7 @@ hill <- function(comm, q = 0, raref = 0, runs = 100){
 #' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree. Will only be used if q = 0, in which case phylogenetic or functional richness are calculated instead of species richness.
 #' @param q Hill number order: q(0) = species richness, q(1) ~ Shannon diversity, q(2) ~ Simpson diversity.
 #' @param precision Precision of the proportion of each habitat type to be tested.
+#' @param replace Boolean indicating whether simulations should be with or without (default) replacement.
 #' @param alpha alpha value for significance level.
 #' @param param Value is calculated with parametric or non-parametric method. The later is preferable when distribution of estimated values is not normally distributed.
 #' @param runs Number of runs for the bootstrap providing confidence limits.
@@ -1021,12 +1026,15 @@ hill <- function(comm, q = 0, raref = 0, runs = 100){
 #' hill(comm)
 #' alpha(comm, tree)
 #' 
-#' mixture(comm)
+#' mixture(comm, runs = 10)
+#' mixture(comm, tree, replace = TRUE, runs = 10)
 #' @export
-mixture <- function(comm, tree, q = 0, precision = 0.1, alpha = 0.05, param = TRUE, runs = 100){
+mixture <- function(comm, tree, q = 0, precision = 0.1, replace = FALSE, alpha = 0.05, param = TRUE, runs = 100){
   
   if(is.null(colnames(comm)))
-    colnames(comm) = 1:ncol(comm)
+    colnames(comm) = paste0("Sp", 1:ncol(comm))
+  if(is.null(rownames(comm)))
+    rownames(comm) = paste0("Hab", 1:nrow(comm))
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
@@ -1041,7 +1049,7 @@ mixture <- function(comm, tree, q = 0, precision = 0.1, alpha = 0.05, param = TR
   res = matrix(NA, nrow = nrow(prop), ncol = runs)
   for(i in 1:nrow(prop)){
     for(j in 1:runs){
-      abund = resample(comm, round(rowSums(comm) * unlist(prop[i, ])), replace = TRUE)
+      abund = remix(comm, round(rowSums(comm) * unlist(prop[i, ])), replace = replace)
       abund = matrix(colSums(abund), nrow = 1)
       if(missing(tree))
         res[i, j] = BAT::hill(abund, q)
@@ -1696,7 +1704,7 @@ evenness <- function(comm, tree, distance, method = "expected", func = "camargo"
 #' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
 #' @param distance A dist or matrix object representing the phylogenetic or functional distance between species. If both tree and distance are missing, taxonomic evenness is calculated.
 #' @param method Calculate evenness using "expected" values (default) or values based on "contribution" of species to the tree.
-#' @param func Calculate evenness using "Camargo" (default) or "Bulla" index.
+#' @param func Calculate evenness using "Camargo" (1993; default) or "Bulla" (1994) index.
 #' @param abund A boolean (T/F) indicating whether evenness should be calculated using abundance data.
 #' @details Contribution to evenness is calculated using a leave-one-out approach, whereby the contribution of a single observation is the total evenness minus the evenness calculated without that observation. Evenness is based on the index of Camargo (1993) or Bulla (1994) using the values of both species abundances and edge lengths in the tree (if PD/FD).
 #' Note that the contribution of a species or individual can be negative, if the removal of an observation increases the total evenness.  
@@ -2761,7 +2769,7 @@ cwd <- function(comm, trait, abund = TRUE, na.rm = FALSE){
 #' @description Evenness value of each of a series of traits in multiple communities.
 #' @param comm A sites x species matrix, with incidence or abundance data about the species in the community.
 #' @param trait A species x traits matrix, with trait values for each species in comm.
-#' @param func Calculate evenness using Camargo (1993, default) or Bulla (1994) index.
+#' @param func Calculate evenness using Camargo (1993; default) or Bulla (1994) index.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.
 #' @param na.rm Remove NA values before calculating cwe.
 #' @details Community weighted evenness is used to compare communities in terms of their evenness of trait values, reflecting trait abundance and distances between values.
@@ -3298,7 +3306,7 @@ optim.beta.stats <- function(comm, tree, methods, samples, abund = TRUE, runs = 
 
 #' Optimization of spatial sampling.
 #' @description Optimization of sampling site distribution in space based on environmental (or other) variables.
-#' @param layers A Raster* object (typically a multi-layer type: RasterStack or RasterBrick).
+#' @param layers A SpatRaster object from package terra.
 #' @param n The number of intended sampling sites (clusters).
 #' @param latlong Boolean indicating whether latitude and longitude should be taken into account when clustering.
 #' @param clusterMap Boolean indicating whether to build a new raster with clusters.
@@ -3308,11 +3316,14 @@ optim.beta.stats <- function(comm, tree, methods, samples, abund = TRUE, runs = 
 #' @references Jimenez-Valverde, A., & Lobo, J. M. (2004) Un metodo sencillo para seleccionar puntos de muestreo con el objetivo de inventariar taxones hiperdiversos: el caso practico de las familias Araneidae y Thomisidae (Araneae) en la comunidad de Madrid, Espana. Ecologia, 18: 297-305.
 #' @export
 optim.spatial <- function(layers, n, latlong = TRUE, clusterMap = TRUE){
-  for(i in 1:length(layers))              ##transform all layers to a scale [0,1]
-    layers[[i]] <- (layers[[i]]-cellStats(layers[[i]], min))/(cellStats(layers[[i]], max)-cellStats(layers[[i]], min))
+  for(i in 1:length(layers)){               ##transform all layers to a scale [0,1]
+    globalMin <- terra::global(layers[[i]], min)[1,1]
+    globalMax <- terra::global(layers[[i]], max)[1,1]
+    layers[[i]] <- (layers[[i]] - globalMin)/(globalMax - globalMin)
+  }
   dataMat <- as.matrix(layers)
   dataMat <- dataMat[complete.cases(dataMat),]
-  dataMat <- cbind(dataMat, rasterToPoints(layers[[1]])[,1:2])					##add latlong
+  dataMat <- cbind(dataMat, terra::extract(layers, terra::cells(layers), xy = TRUE)[,1:2])					##add latlong
   if (latlong)
     res <- kmeans(dataMat, n)        ##do k-means
   else
@@ -3333,28 +3344,29 @@ optim.spatial <- function(layers, n, latlong = TRUE, clusterMap = TRUE){
   
   #output raster with clusters
   if(clusterMap){
-    map <- rasterize(rasterToPoints(layers[[1]])[,1:2], layers[[1]], res$cluster)
+    map <- terra::rasterize(terra::extract(layers, terra::cells(layers), xy = TRUE)[,1:2], layers[[1]], res$cluster)
     names(map) <- "clusters"
     cl <- list(cl, map)
   }
+  
   return(cl)
 }
 
 #' Maps of alpha diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).
 #' @description Observed alpha diversity using rasters of species distributions (presence/absence).
-#' @param layers A Raster* object of species distributions (typically a multi-layer type: RasterStack or RasterBrick).
+#' @param layers A SpatRaster object of species distributions from package terra.
 #' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
 #' @details TD is equivalent to species richness. Calculations of PD and FD are based on Faith (1992) and Petchey & Gaston (2002, 2006), which measure PD and FD of a community as the total branch length of a tree linking all species represented in such community.
 #' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in layers must be the same as in tree.
-#' @return A raster object representing richness in space.
+#' @return A SpatRaster object representing richness in space.
 #' @references Faith, D.P. (1992) Conservation evaluation and phylogenetic diversity. Biological Conservation, 61, 1-10.
 #' @references Petchey, O.L. & Gaston, K.J. (2002) Functional diversity (FD), species richness and community composition. Ecology Letters, 5, 402-411.
 #' @references Petchey, O.L. & Gaston, K.J. (2006) Functional diversity: back to basics and looking forward. Ecology Letters, 9, 741-758.
-#' @examples sp1 <- raster::raster(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-#' sp2 <- raster::raster(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
-#' sp3 <- raster::raster(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-#' spp <- raster::stack(sp1, sp2, sp3)
+#' @examples sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+#' sp2 <- terra::rast(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
+#' sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+#' spp <- c(sp1, sp2, sp3)
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 #' tree$labels = c("Sp1", "Sp2", "Sp3")
 #' names(spp) = tree$labels
@@ -3362,7 +3374,8 @@ optim.spatial <- function(layers, n, latlong = TRUE, clusterMap = TRUE){
 #' raster.alpha(spp, tree)
 #' @export
 raster.alpha <- function(layers, tree){
-  res = raster::raster(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  res = terra::rast(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  names(res) = "alpha"
   for(r in 1:nrow(layers)){
     for(c in 1:ncol(layers)){
       if(is.na(sum(layers[r,c])))
@@ -3376,7 +3389,7 @@ raster.alpha <- function(layers, tree){
 
 #' Maps of beta diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).
 #' @description Observed beta diversity using rasters of species distributions (presence/absence or abundance).
-#' @param layers A Raster* object of species distributions (typically a multi-layer type: RasterStack or RasterBrick).
+#' @param layers A SpatRaster object of species distributions from package terra.
 #' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
 #' @param func Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used. If not specified, default is Jaccard.
 #' @param neighbour Either 8 (default) or 4 cells considered to calculate beta diversiy of each focal cell.
@@ -3387,15 +3400,15 @@ raster.alpha <- function(layers, tree){
 #' Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone.
 #' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in layers must be the same as in tree.
-#' @return A raster.stack object representing Btotal, Brepl and Brich in space.
+#' @return A SpatRaster object with three layers representing Btotal, Brepl and Brich in space.
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 #' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
 #' @references Gotelli, N.J. & Colwell, R.K. (2001) Quantifying biodiversity: procedures and pitfalls in the measurement and comparison of species richness. Ecology Letters, 4, 379-391.
 #' @references Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
-#' @examples sp1 <- raster::raster(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-#' sp2 <- raster::raster(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
-#' sp3 <- raster::raster(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-#' spp <- raster::stack(sp1, sp2, sp3)
+#' @examples sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,1,1,0), nrow = 3, ncol = 3, byrow = TRUE))
+#' sp2 <- terra::rast(matrix(c(0,0,0,1,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
+#' sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,1,1,0), nrow = 3, ncol = 3, byrow = TRUE))
+#' spp <- c(sp1, sp2, sp3)
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 #' tree$labels = c("Sp1", "Sp2", "Sp3")
 #' names(spp) = tree$labels
@@ -3403,17 +3416,18 @@ raster.alpha <- function(layers, tree){
 #' raster.beta(spp, tree)
 #' @export
 raster.beta <- function(layers, tree, func = "jaccard", neighbour = 8, abund = FALSE){
-  resTotal = raster::raster(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  resTotal = terra::rast(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
   resRepl = resTotal
   resRich = resTotal
-  for(c in 1:(raster::ncell(layers))){
+  for(c in 1:(terra::ncell(layers))){
     if(is.na(sum(layers[c]))){
       resTotal[c] = NA
       resRepl[c] = NA
       resRich[c] = NA
     } else {
       betaValue = matrix(ncol = 3)
-      adj = raster::adjacent(layers, c, neighbour)[, 2]
+      adj = terra::adjacent(layers, c, neighbour)
+      adj = adj[!is.na(adj)]
       for(a in adj)
         if(!is.na(sum(layers[a])))
           betaValue = rbind(betaValue, beta(rbind(layers[c], layers[a]), tree, func = func, abund = abund))
@@ -3423,35 +3437,37 @@ raster.beta <- function(layers, tree, func = "jaccard", neighbour = 8, abund = F
       resRich[c] = mean(unlist(betaValue[, 3]))
     }
   }
-  res = raster::stack(resTotal, resRepl, resRich)
+  res = c(resTotal, resRepl, resRich)
   names(res) = c("Btotal", "Brepl", "Brich")
   return(res)
 }
 
 #' Maps of phylogenetic/functional dispersion of species or individuals.
 #' @description Average dissimilarity between any two species or individuals randomly chosen in a community using rasters of species distributions (presence/absence or abundance).
-#' @param layers A Raster* object of species distributions (typically a multi-layer type: RasterStack or RasterBrick).
-#' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
+#' @param layers A SpatRaster object of species distributions from package terra.
+#' @param tree A phylo or hclust object or alternatively a species x traits matrix or data.frame to build a functional tree.
 #' @param distance A dist object representing the phylogenetic or functional distance between species.
 #' @param func Calculate dispersion using originality (default), uniqueness or contribution.
 #' @param abund A boolean (T/F) indicating whether dispersion should be calculated using individuals (T) or species (F).
 #' @param relative A boolean (T/F) indicating whether dispersion should be relative to the maximum distance between any two species in the tree or distance matrix.
 #' @details If abundance data is used and a tree is given, dispersion is the quadratic entropy of Rao (1982).
 #' If abundance data is not used but a tree is given, dispersion is the phylogenetic dispersion measure of Webb et al. (2002).
-#' @return A raster object representing dispersion in space.
+#' Note that cells with less than two species cannot have dispersion values.
+#' @return A SpatRaster object representing dispersion in space.
 #' @references Rao, C.R. (1982) Diversity and dissimilarity coefficients: a unified approach. Theoretical Population Biology, 21: 24-43.
 #' @references Webb, C.O., Ackerly, D.D., McPeek, M.A. & Donoghue, M.J. (2002) Phylogenies and community ecology. Annual Review of Ecology and Systematics, 33: 475-505.
-#' @examples sp1 <- raster::raster(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-#' sp2 <- raster::raster(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
-#' sp3 <- raster::raster(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-#' spp <- raster::stack(sp1, sp2, sp3)
+#' @examples sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+#' sp2 <- terra::rast(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
+#' sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+#' spp <- c(sp1, sp2, sp3)
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 #' tree$labels = c("Sp1", "Sp2", "Sp3")
 #' names(spp) = tree$labels
 #' raster.dispersion(spp, tree)
 #' @export
 raster.dispersion <- function(layers, tree, distance, func = "originality", abund = FALSE, relative = FALSE){
-  res = raster::raster(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  res = terra::rast(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  names(res) = "dispersion"
   for(r in 1:nrow(layers)){
     for(c in 1:ncol(layers)){
       if(is.na(sum(layers[r,c])))
@@ -3465,27 +3481,30 @@ raster.dispersion <- function(layers, tree, distance, func = "originality", abun
 
 #' Maps of phylogenetic/functional evenness of species or individuals.
 #' @description Regularity of distance and abundance between any two species in a community using rasters of species distributions (presence/absence or abundance).
-#' @param layers A Raster* object of species distributions (typically a multi-layer type: RasterStack or RasterBrick).
-#' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
+#' @param layers A SpatRaster object of species distributions from package terra.
+#' @param tree A phylo or hclust object or alternatively a species x traits matrix or data.frame to build a functional tree.
 #' @param distance A dist object representing the phylogenetic or functional distance between species.
 #' @param method Calculate dispersion using "expected" values (default) or values based on "contribution" of species to the tree.
-#' @param func Calculate dispersion using "Camargo" (default) or "Bulla" index.
+#' @param func Calculate dispersion using "Camargo" (1993; default) or "Bulla" (1994) index.
 #' @param abund A boolean (T/F) indicating whether evenness should be calculated using abundance data.
-#' @details Evenness is calculated based on the index of Bulla (1994) using the values of both edge lengths in the tree and their abundance.
 #' @details If no tree or distance is provided the result is the original index of Bulla with correction.
-#' @return A raster object representing evenness in space.
+#' Note that cells with less than two species cannot have evenness values.
+#' @return A SpatRaster object representing evenness in space.
 #' @references Bulla, L. (1994) An index of evenness and its associated diversity measure. Oikos, 70: 167-171.
-#' @examples sp1 <- raster::raster(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-#' sp2 <- raster::raster(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
-#' sp3 <- raster::raster(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
-#' spp <- raster::stack(sp1, sp2, sp3)
+#' @references Camargo, J.A. (1993) Must dominance increase with the number of subordinate species in competitive interactions? Journal of Theoretical Biology, 161: 537-542.
+#' @examples sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+#' sp2 <- terra::rast(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
+#' sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+#' spp <- c(sp1, sp2, sp3)
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 #' tree$labels = c("Sp1", "Sp2", "Sp3")
 #' names(spp) = tree$labels
+#' raster.evenness(spp)
 #' raster.evenness(spp, tree)
 #' @export
 raster.evenness <- function(layers, tree, distance, method = "expected", func = "camargo", abund = TRUE){
-  res = raster::raster(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  res = terra::rast(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  names(res) = "evenness"
   for(r in 1:nrow(layers)){
     for(c in 1:ncol(layers)){
       if(is.na(sum(layers[r,c])) || sum(ifelse(layers[r,c] > 0, 1, 0)) < 2)
@@ -4907,11 +4926,6 @@ sim.sad <- function(n, s, sad = "lognormal", sd = 1) {
 #' comm = sim.spatial(100, 9, distribution = "uniform")
 #' for(i in 1:9){
 #' 	sp <- comm[comm[1] == paste("Sp", i, sep = ""), ]
-#' 	plot(sp$x, sp$y, main = paste("Sp", i), xlim = c(0,1), ylim = c(0,1))
-#' }
-#' comm = sim.spatial(1000, 9, sad = "lognormal", sd = 0.5, distribution = "aggregated", clust = 2)
-#' for(i in 1:9){
-#' 	sp <- comm[comm[1] == paste("Sp", i, sep=""), ]
 #' 	plot(sp$x, sp$y, main = paste("Sp", i), xlim = c(0,1), ylim = c(0,1))
 #' }
 #' @export

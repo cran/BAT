@@ -7,7 +7,7 @@
 optim.spatial(layers, n, latlong = TRUE, clusterMap = TRUE)
 }
 \arguments{
-\item{layers}{A Raster* object (typically a multi-layer type: RasterStack or RasterBrick).}
+\item{layers}{A SpatRaster object from package terra.}
 
 \item{n}{The number of intended sampling sites (clusters).}
 

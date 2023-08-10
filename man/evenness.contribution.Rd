@@ -22,7 +22,7 @@ evenness.contribution(
 
 \item{method}{Calculate evenness using "expected" values (default) or values based on "contribution" of species to the tree.}
 
-\item{func}{Calculate evenness using "Camargo" (default) or "Bulla" index.}
+\item{func}{Calculate evenness using "Camargo" (1993; default) or "Bulla" (1994) index.}
 
 \item{abund}{A boolean (T/F) indicating whether evenness should be calculated using abundance data.}
 }

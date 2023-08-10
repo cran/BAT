@@ -11,7 +11,7 @@ cwe(comm, trait, func = "camargo", abund = TRUE, na.rm = FALSE)
 
 \item{trait}{A species x traits matrix, with trait values for each species in comm.}
 
-\item{func}{Calculate evenness using Camargo (1993, default) or Bulla (1994) index.}
+\item{func}{Calculate evenness using Camargo (1993; default) or Bulla (1994) index.}
 
 \item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.}
 
