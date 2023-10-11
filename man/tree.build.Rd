@@ -10,7 +10,8 @@ tree.build(
   func = "nj",
   fs = 0,
   convert = NULL,
-  weight = NULL
+  weight = NULL,
+  root = NULL
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ tree.build(
 \item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables.}
 
 \item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait.}
+
+\item{root}{A numeric or character specifying the functional outgroup to root the tree.}
 }
 \value{
 A phylo object representing a functional tree.
@@ -40,6 +43,7 @@ If func = "nj" uses the original neighbor-joining algorithm of Saitou & Nei (198
 If func = "bionj" uses the modified neighbor-joining algorithm of Gascuel (1997).
 Any of the neighbor-joining options is usually preferred as they keep distances between species better than UPGMA or MST (Cardoso et al. subm.).
 If func = "best", chooses the best of the options above based on maximum tree.quality values.
+If NJ trees are built, the root will be set at the node closest to the midpoint between the two most dissimilar species in the tree or, if root not NULL, at the node provided in parameter root (Podani et al. 2000).
 Gower distance (Pavoine et al. 2009) allows continuous, ordinal, categorical or binary variables, with possible weighting.
 NAs are allowed as long as each pair of species has at least one trait value in common. For fs > 0 even if this condition is not met the Q* criterion by Criscuolo & Gascuel (2008) is used to fill missing data.
 If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters as values.
@@ -48,7 +52,7 @@ If convert is given the algorithm will convert these column numbers to dummy var
 trait = data.frame(body = c(NA,2,3,4,4), beak = c(1,1,1,1,2))
 plot(tree.build(trait))
 plot(tree.build(trait, func = "bionj", fs = 1, weight = c(1, 0)), "u")
-plot(tree.build(trait, func = "best"))
+plot(tree.build(trait, func = "best", root = 4))
 }
 \references{
 Cardoso et al. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41: 749-761.
@@ -62,6 +66,8 @@ Gascuel (1997) BIONJ: an improved version of the NJ algorithm based on a simple 
 Gower & Ross (1969) Minimum spanning trees and single linkage cluster analysis. Journal of the Royal Statistical Society, 18: 54-64.
 
 Pavoine et al. (2009) On the challenge of treating various types of variables: application for improving the measurement of functional diversity. Oikos, 118: 391-402.
+
+Podani et al. (2000) Additive trees in the analysis of community data. Community Ecology, 1, 33–41.
 
 Saitou & Nei (1987) The neighbor-joining method: a new method for reconstructing phylogenetic trees. Molecular Biology and Evolution, 4, 406–425.
 }

@@ -1,12 +1,12 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.9.3 (2023-07-21)
+#####Version 2.9.4 (2023-09-27)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
-#####Maintainer: pedro.cardoso@helsinki.fi
+#####Maintainer: pmcardoso@fc.ul.pt
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.9.2:
-#####Improved mixture
-#####Changed all spatial analyses from raster to terra
+#####Changed from v2.9.3:
+#####Improved rooting options to NJ trees
+#####Added matching of species names for hull.build and kernel.build 
 
 library("ape")
 library("geometry")
@@ -16,6 +16,7 @@ library("MASS")
 library("methods")
 library("nls2")
 library("parallel")
+library("phytools")
 library("stats")
 library("terra")
 library("utils")
@@ -31,6 +32,7 @@ library("vegan")
 #' @import utils
 #' @import vegan
 #' @importFrom MASS stepAIC
+#' @importFrom phytools midpoint.root
 #' @importFrom terra adjacent cells extract global rast rasterize
 
 #####auxiliary functions
@@ -86,6 +88,27 @@ clean <- function(comm, tree = NA){
     tree <- xTree(tree)
   }
   return(list(comm, tree))
+}
+
+#function to get n individuals from comm
+#(function sample gets species, not individuals)
+abund.sample = function(comm, n){
+  res = rep(0, length(comm))
+  for(i in 1:n){
+    sp = sample.int(length(comm), 1, prob = comm)
+    res[sp] = res[sp] + 1
+  }
+  return(res)
+}
+
+#reorder Spp names in the trait matrix to match comm
+reorderTrait <- function(comm, trait){
+  if(!is.null(colnames(comm)) && !is.null(rownames(trait))){
+    trait <- trait[match(colnames(comm), rownames(trait)), ]
+    if (any(colnames(comm) != rownames(trait)))
+      warning("Species names of comm and trait do not match!")
+  }
+  return(trait)
 }
 
 reorderComm <- function(comm, tree = NULL){
@@ -961,7 +984,7 @@ rao <- function(comm, tree, distance, raref = 0, runs = 100){
 #' Hill numbers.
 #' @description Hill numbers with possible rarefaction, multiple sites simultaneously.
 #' @param comm A sites x species matrix, with abundance data.
-#' @param q Hill number order: q(0) = species richness, q(1) ~ Shannon diversity, q(2) ~ Simpson diversity.
+#' @param q Hill number order: q(0) = species richness, q(1) ~ Shannon diversity, q(2) ~ Simpson diversity, and so on...
 #' @param raref An integer specifying the number of individuals for rarefaction (individual based).
 #' If raref < 1 no rarefaction is made.
 #' If raref = 1 rarefaction is made by the minimum abundance among all sites.
@@ -975,7 +998,7 @@ rao <- function(comm, tree, distance, raref = 0, runs = 100){
 #' @examples comm <- matrix(c(0,0,1,1,0,0,100,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
 #' hill(comm)
 #' hill(comm, q = 1)
-#' hill(comm, q = 2, 1)
+#' hill(comm, q = 4, 1)
 #' @export
 hill <- function(comm, q = 0, raref = 0, runs = 100){
   
@@ -4436,6 +4459,7 @@ ses <- function(obs, est, param = TRUE, p = TRUE){
 #' @param fs Only used for func = "nj" OR "bionj". Argument s of the agglomerative criterion: it is coerced as an integer and must at least equal to one. 
 #' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables.
 #' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait.
+#' @param root A numeric or character specifying the functional outgroup to root the tree.
 #' @details The tree will be built using one of four algorithms after traits are dummyfied (if needed) and standardized (always):
 #' If func = "upgma" uses average linkage clustering (UPGMA, Cardoso et al. 2014).
 #' If func = "mst" uses minimum spanning trees, equivalent to single linkage clustering (Gower & Ross 1969).
@@ -4443,6 +4467,7 @@ ses <- function(obs, est, param = TRUE, p = TRUE){
 #' If func = "bionj" uses the modified neighbor-joining algorithm of Gascuel (1997).
 #' Any of the neighbor-joining options is usually preferred as they keep distances between species better than UPGMA or MST (Cardoso et al. subm.).
 #' If func = "best", chooses the best of the options above based on maximum tree.quality values.
+#' If NJ trees are built, the root will be set at the node closest to the midpoint between the two most dissimilar species in the tree or, if root not NULL, at the node provided in parameter root (Podani et al. 2000).
 #' Gower distance (Pavoine et al. 2009) allows continuous, ordinal, categorical or binary variables, with possible weighting.
 #' NAs are allowed as long as each pair of species has at least one trait value in common. For fs > 0 even if this condition is not met the Q* criterion by Criscuolo & Gascuel (2008) is used to fill missing data.
 #' If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters as values.
@@ -4453,13 +4478,14 @@ ses <- function(obs, est, param = TRUE, p = TRUE){
 #' @references Gascuel (1997) BIONJ: an improved version of the NJ algorithm based on a simple model of sequence data. Molecular Biology and Evolution, 14: 685–695.
 #' @references Gower & Ross (1969) Minimum spanning trees and single linkage cluster analysis. Journal of the Royal Statistical Society, 18: 54-64.
 #' @references Pavoine et al. (2009) On the challenge of treating various types of variables: application for improving the measurement of functional diversity. Oikos, 118: 391-402.
+#' @references Podani et al. (2000) Additive trees in the analysis of community data. Community Ecology, 1, 33–41.
 #' @references Saitou & Nei (1987) The neighbor-joining method: a new method for reconstructing phylogenetic trees. Molecular Biology and Evolution, 4, 406–425.
 #' @examples trait = data.frame(body = c(NA,2,3,4,4), beak = c(1,1,1,1,2))
 #' plot(tree.build(trait))
 #' plot(tree.build(trait, func = "bionj", fs = 1, weight = c(1, 0)), "u")
-#' plot(tree.build(trait, func = "best"))
+#' plot(tree.build(trait, func = "best", root = 4))
 #' @export
-tree.build <- function(trait, distance = "gower", func = "nj", fs = 0, convert = NULL, weight = NULL){
+tree.build <- function(trait, distance = "gower", func = "nj", fs = 0, convert = NULL, weight = NULL, root = NULL){
   
   #get distance matrix
   if (distance == "gower"){
@@ -4493,7 +4519,7 @@ tree.build <- function(trait, distance = "gower", func = "nj", fs = 0, convert =
     methods = c("upgma", "mst", "nj", "bionj")
     qual = c()
     for(i in 1:4){
-      trees[[i]] = tree.build(trait, distance, func = methods[i], fs, convert, weight)
+      trees[[i]] = tree.build(trait, distance, func = methods[i], fs, convert, weight, root = root)
       qual[i] = tree.quality(distmatrix, trees[[i]])
     }
     best_tree = which.max(qual)
@@ -4503,9 +4529,13 @@ tree.build <- function(trait, distance = "gower", func = "nj", fs = 0, convert =
     stop("func not recognized!")
   }
   
-  if(is(tree, "phylo") && !is.rooted(tree))
-    tree <- root(tree, which.min(originality(rep(1, length(tree$tip.label)), tree = tree)))
-  
+  if(is(tree, "phylo") && !is.rooted(tree)){
+    if(is.null(root))
+      tree <- phytools::midpoint.root(tree)
+    else
+      tree <- ape::root(tree, outgroup = root)
+  }
+
   return(tree)
 }
 
@@ -4704,7 +4734,8 @@ hull.build <- function(comm, trait, distance = "gower", weight = NULL, axes = 0,
   trait = hyper.build(trait, distance, weight, axes, convert)
   if(is.vector(comm))
     comm = matrix(comm, nrow = 1)
-  
+  trait = reorderTrait(comm, trait)
+
   #check if there are communities with less species than traits + 1 and remove them
   fewSpp = as.vector(which(rowSums(ifelse(comm > 0, 1, 0)) <= ncol(trait)))
   if(length(fewSpp) > 0){
@@ -4778,6 +4809,7 @@ kernel.build <- function(comm, trait, distance = "gower", method.hv = "gaussian"
   trait = hyper.build(trait, distance, weight, axes, convert)
   if(is.vector(comm))
     comm = matrix(comm, nrow = 1)
+  trait = reorderTrait(comm, trait)
   
   #check if there are communities with no species
   fewSpp = as.vector(which(rowSums(comm) == 0))

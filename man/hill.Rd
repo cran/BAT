@@ -9,7 +9,7 @@ hill(comm, q = 0, raref = 0, runs = 100)
 \arguments{
 \item{comm}{A sites x species matrix, with abundance data.}
 
-\item{q}{Hill number order: q(0) = species richness, q(1) ~ Shannon diversity, q(2) ~ Simpson diversity.}
+\item{q}{Hill number order: q(0) = species richness, q(1) ~ Shannon diversity, q(2) ~ Simpson diversity, and so on...}
 
 \item{raref}{An integer specifying the number of individuals for rarefaction (individual based).
 If raref < 1 no rarefaction is made.
@@ -33,7 +33,7 @@ Depending on the single parameter they give more or less weight to rare species 
 comm <- matrix(c(0,0,1,1,0,0,100,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
 hill(comm)
 hill(comm, q = 1)
-hill(comm, q = 2, 1)
+hill(comm, q = 4, 1)
 }
 \references{
 Hill, M.O. (1973). Diversity and evenness: a unifying notation and its consequences. Ecology, 54: 427-432.

@@ -1,6 +1,6 @@
-3e92970edbd19ba5683ddbdc75049f2a *DESCRIPTION
-658c85bf7e48848a9674367cfc1a8627 *NAMESPACE
-89e98939f079ba96066defb134a00fe3 *R/BAT.R
+92549288e5656d3346ccb9a043870833 *DESCRIPTION
+81857e56e3b1c16165c01b39234456b7 *NAMESPACE
+5a8c491c4f9270186e8a628fb5556ff5 *R/BAT.R
 dcaed1578113ec8d3e2f349487e7fffc *data/arrabida.rda
 dd86dc6c6bea68a3b8ff605352919747 *data/functree.rda
 8beb17284bf3e4069b3dd1105cf8f269 *data/geres.rda
@@ -32,7 +32,7 @@ b1d1a3f7c71dd4bb538682886d8d62e7 *man/gamma.Rd
 a2dc8f267ed70cc738a1c78c3db11cc7 *man/geres.Rd
 dca0c93146c1cfc7d9b849208bdce94b *man/gower.Rd
 cba33d4b5708b1b808ae7faa38b40061 *man/guadiana.Rd
-61be2adcc87a141c47c90659b1cdd58f *man/hill.Rd
+bd64db6e813faaca37bc5fbbe8a5c0a5 *man/hill.Rd
 0d5aedf3db582acbc12a67667686a0b7 *man/hull.alpha.Rd
 c2fb920f41b4334f9ca7b25a227588d2 *man/hull.beta.Rd
 7f3f514e2063e14e329e6bae698d6e08 *man/hull.build.Rd
@@ -80,7 +80,7 @@ e6d6aa1d817d5adad674bc0b36cd2a83 *man/sim.spatial.Rd
 c849f503864415f10c679868695b351c *man/sim.tree.Rd
 296680a58bb0d408767c67bef3a09b98 *man/slope.Rd
 8d669f6584d01f7ba1e51fcadf06377b *man/standard.Rd
-079abbce8bb97f4549dd367b81938976 *man/tree.build.Rd
+ea118a1af052564a55228ab1126cb3c9 *man/tree.build.Rd
 ea0b365c75c7250ebd65acfa70203b49 *man/tree.quality.Rd
 72b75f1d51a1cad6f1350b9458e5048c *man/tree.zero.Rd
 66550e780bdc562d5326340293fe9da4 *man/uniqueness.Rd
