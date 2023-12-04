@@ -7,9 +7,9 @@
 hyper.quality(distance, hyper)
 }
 \arguments{
-\item{distance}{A dist matrix representing the initial distances between species.}
+\item{distance}{A dist object representing the initial distances between species.}
 
-\item{hyper}{A matrix with trait data from function hyper.build.}
+\item{hyper}{A matrix with coordinates data from function hyper.build.}
 }
 \value{
 A single value of quality.

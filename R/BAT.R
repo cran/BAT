@@ -1,12 +1,14 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.9.4 (2023-09-27)
+#####Version 2.9.5 (2023-12-04)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pmcardoso@fc.ul.pt
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.9.3:
-#####Improved rooting options to NJ trees
-#####Added matching of species names for hull.build and kernel.build 
+#####Changed from v2.9.4:
+#####Improved optim.alpha and optim.beta to accept sample costs
+#####Improved all *.build functions to accept dist objects
+#####Improved kernel.evenness to keep same parameters as original hypervolume
+#####Corrected explanation for ses
 
 library("ape")
 library("geometry")
@@ -88,17 +90,6 @@ clean <- function(comm, tree = NA){
     tree <- xTree(tree)
   }
   return(list(comm, tree))
-}
-
-#function to get n individuals from comm
-#(function sample gets species, not individuals)
-abund.sample = function(comm, n){
-  res = rep(0, length(comm))
-  for(i in 1:n){
-    sp = sample.int(length(comm), 1, prob = comm)
-    res[sp] = res[sp] + 1
-  }
-  return(res)
 }
 
 #reorder Spp names in the trait matrix to match comm
@@ -494,7 +485,164 @@ remix <- function(comm, size, replace){
   }
   
   return(newComm)
-}     
+}
+
+#base function for sampling optimization (optim.alpha or optim.beta)
+optim.div <- function(div, comm, tree, methods, base, seq, abund, runs, prog){
+
+  ##check if data are correct
+  if(sum(methods[, 2]) != nrow(comm))
+    stop("Sum of the methods must be the same as nrow(comm).")
+  if(length(dim(comm)) == 3)					             ##number of sites
+    nSites <- dim(comm)[3]
+  else
+    nSites <- 1
+  if(div == "beta" && nSites < 2)
+    stop("You need more than 1 site to optimize beta-sampling.")
+
+  ##convert traits to a tree and order comm if needed
+  if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
+    tree = tree.build(tree)
+  if (!missing(tree))
+    comm = reorderComm(comm, tree)
+
+  ##preliminary stats
+  nMethods <- nrow(methods) 		                    ##number of methods
+  if(ncol(methods) == 2)
+    methods = cbind(methods, fixCost = rep(0, nMethods), varCost = rep(1, nMethods))
+  lMethods = c()                                    ##method of each sample
+  for (i in 1:nMethods)
+    lMethods = c(lMethods, rep(methods[i, 1], methods[i, 2]))
+  if (missing(base))										            ##if no samples to start with for complementarity analysis
+    base <- rep(0,nMethods)
+
+  #basic algorithm, using a grid search to calculate costs and diversity
+  if(!seq){
+    
+    #create all combinations
+    comb = list()
+    for(i in 1:nMethods)
+      comb[[i]] = 0:methods[i, 2]
+    comb = expand.grid(comb)
+    colnames(comb) = methods[, 1]
+    
+    #filter to combinations with minimum base
+    for(i in 1:ncol(comb))
+      comb = comb[comb[ ,i] >= base[i], ]
+    
+    #calculate cost of each combination
+    cost = c()
+    for(i in 1:nrow(comb))
+      cost[i] = optim.cost(comb[i, ], methods)
+
+    #calculate diversity of each combination
+    if (prog)
+      pb <- txtProgressBar(max = nrow(comb), style = 3)
+    diversity = c()
+    for(i in 1:nrow(comb)){
+      if (prog)
+        setTxtProgressBar(pb, i)
+      if(div == "alpha")
+        diversity[i] <- optim.alpha.stats(comm, tree, methods, as.numeric(comb[i,]), runs)
+      else
+        diversity[i] <- optim.beta.stats(comm, tree, methods, as.numeric(comb[i,]), abund, runs)
+    }
+
+    #order combinations by diversity (main) and cost
+    comb = cbind(comb, cost, diversity)
+    comb = comb[order(comb$cost), ]
+    comb = comb[order(comb$diversity), ]
+    rownames(comb) = 1:nrow(comb)
+
+    #finalize
+    if (prog)
+      close(pb)
+    
+  #if sequential adding combination with steepest slope at each step
+  } else {
+    
+    #prep data
+    comb <- matrix(base, nrow = 1)
+    cost <- optim.cost(comb, methods)
+    if(div == "alpha")
+      diversity = optim.alpha.stats(comm, tree, methods, comb, runs)
+    else
+      diversity = optim.beta.stats(comm, tree, methods, comb, abund, runs)
+    nMissing <- sum(methods[, 2]) - sum(base)
+    
+    if (prog)
+      pb <- txtProgressBar(max = nMissing, style = 3)
+    
+    #add one sample at a time
+    for(i in 1:nMissing){
+
+      if(prog)
+        setTxtProgressBar(pb, i)
+      
+      #create all combinations with +1 sample and filter to max number of samples
+      newComb = matrix(rep(comb[nrow(comb), ], nMethods), nrow = nMethods, byrow = TRUE)
+      for(i in 1:nMethods)
+        newComb[i, i] = newComb[i, i] + 1
+      del = c()
+      for(i in 1:nrow(newComb))
+        if(any(newComb[ ,i] > methods[, 2]))
+          del = c(del, i)
+      if(length(del) > 0)
+        newComb = newComb[-del, , drop = FALSE]
+      
+      #calculate cost of each combination
+      newCost = c()
+      for(i in 1:nrow(newComb))
+        newCost[i] = optim.cost(newComb[i, ], methods)
+
+      #calculate diversity of each combination
+      newDiversity = c()
+      for(i in 1:nrow(newComb)){
+        if(div == "alpha")
+          newDiversity[i] <- optim.alpha.stats(comm, tree, methods, as.numeric(newComb[i,]), runs)
+        else
+          newDiversity[i] <- optim.beta.stats(comm, tree, methods, as.numeric(newComb[i,]), abund, runs)
+      }
+      
+      #choose combination with steepest slope (choose randomly if tie)
+      slope = c()
+      for(i in 1:nrow(newComb)){
+        slope[i] = (newDiversity[i] - diversity[length(diversity)])
+        slope[i] = slope[i] / (newCost[i] - cost[length(cost)])
+      }
+      best = which(slope == max(slope))
+      if(length(best) > 1)
+        best = sample(best, 1)
+
+      #add new row to comb and new values to cost and diversity
+      comb = rbind(comb, newComb[best, ])
+      cost = c(cost, newCost[best])
+      diversity = c(diversity, newDiversity[best])
+    }
+    
+    #finalize
+    comb = cbind(comb, cost, diversity)
+    rownames(comb) = 1:nrow(comb)
+    if (prog)
+      close(pb)
+  }
+  
+  #return results
+  return(comb)
+}
+
+#calculate cost of each combination of samples
+optim.cost <- function(samples, methods){
+  cost = 0
+  for(i in 1:nrow(methods)){
+    if(samples[i] > 0){
+      fixCost = methods[i, 3]               #fixed costs
+      varCost = samples[i] * methods[i, 4]  #costs per sample
+      cost = cost + varCost + fixCost
+    }
+  }
+  return(unlist(cost))
+}  
 
 ##################################################################################
 ##################################MAIN FUNCTIONS##################################
@@ -1052,7 +1200,7 @@ hill <- function(comm, q = 0, raref = 0, runs = 100){
 #' mixture(comm, runs = 10)
 #' mixture(comm, tree, replace = TRUE, runs = 10)
 #' @export
-mixture <- function(comm, tree, q = 0, precision = 0.1, replace = FALSE, alpha = 0.05, param = TRUE, runs = 100){
+mixture <- function(comm, tree, q = 0, precision = 0.1, replace = TRUE, alpha = 0.05, param = TRUE, runs = 1000){
   
   if(is.null(colnames(comm)))
     colnames(comm) = paste0("Sp", 1:ncol(comm))
@@ -2416,13 +2564,28 @@ kernel.evenness = function(comm) {
       ref_even[, j] <- seq(from = range(comm@Data[,j])[1], to = range(comm@Data[,j])[2], by = space)
     }
     
-    if (comm@Method == "Box kernel density estimate")
-      hv_ref <- hypervolume_box(ref_even, verbose = FALSE)
-    else if (comm@Method == "Gaussian kernel density estimate")
-      hv_ref <- hypervolume_gaussian(ref_even, verbose = FALSE)
-    else if (comm@Method == "One-class support vector machine")
-      hv_ref <- hypervolume_svm(ref_even, verbose = FALSE)
+    #get parameters to build even hypervolumes
     
+    
+    if (comm@Method == "Box kernel density estimate")
+      hv_ref <- hypervolume_box(ref_even, verbose = FALSE,
+                                samples.per.point = comm@Parameters$samples.per.point,
+                                kde.bandwidth = comm@Parameters$kde.bandwidth)
+    else if (comm@Method == "Gaussian kernel density estimate")
+      hv_ref <- hypervolume_gaussian(ref_even, verbose = FALSE,
+                                     weight = NULL,
+                                     samples.per.point = comm@Parameters$samples.per.point,
+                                     kde.bandwidth = comm@Parameters$kde.bandwidth,
+                                     sd.count = comm@Parameters$sd.count,
+                                     quantile.requested = comm@Parameters$quantile.requested,
+                                     quantile.requested.type = comm@Parameters$quantile.requested.type)
+    else if (comm@Method == "One-class support vector machine")
+      hv_ref <- hypervolume_svm(ref_even, verbose = FALSE,
+                                samples.per.point = comm@Parameters$samples.per.point,
+                                svm.nu = comm@Parameters$svm.nu,
+                                svm.gamma = comm@Parameters$svm.gamma, 
+                                scale.factor = comm@Parameters$svm.gamma)
+
     #Checking the overlap between the hypervolume and the even hypervolume
     set <- hypervolume_set(hv_ref, comm, check.memory = FALSE, distance.factor = 1, verbose = FALSE)
     even <- hypervolume_overlap_statistics(set)[1]
@@ -2435,6 +2598,7 @@ kernel.evenness = function(comm) {
       message(paste("Evenness of hypervolume", as.character(i), "out of", as.character(length(comm@HVList)), "has been estimated.\n"))
     }
   }
+  
   return(even)
 }
 
@@ -3041,8 +3205,9 @@ coverage <- function(comm, tree){
 #' @description Optimization of alpha diversity sampling protocols when different methods and multiple samples per method are available.
 #' @param comm A samples x species x sites array, with either abundance or incidence data.
 #' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
-#' @param methods A vector specifying the method of each sample (length must be equal to nrow(comm))
+#' @param methods A data.frame with the method names (1st column), number of samples per method (2nd column), base cost per method (3rd column, those costs that are fixed once a method is decided), and sample cost per method (those costs that add with each sample of the method, 4th column). If the last two columns are not provided base = 0 and sample = 1. The order of methods must be the same as in comm and the sum of the samples must be the same as nrow(comm).
 #' @param base A vector defining a base protocol from which to build upon (complementarity analysis) (length must be equal to number of methods).
+#' @param seq By default all combinations will be tested. If TRUE, a sequential approach will be taken, where methods are added based on the previous step. The method added will be the one providing the highest efficiency as quantified by the slope of the accumulation curve.
 #' @param runs Number of random permutations to be made to the sample order. Default is 1000.
 #' @param prog Present a text progress bar in the R console.
 #' @details Often a combination of methods allows sampling maximum plot diversity with minimum effort, as it allows sampling different sub-communities, contrary to using single methods.
@@ -3054,72 +3219,32 @@ coverage <- function(comm, tree){
 #' comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
 #' comm <- array(c(comm1, comm2), c(4,3,2))
 #' colnames(comm) <- c("Sp1","Sp2","Sp3")
-#' methods <- c("Met1","Met2","Met2","Met3")
+#' 
+#' methods <- data.frame(method = c("Met1","Met2","Met3"),
+#'            nSamples = c(1,2,1), fixcost = c(1,1,2), varCost = c(1,1,1))
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 #' tree$labels <- colnames(comm)
+#' 
 #' optim.alpha(comm,,methods)
-#' optim.alpha(comm, tree, methods)
-#' optim.alpha(comm,, methods = methods, base = c(0,0,1), runs = 100)
+#' 
+#' \dontrun{
+#'   optim.alpha(comm,,methods, seq = TRUE)
+#'   optim.alpha(comm, tree, methods)
+#'   optim.alpha(comm,, methods = methods, seq = TRUE, base = c(0,1,1))
+#' }
 #' @export
-optim.alpha <- function(comm, tree, methods, base, runs = 0, prog = TRUE){
+optim.alpha <- function(comm, tree, methods, base, seq = FALSE, runs = 1000, prog = TRUE){
   
-  #convert traits to a tree if needed
-  if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
-  
-  ##preliminary stats
-  methods <- as.vector(t(methods))
-  nSamples <- length(methods)							          ##number of samples
-  metUnique <- as.vector(t(unique(methods)))				##list of methods
-  metNum <- length(metUnique)							          ##number of methods
-  if (missing(base))										            ##if no samples to start with for complementarity analysis
-    samples <- rep(0,metNum)
-  else
-    samples <- base
-  nMiss <- nSamples - sum(samples)          				##number of samples missing
-  nSamplesMet <- rep(0,metNum)						          ##samples per method
-  for (m in 1:metNum)
-    nSamplesMet[m] <- sum(methods == metUnique[m])
-  
-  ##accumulation process
-  if (prog)
-    pb <- txtProgressBar(max = nMiss + 1, style = 3)
-  div <- rep(0, nMiss + 1)									      	##diversity along the optimal accumulation curve
-  if (sum(samples) > 0)
-    div[1] <- optim.alpha.stats(comm, tree, methods, samples, runs)
-  if (prog)
-    setTxtProgressBar(pb, 1)
-  for (s in 2:(nMiss+1)){
-    samples <- rbind (samples, rep(0,metNum))
-    samples[s,] <- samples[s-1,]
-    metValue <- rep(0, metNum)										  #diversity when adding each method
-    for (m in 1:metNum){
-      if (samples[s,m] < nSamplesMet[m]){
-        samples[s,m] <- samples[s,m] + 1
-        metValue[m] <- optim.alpha.stats(comm, tree, methods, samples[s,], runs)
-        samples[s,m] <- samples[s,m] - 1
-      }
-    }
-    div[s] <- max(metValue)
-    best <- which(metValue == div[s])
-    if (length(best) > 1)
-      best = best[sample(1:length(best),1)]					#if tie, choose one of the best methods randomly
-    samples[s, best] <- samples[s, best] + 1
-    if (prog) setTxtProgressBar(pb, s)
-  }
-  if (prog) close(pb)
-  colnames(samples) <- metUnique
-  rownames(samples) <- (0:nMiss+sum(samples[1,]))
-  samples <- cbind(samples, div)
-  return(samples)
+  return(optim.div("alpha", comm, tree, methods, base, seq, abund = FALSE, runs, prog))
+
 }
 
 #' Efficiency statistics for alpha-sampling.
 #' @description Average alpha diversity observed with a given number of samples per method.
 #' @param comm A samples x species x sites array, with either abundance or incidence data.
 #' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
-#' @param methods A vector specifying the method of each sample (length must be equal to nrow(comm))
-#' @param samples A vector defining the number of samples per method to be evaluated (length must be equal to number of methods).
+#' @param methods A data.frame with the method names (1st column) and number of samples per method (2nd column). The order of methods must be the same as in comm and the sum of the samples must be the same as nrow(comm).
+#' @param samples A vector with the number of samples per method to test.
 #' @param runs Number of random permutations to be made to the sample order. Default is 1000.
 #' @details Different combinations of samples per method allow sampling different sub-communities.
 #' This function allows knowing the average TD, PD or FD values for a given combination, for one or multiple sites simultaneously.
@@ -3129,18 +3254,24 @@ optim.alpha <- function(comm, tree, methods, base, runs = 0, prog = TRUE){
 #' comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
 #' comm <- array(c(comm1, comm2), c(4,3,2))
 #' colnames(comm) <- c("Sp1","Sp2","Sp3")
-#' methods <- c("Met1","Met2","Met2","Met3")
+#' 
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 #' tree$labels <- colnames(comm)
-#' optim.alpha.stats(comm,,methods, c(1,1,1))
-#' optim.alpha.stats(comm, tree, methods = methods, samples = c(0,0,1), runs = 100)
+#' 
+#' methods <- data.frame(method = c("Met1","Met2","Met3"), nSamples = c(1,2,1))
+#' 
+#' optim.alpha.stats(comm,, methods, c(0,0,1))
+#' optim.alpha.stats(comm, tree, methods, c(0,1,1), runs = 100)
 #' @export
-optim.alpha.stats <- function(comm, tree, methods, samples, runs = 0){
+optim.alpha.stats <- function(comm, tree, methods, samples, runs = 1000){
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
   
+  if(sum(methods[, 2]) != nrow(comm))
+    stop("sum of the methods must be the same as nrow(comm)")
+
   ##preliminary stats
   if (!missing(tree)){
     comm = reorderComm(comm, tree)
@@ -3150,9 +3281,10 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 0){
     nSites <- dim(comm)[3]
   else
     nSites <- 1
-  methods <- as.vector(t(methods))
-  metUnique <- as.vector(t(unique(methods)))				            ##list of methods
-  metNum <- length(metUnique)					                          ##number of methods
+  nMethods <- nrow(methods) 					                          ##number of methods
+  lMethods = c()                                                 ##method of each sample
+  for (i in 1:nMethods)
+    lMethods = c(lMethods, rep(methods[i, 1], methods[i, 2]))
   div <- 0														                          ##average diversity obtained using this particular combination of samples per method
   
   for (i in 1:nSites){
@@ -3166,11 +3298,11 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 0){
     
     for (r in 1:runs){
       addSample <- rep(0, ncol(comm))
-      for (m in 1:metNum){
+      for (m in 1:nMethods){
         if (samples[m] > 0){
-          filterList <- site[which(methods == metUnique[m]),,drop=F]						##filter by method m
-          filterList <- filterList[sample(nrow(filterList),samples[m]),,drop=F]	##randomly select rows
-          addSample <- rbind(addSample, filterList)															##add random samples
+          filterList <- site[which(lMethods == methods[m, 1]),, drop = F]						##filter by method m
+          filterList <- filterList[sample(nrow(filterList), samples[m]),, drop = F]	##randomly select rows
+          addSample <- rbind(addSample, filterList)															    ##add random samples
         }
       }
       div <- div + sobs(addSample, tree) / runs / nSites / true
@@ -3183,8 +3315,9 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 0){
 #' @description Optimization of beta diversity sampling protocols when different methods and multiple samples per method are available.
 #' @param comm A samples x species x sites array, with either abundance or incidence data.
 #' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
-#' @param methods A vector specifying the method of each sample (length must be equal to nrow(comm))
+#' @param methods A data.frame with the method names (1st column), number of samples per method (2nd column), base cost per method (3rd column, those costs that are fixed once a method is decided), and sample cost per method (those costs that add with each sample of the method, 4th column). If the last two columns are not provided base = 0 and sample = 1. The order of methods must be the same as in comm and the sum of the samples must be the same as nrow(comm).
 #' @param base Allows defining a base mandatory protocol from which to build upon (complementarity analysis). It should be a vector with length = number of methods.
+#' @param seq By default all combinations will be tested. If TRUE, a sequential approach will be taken, where methods are added based on the previous step. The method added will be the one providing the highest efficiency as quantified by the slope of the accumulation curve.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis.
 #' @param runs Number of random permutations to be made to the sample order. Default is 1000.
 #' @param prog Present a text progress bar in the R console.
@@ -3192,7 +3325,7 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 0){
 #' Cardoso et al. (in prep.) introduce and differentiate the concepts of alpha-sampling and beta-sampling. While alpha-sampling optimization implies maximizing local diversity sampled (Cardoso 2009), beta-sampling optimization implies minimizing differences in beta diversity values between partially and completely sampled communities.
 #' This function uses as beta diversity measures the Btotal, Brepl and Brich partitioning framework (Carvalho et al. 2012) and respective generalizations to PD and FD (Cardoso et al. 2014).
 #' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
-#' @return A matrix of samples x methods (values being optimum number of samples per method). The last column is the average absolute difference from real beta.
+#' @return A matrix of samples x methods (values being optimum number of samples per method). The last column is precision = (1 - average absolute difference from real beta).
 #' @references Cardoso, P. (2009) Standardization and optimization of arthropod inventories - the case of Iberian spiders. Biodiversity and Conservation, 18, 3949-3962.
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 #' @references Cardoso, P., et al. (in prep.) Optimal inventorying and monitoring of taxon, phylogenetic and functional diversity.
@@ -3202,101 +3335,73 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 0){
 #' comm3 <- matrix(c(2,0,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
 #' comm <- array(c(comm1, comm2, comm3), c(4,3,3))
 #' colnames(comm) <- c("sp1","sp2","sp3")
-#' methods <- c("Met1","Met2","Met2","Met3")
+#' 
+#' methods <- data.frame(method = c("Met1","Met2","Met3"),
+#'            nSamples = c(1,2,1), fixcost = c(1,1,2), varCost = c(1,1,1))
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 #' tree$labels <- colnames(comm)
-#' optim.beta(comm, methods = methods, runs = 100)
-#' optim.beta(comm, tree, methods = methods, abund = FALSE, base = c(0,0,1), runs = 100)
+#' 
+#' optim.beta(comm,,methods)
+#' 
+#' \dontrun{
+#'   optim.beta(comm,,methods, seq = TRUE)
+#'   optim.beta(comm, tree, methods)
+#'   optim.alpha(comm,, methods = methods, seq = TRUE, base = c(0,1,1))
+#' }
 #' @export
-optim.beta <- function(comm, tree, methods, base, abund = TRUE, runs = 0, prog = TRUE){
+optim.beta <- function(comm, tree, methods, base, seq = FALSE, abund = TRUE, runs = 1000, prog = TRUE){
   
-  ##preliminary stats
-  methods <- as.vector(t(methods))
-  nSamples <- length(methods)							          ##number of samples
-  metUnique <- as.vector(t(unique(methods)))				##list of methods
-  metNum <- length(metUnique)						          	##number of methods
+  return(optim.div("beta", comm, tree, methods, base, seq, abund, runs, prog))
   
-  if (missing(base))										            ##if no samples to start with
-    samples <- rep(0,metNum)
-  else
-    samples <- base
-  nMiss <- nSamples - sum(samples)				          ##number of samples missing
-  nSamplesMet <- rep (0, metNum)					          ##samples per method
-  for (m in 1:metNum)
-    nSamplesMet[m] <- sum(methods == metUnique[m])
-  
-  ##accumulation process
-  if (prog) pb <- txtProgressBar(max = nMiss+1, style = 3)
-  diff <- rep(0,nMiss+1)														#absolute difference along the optimal accumulation curve
-  diff[1] <- optim.beta.stats(comm, tree, methods, samples, abund, runs)
-  if (prog) setTxtProgressBar(pb, 1)
-  if (diff[1] == "NaN")
-    diff[1] = 1
-  for (s in 2:(nMiss+1)){
-    samples <- rbind (samples, rep(0,metNum))
-    samples[s,] <- samples[s-1,]
-    metValue <- rep(1, metNum)										  #absolute difference when adding each method
-    for (m in 1:metNum){
-      if (samples[s,m] < nSamplesMet[m]){
-        samples[s,m] <- samples[s,m] + 1
-        metValue[m] <- optim.beta.stats(comm, tree, methods, samples[s,], abund, runs)
-        samples[s,m] <- samples[s,m] - 1
-      }
-    }
-    diff[s] <- min(metValue)
-    best <- which(metValue == diff[s])
-    if (length(best) > 1)
-      best = best[sample(1:length(best),1)]					#if tie, choose one of the best methods randomly
-    samples[s, best] <- samples[s, best] + 1
-    if (prog) setTxtProgressBar(pb, s)
-  }
-  if (prog) close(pb)
-  colnames(samples) <- metUnique
-  rownames(samples) <- (0:nMiss+sum(samples[1,]))
-  samples <- cbind(samples, diff)
-  return(samples)
 }
 
 #' Efficiency statistics for beta-sampling.
 #' @description Average absolute difference between sampled and real beta diversity when using a given number of samples per method.
 #' @param comm A samples x species x sites array, with either abundance or incidence data.
 #' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
-#' @param methods A vector specifying the method of each sample (length must be equal to nrow(comm))
-#' @param samples The combination of samples per method we want to test. It should be a vector with length = number of methods.
+#' @param methods A data.frame with the method names (1st column) and number of samples per method (2nd column). The order of methods must be the same as in comm and the sum of the samples must be the same as nrow(comm).
+#' @param samples A vector with the number of samples per method to test.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis.
 #' @param runs Number of random permutations to be made to the sample order. Default is 1000.
 #' @details Different combinations of samples per method allow sampling different sub-communities.
 #' This function allows knowing the average absolute difference between sampled and real beta diversity for a given combination, for one or multiple sites simultaneously.
 #' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
-#' @return A single average absolute beta diversity difference value.
+#' @return A single precision value = (1 - average absolute beta diversity difference value).
 #' @examples comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)
 #' comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
 #' comm3 <- matrix(c(2,0,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
 #' comm <- array(c(comm1, comm2, comm3), c(4,3,3))
 #' colnames(comm) <- c("sp1","sp2","sp3")
-#' methods <- c("Met1","Met2","Met2","Met3")
+#' 
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 #' tree$labels <- colnames(comm)
-#' optim.beta.stats(comm,,methods, c(1,1,1))
-#' optim.beta.stats(comm, tree, methods = methods, samples = c(0,0,1), runs = 100)
+#' 
+#' methods <- data.frame(method = c("Met1","Met2","Met3"), nSamples = c(1,2,1))
+#' 
+#' optim.beta.stats(comm,,methods, c(1,2,1)) #a complete sample will have 0 difference
+#' optim.beta.stats(comm, tree, methods = methods, samples = c(0,1,1), runs = 100)
 #' @export
-optim.beta.stats <- function(comm, tree, methods, samples, abund = TRUE, runs = 0){
-  
+optim.beta.stats <- function(comm, tree, methods, samples, abund = TRUE, runs = 1000){
+
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
     tree = tree.build(tree)
   
+  if(sum(methods[, 2]) != nrow(comm))
+    stop("Sum of the methods must be the same as nrow(comm).")
+
   ##preliminary stats
-  if(length(dim(comm)) == 3){					              ##number of sites
+  if(length(dim(comm)) == 3){					                           ##number of sites
     nSites <- dim(comm)[3]
   }else{
     return(message("Need sample data from at least two sites to perform analyses."))
   }
-  methods <- as.vector(t(methods))
-  metUnique <- as.vector(t(unique(methods)))				##list of methods
-  metNum <- length(metUnique)					              ##number of methods
+  nMethods <- nrow(methods) 					                           ##number of methods
+  lMethods = c()                                                 ##method of each sample
+  for (i in 1:nMethods)
+    lMethods = c(lMethods, rep(methods[i, 1], methods[i, 2]))
   diff <- 0													              	##average absolute difference between observed and true diversity obtained using this particular combination of samples per method
-  
+
   if(!missing(tree))
     comm = reorderComm(comm, tree)
   
@@ -3310,12 +3415,12 @@ optim.beta.stats <- function(comm, tree, methods, samples, abund = TRUE, runs = 
   ##calculate absolute difference between sampled and true beta values
   for (r in 1:runs){
     sumComm <- matrix(0, nrow = nSites, ncol = ncol(comm))
-    for (m in 1:metNum){
+    for (m in 1:nMethods){
       if (samples[m] > 0){
-        filterList <- comm[which(methods == metUnique[m]),,,drop=F] 							##filter by method m
-        filterList <- filterList[sample(nrow(filterList),samples[m]),,,drop=F]		##randomly select rows
+        filterList <- comm[which(lMethods == methods[m, 1]),,, drop=F]						##filter by method m
+        filterList <- filterList[sample(nrow(filterList), samples[m]),,, drop=F]		##randomly select rows
         for (i in 1:nSites){
-          sumComm[i,] <- sumComm[i,] + colSums(filterList[,,i,drop=F])
+          sumComm[i,] <- sumComm[i,] + colSums(filterList[,,i, drop=F])
         }
       }
     }
@@ -3324,7 +3429,8 @@ optim.beta.stats <- function(comm, tree, methods, samples, abund = TRUE, runs = 
       diff <- diff + mean(abs(sampleBeta[[i]] - true[[i]])) / 3 / runs
     }
   }
-  return(diff)
+  
+  return(1 - diff)
 }
 
 #' Optimization of spatial sampling.
@@ -4417,7 +4523,7 @@ aic <- function(obs, est = NULL, param = 0, correct = FALSE){
 #' @param obs A single observed value.
 #' @param est A vector with estimated values.
 #' @param param Value is calculated with parametric or non-parametric method. Because standardized effect sizes may lead to biased conclusions if null values show an asymmetric distribution or deviate from normality, non-parametric effect sizes use probit transformed p-values (Lhotsky et al., 2016).
-#' @param p Boolean indicating whether the p-value should be calculated based on the rank of 'obs' in 'est'.
+#' @param p Boolean indicating whether the p-value should be returned.
 #' @return The ses value or a vector with ses and p-value.
 #' @references Lhotsky et al. (2016) Changes in assembly rules along a stress gradient from open dry grasslands to wetlands. Journal of Ecology, 104: 507-517.
 #' @examples est = rnorm(1000, 500, 100)
@@ -4431,7 +4537,7 @@ aic <- function(obs, est = NULL, param = 0, correct = FALSE){
 #' @export
 ses <- function(obs, est, param = TRUE, p = TRUE){
   if(param){
-    res = (obs - mean(est)) / (sd(est, na.rm = TRUE))
+    res = (obs - mean(est, na.rm = TRUE)) / sd(est, na.rm = TRUE)
     pval = pnorm(res)   #converts ses to p
   } else {
     est = c(obs, est)
@@ -4452,13 +4558,13 @@ ses <- function(obs, est, param = TRUE, p = TRUE){
 }
 
 #' Build functional tree.
-#' @description Builds a functional tree from trait data.
-#' @param trait A species x traits matrix or data.frame.
-#' @param distance One of "gower" or "euclidean".
+#' @description Builds a functional tree from trait or distance data.
+#' @param trait A species x traits matrix or data.frame or, alternatively, a dist object.
+#' @param distance One of "gower" or "euclidean". Not used if trait is already a dist object.
 #' @param func One of "upgma", "mst", "nj", "bionj" or "best".
 #' @param fs Only used for func = "nj" OR "bionj". Argument s of the agglomerative criterion: it is coerced as an integer and must at least equal to one. 
-#' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables.
-#' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait.
+#' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables.  Not used if trait is already a dist object.
+#' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Not used if trait is already a dist object.
 #' @param root A numeric or character specifying the functional outgroup to root the tree.
 #' @details The tree will be built using one of four algorithms after traits are dummyfied (if needed) and standardized (always):
 #' If func = "upgma" uses average linkage clustering (UPGMA, Cardoso et al. 2014).
@@ -4488,12 +4594,16 @@ ses <- function(obs, est, param = TRUE, p = TRUE){
 tree.build <- function(trait, distance = "gower", func = "nj", fs = 0, convert = NULL, weight = NULL, root = NULL){
   
   #get distance matrix
-  if (distance == "gower"){
-    distmatrix = gower(trait, convert, weight)
-  } else if (distance == "euclidean"){
-    distmatrix = dist(trait, method = "euclidean")
+  if(is(trait, "dist")){
+    distmatrix = trait
   } else {
-    stop("Distance should be one of gower or euclidean")
+    if (distance == "gower"){
+      distmatrix = gower(trait, convert, weight)
+    } else if (distance == "euclidean"){
+      distmatrix = dist(trait, method = "euclidean")
+    } else {
+      stop("Distance should be one of gower or euclidean")
+    }
   }
   
   #build tree
@@ -4616,14 +4726,14 @@ tree.quality <- function(distance, tree){
 }
 
 #' Build hyperspace.
-#' @description Builds hyperspace by transforming trait data to use with either hull.build or kernel.build.
-#' @param trait A species x traits matrix or data.frame.
-#' @param distance One of "gower" or "euclidean".
-#' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.
+#' @description Builds hyperspace by transforming trait or distance data to use with either hull.build or kernel.build.
+#' @param trait A species x traits matrix or data.frame or, alternatively, a dist object.
+#' @param distance One of "gower" or "euclidean". Not used if trait is a dist object.
+#' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0 and if trait is not a dist object.
 #' @param axes If 0, no transformation of data is done.
 #' If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
 #' If axes > 1 these many axes are selected.
-#' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.
+#' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0 and if trait is not a dist object.
 #' @details The hyperspace can be constructed with the given data or data can be transformed using PCoA after traits are dummyfied (if needed) and standardized (always).
 #' Gower distance (Pavoine et al. 2009) allows continuous, ordinal, categorical or binary variables, with possible weighting.
 #' NAs are allowed as long as each pair of species has at least one trait value in common.
@@ -4633,7 +4743,7 @@ tree.quality <- function(distance, tree){
 #' 1) Some traits are not continuous;
 #' 2) Some traits are correlated; or
 #' 3) There are less species than traits + 1, in which case the number of axes should be smaller.
-#' @return A matrix with trait data.
+#' @return A matrix with the coordinates of each species in hyperspace.
 #' @references Carvalho, J.C. & Cardoso, P. (2020) Decomposing the causes for niche differentiation between species using hypervolumes. Frontiers in Ecology and Evolution, 8: 243.
 #' @references Pavoine et al. (2009) On the challenge of treating various types of variables: application for improving the measurement of functional diversity. Oikos, 118: 391-402.
 #' @examples
@@ -4646,15 +4756,17 @@ tree.quality <- function(distance, tree){
 hyper.build <- function(trait, distance = "gower", weight = NULL, axes = 1, convert = NULL){
   
   #do gower/euclidean and pcoa if axes is larger than 0
-  if(axes > 0){
+  if(is(trait, "dist") || axes > 0){
     
     #get distance matrix
-    if (distance == "gower"){
-      trait = gower(trait, convert, weight)
-    } else if (distance == "euclidean"){
-      trait = dist(trait, method = "euclidean")
-    } else {
-      stop("Distance should be one of gower or euclidean")
+    if(!is(trait, "dist")){
+      if (distance == "gower"){
+        trait = gower(trait, convert, weight)
+      } else if (distance == "euclidean"){
+        trait = dist(trait, method = "euclidean")
+      } else {
+        stop("Distance should be one of gower or euclidean")
+      }
     }
     trait = ape::pcoa(trait)
     
@@ -4672,8 +4784,7 @@ hyper.build <- function(trait, distance = "gower", weight = NULL, axes = 1, conv
     trait = trait$vectors[,(1:axes)]
   }
   
-  if(is.null(colnames(trait)))
-    colnames(trait) = paste("Trait", 1:ncol(trait), sep = "")
+  colnames(trait) = paste("Axis", 1:ncol(trait), sep = "")
   if(is.null(rownames(trait)))
     rownames(trait) = paste("Sp", 1:nrow(trait), sep = "")
   
@@ -4682,8 +4793,8 @@ hyper.build <- function(trait, distance = "gower", weight = NULL, axes = 1, conv
 
 #' Quality of hyperspace.
 #' @description Assess the quality of a functional hyperspace.
-#' @param distance A dist matrix representing the initial distances between species.
-#' @param hyper A matrix with trait data from function hyper.build.
+#' @param distance A dist object representing the initial distances between species.
+#' @param hyper A matrix with coordinates data from function hyper.build.
 #' @details This is used for any representation using hyperspaces, including convex hull and kernel-density hypervolumes. The algorithm calculates the inverse of the squared deviation between initial and euclidean distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation. A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for an hyperspace where all distances between species are 1.
 #' @return A single value of quality.
 #' @references Maire et al. (2015) How many dimensions are needed to accurately assess functional diversity? A pragmatic approach for assessing the quality of functional spaces. Global Ecology and Biogeography, 24: 728:740.
@@ -4704,13 +4815,13 @@ hyper.quality <- function(distance, hyper){
 #' Build convex hull hypervolumes.
 #' @description Builds convex hull hypervolumes for each community from incidence and trait data.
 #' @param comm A sites x species matrix, data.frame or vector, with incidence data about the species in the community.
-#' @param trait A species x traits matrix or data.frame.
-#' @param distance One of "gower" or "euclidean".
-#' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.
+#' @param trait A species x traits or axes matrix or data.frame (often from hyper.build) or, alternatively, a dist object.
+#' @param distance One of "gower" or "euclidean". Not used if trait is a dist object.
+#' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0 and if trait is not a dist object.
 #' @param axes If 0, no transformation of data is done.
 #' If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
 #' If axes > 1 these many axes are selected.
-#' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.
+#' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0 and if trait is not a dist object.
 #' @details The hypervolumes can be constructed with the given data or data can be transformed using PCoA after traits are dummyfied (if needed) and standardized (always).
 #' Beware that if transformations are required, all communities to be compared should be built simultaneously to guarantee comparability. In such case, one might want to first run hyper.build and use the resulting data in different runs of hull.build.
 #' See function hyper.build for more details.
@@ -4773,15 +4884,15 @@ hull.build <- function(comm, trait, distance = "gower", weight = NULL, axes = 0,
 #' Build kernel hypervolumes.
 #' @description Builds kernel density hypervolumes from trait data.
 #' @param comm A sites x species matrix, data.frame or vector, with incidence or abundance data about the species in the community.
-#' @param trait A species x traits matrix or data.frame.
-#' @param distance One of "gower" or "euclidean".
+#' @param trait A species x traits or axes matrix or data.frame (often from hyper.build) or, alternatively, a dist object.
+#' @param distance One of "gower" or "euclidean". Not used if trait is a dist object.
 #' @param method.hv Method for constructing the 'Hypervolume' object. One of "gaussian" (Gaussian kernel density estimation, default), "box" (box kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method.hv = "gaussian".
-#' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.
+#' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0 and if trait is not a dist object.
 #' @param axes If 0, no transformation of data is done.
 #' If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
 #' If axes > 1 these many axes are selected.
-#' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.
+#' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0 and if trait is not a dist object.
 #' @param cores Number of cores to be used in parallel processing. If = 0 all available cores are used. Beware that multicore for Windows is not optimized yet and it often takes longer than single core.
 #' @param ... further arguments to be passed to hypervolume::hypervolume
 #' @details The hypervolumes can be constructed with the given data or data can be transformed using PCoA after traits are dummyfied (if needed) and standardized (always).

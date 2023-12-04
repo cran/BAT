@@ -7,23 +7,23 @@
 hyper.build(trait, distance = "gower", weight = NULL, axes = 1, convert = NULL)
 }
 \arguments{
-\item{trait}{A species x traits matrix or data.frame.}
+\item{trait}{A species x traits matrix or data.frame or, alternatively, a dist object.}
 
-\item{distance}{One of "gower" or "euclidean".}
+\item{distance}{One of "gower" or "euclidean". Not used if trait is a dist object.}
 
-\item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.}
+\item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0 and if trait is not a dist object.}
 
 \item{axes}{If 0, no transformation of data is done.
 If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
 If axes > 1 these many axes are selected.}
 
-\item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.}
+\item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0 and if trait is not a dist object.}
 }
 \value{
-A matrix with trait data.
+A matrix with the coordinates of each species in hyperspace.
 }
 \description{
-Builds hyperspace by transforming trait data to use with either hull.build or kernel.build.
+Builds hyperspace by transforming trait or distance data to use with either hull.build or kernel.build.
 }
 \details{
 The hyperspace can be constructed with the given data or data can be transformed using PCoA after traits are dummyfied (if needed) and standardized (always).

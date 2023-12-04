@@ -9,10 +9,10 @@ mixture(
   tree,
   q = 0,
   precision = 0.1,
-  replace = FALSE,
+  replace = TRUE,
   alpha = 0.05,
   param = TRUE,
-  runs = 100
+  runs = 1000
 )
 }
 \arguments{

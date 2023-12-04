@@ -20,21 +20,21 @@ kernel.build(
 \arguments{
 \item{comm}{A sites x species matrix, data.frame or vector, with incidence or abundance data about the species in the community.}
 
-\item{trait}{A species x traits matrix or data.frame.}
+\item{trait}{A species x traits or axes matrix or data.frame (often from hyper.build) or, alternatively, a dist object.}
 
-\item{distance}{One of "gower" or "euclidean".}
+\item{distance}{One of "gower" or "euclidean". Not used if trait is a dist object.}
 
 \item{method.hv}{Method for constructing the 'Hypervolume' object. One of "gaussian" (Gaussian kernel density estimation, default), "box" (box kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details.}
 
 \item{abund}{A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method.hv = "gaussian".}
 
-\item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0.}
+\item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0 and if trait is not a dist object.}
 
 \item{axes}{If 0, no transformation of data is done.
 If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
 If axes > 1 these many axes are selected.}
 
-\item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0.}
+\item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0 and if trait is not a dist object.}
 
 \item{cores}{Number of cores to be used in parallel processing. If = 0 all available cores are used. Beware that multicore for Windows is not optimized yet and it often takes longer than single core.}
 

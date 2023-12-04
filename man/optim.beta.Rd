@@ -4,16 +4,27 @@
 \alias{optim.beta}
 \title{Optimization of beta diversity sampling protocols.}
 \usage{
-optim.beta(comm, tree, methods, base, abund = TRUE, runs = 0, prog = TRUE)
+optim.beta(
+  comm,
+  tree,
+  methods,
+  base,
+  seq = FALSE,
+  abund = TRUE,
+  runs = 1000,
+  prog = TRUE
+)
 }
 \arguments{
 \item{comm}{A samples x species x sites array, with either abundance or incidence data.}
 
 \item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
-\item{methods}{A vector specifying the method of each sample (length must be equal to nrow(comm))}
+\item{methods}{A data.frame with the method names (1st column), number of samples per method (2nd column), base cost per method (3rd column, those costs that are fixed once a method is decided), and sample cost per method (those costs that add with each sample of the method, 4th column). If the last two columns are not provided base = 0 and sample = 1. The order of methods must be the same as in comm and the sum of the samples must be the same as nrow(comm).}
 
 \item{base}{Allows defining a base mandatory protocol from which to build upon (complementarity analysis). It should be a vector with length = number of methods.}
+
+\item{seq}{By default all combinations will be tested. If TRUE, a sequential approach will be taken, where methods are added based on the previous step. The method added will be the one providing the highest efficiency as quantified by the slope of the accumulation curve.}
 
 \item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis.}
 
@@ -22,7 +33,7 @@ optim.beta(comm, tree, methods, base, abund = TRUE, runs = 0, prog = TRUE)
 \item{prog}{Present a text progress bar in the R console.}
 }
 \value{
-A matrix of samples x methods (values being optimum number of samples per method). The last column is the average absolute difference from real beta.
+A matrix of samples x methods (values being optimum number of samples per method). The last column is precision = (1 - average absolute difference from real beta).
 }
 \description{
 Optimization of beta diversity sampling protocols when different methods and multiple samples per method are available.
@@ -39,11 +50,19 @@ comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
 comm3 <- matrix(c(2,0,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
 comm <- array(c(comm1, comm2, comm3), c(4,3,3))
 colnames(comm) <- c("sp1","sp2","sp3")
-methods <- c("Met1","Met2","Met2","Met3")
+
+methods <- data.frame(method = c("Met1","Met2","Met3"),
+           nSamples = c(1,2,1), fixcost = c(1,1,2), varCost = c(1,1,1))
 tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 tree$labels <- colnames(comm)
-optim.beta(comm, methods = methods, runs = 100)
-optim.beta(comm, tree, methods = methods, abund = FALSE, base = c(0,0,1), runs = 100)
+
+optim.beta(comm,,methods)
+
+\dontrun{
+  optim.beta(comm,,methods, seq = TRUE)
+  optim.beta(comm, tree, methods)
+  optim.alpha(comm,, methods = methods, seq = TRUE, base = c(0,1,1))
+}
 }
 \references{
 Cardoso, P. (2009) Standardization and optimization of arthropod inventories - the case of Iberian spiders. Biodiversity and Conservation, 18, 3949-3962.

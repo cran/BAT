@@ -15,17 +15,17 @@ tree.build(
 )
 }
 \arguments{
-\item{trait}{A species x traits matrix or data.frame.}
+\item{trait}{A species x traits matrix or data.frame or, alternatively, a dist object.}
 
-\item{distance}{One of "gower" or "euclidean".}
+\item{distance}{One of "gower" or "euclidean". Not used if trait is already a dist object.}
 
 \item{func}{One of "upgma", "mst", "nj", "bionj" or "best".}
 
 \item{fs}{Only used for func = "nj" OR "bionj". Argument s of the agglomerative criterion: it is coerced as an integer and must at least equal to one.}
 
-\item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables.}
+\item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables.  Not used if trait is already a dist object.}
 
-\item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait.}
+\item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Not used if trait is already a dist object.}
 
 \item{root}{A numeric or character specifying the functional outgroup to root the tree.}
 }
@@ -33,7 +33,7 @@ tree.build(
 A phylo object representing a functional tree.
 }
 \description{
-Builds a functional tree from trait data.
+Builds a functional tree from trait or distance data.
 }
 \details{
 The tree will be built using one of four algorithms after traits are dummyfied (if needed) and standardized (always):

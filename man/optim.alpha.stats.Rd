@@ -4,16 +4,16 @@
 \alias{optim.alpha.stats}
 \title{Efficiency statistics for alpha-sampling.}
 \usage{
-optim.alpha.stats(comm, tree, methods, samples, runs = 0)
+optim.alpha.stats(comm, tree, methods, samples, runs = 1000)
 }
 \arguments{
 \item{comm}{A samples x species x sites array, with either abundance or incidence data.}
 
 \item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
-\item{methods}{A vector specifying the method of each sample (length must be equal to nrow(comm))}
+\item{methods}{A data.frame with the method names (1st column) and number of samples per method (2nd column). The order of methods must be the same as in comm and the sum of the samples must be the same as nrow(comm).}
 
-\item{samples}{A vector defining the number of samples per method to be evaluated (length must be equal to number of methods).}
+\item{samples}{A vector with the number of samples per method to test.}
 
 \item{runs}{Number of random permutations to be made to the sample order. Default is 1000.}
 }
@@ -33,9 +33,12 @@ comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)
 comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
 comm <- array(c(comm1, comm2), c(4,3,2))
 colnames(comm) <- c("Sp1","Sp2","Sp3")
-methods <- c("Met1","Met2","Met2","Met3")
+
 tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 tree$labels <- colnames(comm)
-optim.alpha.stats(comm,,methods, c(1,1,1))
-optim.alpha.stats(comm, tree, methods = methods, samples = c(0,0,1), runs = 100)
+
+methods <- data.frame(method = c("Met1","Met2","Met3"), nSamples = c(1,2,1))
+
+optim.alpha.stats(comm,, methods, c(0,0,1))
+optim.alpha.stats(comm, tree, methods, c(0,1,1), runs = 100)
 }

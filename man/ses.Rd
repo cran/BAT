@@ -13,7 +13,7 @@ ses(obs, est, param = TRUE, p = TRUE)
 
 \item{param}{Value is calculated with parametric or non-parametric method. Because standardized effect sizes may lead to biased conclusions if null values show an asymmetric distribution or deviate from normality, non-parametric effect sizes use probit transformed p-values (Lhotsky et al., 2016).}
 
-\item{p}{Boolean indicating whether the p-value should be calculated based on the rank of 'obs' in 'est'.}
+\item{p}{Boolean indicating whether the p-value should be returned.}
 }
 \value{
 The ses value or a vector with ses and p-value.
