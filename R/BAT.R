@@ -1,15 +1,12 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.9.5 (2023-12-04)
+#####Version 2.9.6 (2024-02-16)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
 #####Maintainer: pmcardoso@fc.ul.pt
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.9.4:
-#####Improved optim.alpha and optim.beta to accept sample costs
-#####Improved all *.build functions to accept dist objects
-#####Improved kernel.evenness to keep same parameters as original hypervolume
-#####Corrected explanation for ses
-
+#####Changed from v2.9.5:
+#####Corrected optim.alpha and optim.beta for sequential analyses
+ 
 library("ape")
 library("geometry")
 library("graphics")
@@ -569,13 +566,15 @@ optim.div <- function(div, comm, tree, methods, base, seq, abund, runs, prog){
     else
       diversity = optim.beta.stats(comm, tree, methods, comb, abund, runs)
     nMissing <- sum(methods[, 2]) - sum(base)
+    met = unlist(methods[,2])
     
     if (prog)
       pb <- txtProgressBar(max = nMissing, style = 3)
     
     #add one sample at a time
+    del = c() #combinations that are no longer valid
     for(i in 1:nMissing){
-
+      
       if(prog)
         setTxtProgressBar(pb, i)
       
@@ -584,12 +583,13 @@ optim.div <- function(div, comm, tree, methods, base, seq, abund, runs, prog){
       for(i in 1:nMethods)
         newComb[i, i] = newComb[i, i] + 1
       del = c()
-      for(i in 1:nrow(newComb))
-        if(any(newComb[ ,i] > methods[, 2]))
+      for(i in 1:nrow(newComb)){
+        if(any(newComb[i, ] > met))
           del = c(del, i)
+      }
       if(length(del) > 0)
         newComb = newComb[-del, , drop = FALSE]
-      
+
       #calculate cost of each combination
       newCost = c()
       for(i in 1:nrow(newComb))
@@ -3225,9 +3225,8 @@ coverage <- function(comm, tree){
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 #' tree$labels <- colnames(comm)
 #' 
-#' optim.alpha(comm,,methods)
-#' 
 #' \dontrun{
+#'   optim.alpha(comm,,methods)
 #'   optim.alpha(comm,,methods, seq = TRUE)
 #'   optim.alpha(comm, tree, methods)
 #'   optim.alpha(comm,, methods = methods, seq = TRUE, base = c(0,1,1))
@@ -3341,9 +3340,8 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 1000){
 #' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 #' tree$labels <- colnames(comm)
 #' 
-#' optim.beta(comm,,methods)
-#' 
 #' \dontrun{
+#'   optim.beta(comm,,methods)
 #'   optim.beta(comm,,methods, seq = TRUE)
 #'   optim.beta(comm, tree, methods)
 #'   optim.alpha(comm,, methods = methods, seq = TRUE, base = c(0,1,1))

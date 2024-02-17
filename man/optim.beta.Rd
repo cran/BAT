@@ -56,9 +56,8 @@ methods <- data.frame(method = c("Met1","Met2","Met3"),
 tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
 tree$labels <- colnames(comm)
 
-optim.beta(comm,,methods)
-
 \dontrun{
+  optim.beta(comm,,methods)
   optim.beta(comm,,methods, seq = TRUE)
   optim.beta(comm, tree, methods)
   optim.alpha(comm,, methods = methods, seq = TRUE, base = c(0,1,1))

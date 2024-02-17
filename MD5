@@ -1,6 +1,6 @@
-007a7a85c0880908f6ae485de9cd96db *DESCRIPTION
+9172e25d07ab601a11f51d09ade70c5b *DESCRIPTION
 81857e56e3b1c16165c01b39234456b7 *NAMESPACE
-6a2dad9a0ad87ba0e42b88eeeed10e1f *R/BAT.R
+8ab282d12e923accb993745c043b8ffd *R/BAT.R
 dcaed1578113ec8d3e2f349487e7fffc *data/arrabida.rda
 dd86dc6c6bea68a3b8ff605352919747 *data/functree.rda
 8beb17284bf3e4069b3dd1105cf8f269 *data/geres.rda
@@ -57,9 +57,9 @@ f4c6854ef517d08bb04b9f6babe0938a *man/kernel.originality.Rd
 a504150bf4854aef95f52b140e1a2454 *man/kernel.similarity.Rd
 bd80085f96feaa1210f8d5adc5874749 *man/linnean.Rd
 df59d4dc871f3c0c07e3b3b4d376dd01 *man/mixture.Rd
-78f2a5ca8e4f11bdf64d8af16dde49e4 *man/optim.alpha.Rd
+9d5b33418f5cd9a1788c981893f4fe7d *man/optim.alpha.Rd
 e1189cfb66a1f174c1cd46a0174f7e7f *man/optim.alpha.stats.Rd
-bfa0f514aeca43bffbc63959794aa618 *man/optim.beta.Rd
+d5ffd448b37fa4530531357fb2b20e6d *man/optim.beta.Rd
 43dacfa2b506ea653b5aeaa275a84eee *man/optim.beta.stats.Rd
 c32b8c48e58f127b2c1b33393d971df2 *man/optim.spatial.Rd
 dc716496e36fcdd1c9a1ffe79d9306c5 *man/originality.Rd
