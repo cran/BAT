@@ -12,7 +12,7 @@ sim.tree(s, m = 100)
 \item{m}{a structural parameter defining the average difference between species. Default is 100. Lower numbers create trees dominated by increasingly similar species, higher numbers by increasingly dissimilar species.}
 }
 \value{
-An hclust object.
+A phylo object.
 }
 \description{
 Simulates a random tree.
@@ -22,9 +22,9 @@ A very simple tree based on random genes/traits.
 }
 \examples{
 tree <- sim.tree(10)
-plot(as.dendrogram(tree))
+plot(tree)
 tree <- sim.tree(100,10)
-plot(as.dendrogram(tree))
+plot(tree)
 tree <- sim.tree(100,1000)
-plot(as.dendrogram(tree))
+plot(tree)
 }

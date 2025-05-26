@@ -35,7 +35,7 @@ comm <- matrix(c(1,1,1,1,1,0,100,1,2,0), nrow = 2, ncol = 5, byrow = TRUE)
 distance = dist(1:5)
 rao(comm)
 rao(comm, , distance)
-rao(comm, hclust(distance), raref = 1)
+rao(comm, tree.build(distance), raref = 1)
 }
 \references{
 Rao, C.R. (1982). Diversity and dissimilarity coefficients: a unified approach. Theoretical Population Biology, 21: 24-43.

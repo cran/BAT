@@ -18,7 +18,7 @@ raster.dispersion(
 
 \item{tree}{A phylo or hclust object or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
-\item{distance}{A dist object representing the phylogenetic or functional distance between species.}
+\item{distance}{A dist object representing the phylogenetic or functional distance between species. Only used if no tree is given.}
 
 \item{func}{Calculate dispersion using originality (default), uniqueness or contribution.}
 
@@ -42,9 +42,11 @@ sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRU
 sp2 <- terra::rast(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
 sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 spp <- c(sp1, sp2, sp3)
-tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-tree$labels = c("Sp1", "Sp2", "Sp3")
-names(spp) = tree$labels
+names(spp) = c("Sp1", "Sp2", "Sp3")
+
+tree <- tree.build(gower(1:3))
+tree$tip.label = names(spp)
+
 raster.dispersion(spp, tree)
 }
 \references{

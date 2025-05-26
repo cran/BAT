@@ -24,11 +24,9 @@ The number and order of species in comm must be the same as in tree.
 }
 \examples{
 comm <- matrix(c(0,0,1,1,0,0,2,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
-trait = 1:5
-tree <- hclust(dist(c(1:5), method = "euclidean"), method = "average")
+tree <- tree.build(gower(1:5))
 alpha(comm)
 gamma(comm)
-gamma(comm, trait)
 gamma(comm, tree)
 }
 \references{

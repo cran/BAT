@@ -11,7 +11,7 @@ originality(comm, tree, distance, abund = FALSE, relative = FALSE)
 
 \item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
-\item{distance}{A dist object representing the phylogenetic or functional distance between species.}
+\item{distance}{A dist object representing the phylogenetic or functional distance between species. Only used if no tree is given.}
 
 \item{abund}{A boolean (T/F) indicating whether originality should be calculated per individual (T) or species (F).}
 
@@ -29,8 +29,7 @@ This is the originality measure of Pavoine et al. (2005) without replacement.
 \examples{
 comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
 distance <- dist(c(1:5), method="euclidean")
-tree = hclust(distance)
-
+tree = tree.build(distance)
 originality(tree = tree)
 originality(distance = distance)
 originality(comm, tree)

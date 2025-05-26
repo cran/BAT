@@ -11,7 +11,7 @@ uniqueness(comm, tree, distance, relative = FALSE)
 
 \item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
-\item{distance}{A dist object representing the phylogenetic or functional distance between species.}
+\item{distance}{A dist object representing the phylogenetic or functional distance between species. Only used if no tree is given.}
 
 \item{relative}{A boolean (T/F) indicating whether uniqueness should be relative to the maximum distance between any two species in the tree or distance matrix.}
 }
@@ -27,8 +27,7 @@ This is equivalent to the originality measure of Mouillot et al. (2013).
 \examples{
 comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,0,1), nrow = 4, byrow = TRUE)
 distance <- dist(c(1:5), method="euclidean")
-tree <- hclust(distance, method="average")
-
+tree <- tree.build(distance)
 uniqueness(tree = tree)
 uniqueness(distance = distance)
 uniqueness(comm, tree)

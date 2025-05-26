@@ -25,19 +25,19 @@ A value of 1 corresponds to maximum quality of the functional representation. A 
 trait = data.frame(body = c(1,2,3,4,4), beak = c(1,1,1,1,2))
 distance = gower(trait)
 
-tree = tree.build(trait)
+tree = tree.build(distance)
 tree.quality(distance, tree)
 
-tree = tree.build(trait, func = "bionj")
+tree = tree.build(distance, func = "bionj")
 tree.quality(distance, tree)
 
-tree = tree.build(trait, func = "upgma")
+tree = tree.build(distance, func = "upgma")
 tree.quality(distance, tree)
 
-tree = tree.build(trait, func = "mst")
+tree = tree.build(distance, func = "mst")
 tree.quality(distance, tree)
 
-tree = tree.build(trait, func = "best")
+tree = tree.build(distance, func = "best")
 
 distance1 = distance
 distance1[] = 1

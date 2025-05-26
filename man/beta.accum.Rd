@@ -30,7 +30,7 @@ beta.accum(
 \item{prog}{Present a text progress bar in the R console.}
 }
 \value{
-Three matrices of sampling units x diversity values, one per each of the three beta diversity measures (sampling units, individuals and observed diversity).
+Five matrices of sampling units x diversity values, one per each of the five beta diversity measures (sampling units, individuals and observed diversity).
 }
 \description{
 Beta diversity between two sites with accumulation of sampling units.
@@ -38,18 +38,18 @@ Beta diversity between two sites with accumulation of sampling units.
 \details{
 As widely recognized for species richness, beta diversity is also biased when communities are undersampled.
 Beta diversity accumulation curves have been proposed by Cardoso et al. (2009) to test if beta diversity has approached an asymptote when comparing two undersampled sites.
-The beta diversity measures used here follow the partitioning framework independently developed by Podani & Schmera (2011) and Carvalho et al. (2012)
-and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
+The beta diversity measures used here follow the partitioning frameworks developed by Podani & Schmera (2011), Carvalho et al. (2012) and Legendre (2019)
+and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich or Btotal = Bgain + Bloss.
 Btotal = total beta diversity, reflecting both species replacement and loss/gain;
-Brepl = beta diversity explained by replacement of species alone;
-Brich = beta diversity explained by species loss/gain (richness differences) alone.
+Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone;
+Bgain = beta diversity explained by species gain from T1 to T2; Bloss = beta diversity explained by species lost from T1 to T2.
 PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 The number and order of species in comm1 and comm2 must be the same as in tree. Also, the number of sampling units should be similar in both sites.
 }
 \examples{
 comm1 <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRUE)
 comm2 <- matrix(c(1,1,0,0,0,0,2,1,0,0,0,0,2,1,0,0,0,0,2,1), nrow = 4, byrow = TRUE)
-tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+tree <- tree.build(dist(c(1:5)))
 beta.accum(comm1, comm2)
 beta.accum(comm1, comm2, func = "Soerensen")
 beta.accum(comm1, comm2, tree)
@@ -62,6 +62,8 @@ Cardoso, P., Borges, P.A.V. & Veech, J.A. (2009) Testing the performance of beta
 Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 
 Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
+
+Legendre, P. (2019) A temporal beta-diversity index to identify sites that have changed in exceptional ways in space–time surveys. Ecology and Evolution, 9: 3500-3514.
 
 Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
 }

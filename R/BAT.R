@@ -1,12 +1,19 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.9.6 (2024-02-16)
+#####Version 2.10.0 (2025-05-12)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
-#####Maintainer: pmcardoso@fc.ul.pt
+#####Maintainer: pmcardoso@ciencias.ulisboa.pt
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.9.5:
-#####Corrected optim.alpha and optim.beta for sequential analyses
- 
+#####Changed from v2.9.6:
+#####Added function kernel.arrangement by Carvalho & Cardoso (2025)
+#####Added function tree.addTip to add tips to a given tree
+#####alpha function works with relative abundances
+#####All *.beta functions work with relative abundances and TBI by Legendre (2019)
+#####standard function now with option to use IQR and does not try to standardize categorical variables
+#####hyper.build now allows NMDS and returns variance/stress values for ordination methods
+#####hull.build and kernel.build are simplified, do not perform ordination anymore
+#####gower now implements both Podani and Pavoine versions and its output was corrected when any trait has more than 2 categories
+
 library("ape")
 library("geometry")
 library("graphics")
@@ -18,6 +25,7 @@ library("parallel")
 library("phytools")
 library("stats")
 library("terra")
+library("TreeTools")
 library("utils")
 library("vegan")
 #' @import ape
@@ -28,6 +36,7 @@ library("vegan")
 #' @import nls2
 #' @import parallel
 #' @import stats
+#' @import TreeTools
 #' @import utils
 #' @import vegan
 #' @importFrom MASS stepAIC
@@ -53,8 +62,8 @@ prepTree <- function(comm, tree, abund){
   if(missing(tree)){
     if(missing(comm))
       stop("One of comm OR tree must be provided")
-    tree = hclust(as.dist(matrix(1,ncol(comm),ncol(comm))))
-    tree$labels = colnames(comm)
+    tree = tree.build(as.dist(matrix(1,ncol(comm),ncol(comm))))
+    tree$tip.label = colnames(comm)
   } else {
     if(is.matrix(tree) || is.data.frame(tree))
       tree = tree.build(tree)
@@ -183,24 +192,6 @@ xTree <- function(tree) {
     return(list(lenEdges, sppEdges))
     
   } else if(is(tree, "phylo")){
-    
-    # old code
-    # lenEdges <- tree$edge.length
-    # nSpp <- length(tree$tip.label)
-    # nEdges <- length(tree$edge.length)
-    # root <- nSpp + 1
-    # sppEdges <- matrix(0, nSpp, nEdges)
-    # for(i in 1:nSpp){
-    #   find = i                                    #start by finding the ith species
-    #   repeat{
-    #     row = which(tree$edge[,2] == find)        #locate in which row of the edge table is our species or edge to be found
-    #     sppEdges[i, row] = 1
-    #     find = tree$edge[row,1]                   #find next edge if any until reaching the root
-    #     if(find == root) break                    #all edges of this species were found, go to next species
-    #   }
-    # }
-    # rownames(sppEdges) <- tree$tip.label
-    # return(list(lenEdges, sppEdges))
     
     edgeList = tree$edge # edge list
     edgeLength = tree$edge.length # edge length
@@ -340,8 +331,8 @@ pcorr <- function(obs, s1){
 #####observed beta (a = shared species/edges, b/c = species/edges exclusive to either site, comm is a 2sites x species matrix)
 betaObs <- function(comm, xtree, func = "jaccard", abund = TRUE, comp = FALSE){
   if(sum(comm) == 0)                                ##if no species on any community return 0
-    return(list(Btotal = 0, Brepl = 0, Brich = 0))
-  if (!abund || max(comm) == 1) {										##if incidence data
+    return(list(Btotal = 0, Brepl = 0, Brich = 0, Bgain = 0, Bloss = 0))
+  if (!abund) {										                  ##if incidence data
     obs1 <- sobs(comm[1,,drop=FALSE], xtree)
     obs2 <- sobs(comm[2,,drop=FALSE], xtree)
     obsBoth <- sobs(comm, xtree)
@@ -369,7 +360,7 @@ betaObs <- function(comm, xtree, func = "jaccard", abund = TRUE, comp = FALSE){
   denominator <- a + b + c
   if(tolower(substr(func, 1, 1)) == "s")
     denominator <- denominator + a
-  betaValues = (list(Btotal = (b+c)/denominator, Brepl = 2*min(b,c)/denominator, Brich = abs(b-c)/denominator))
+  betaValues = (list(Btotal = (b+c)/denominator, Brepl = 2*min(b,c)/denominator, Brich = abs(b-c)/denominator, Bgain = c/denominator, Bloss = b/denominator))
   if(comp){
     betaValues$Shared = a
     betaValues$Unique1 = b
@@ -642,7 +633,40 @@ optim.cost <- function(samples, methods){
     }
   }
   return(unlist(cost))
-}  
+} 
+
+#Auxiliary function: PNcp - Cumulative proportion of pairwise neighbor distances within distance r 
+rneig_distR <- function(coord, distances){
+  D <- as.matrix(dist(coord))
+  diag(D) <- Inf
+  n <- nrow(coord)
+  
+  out <- rep(0, length(distances))
+  for (i in 1:length(distances)){
+    out[i] <- sum(D <= distances[i]) / (n*(n-1))
+  }
+  
+  return(out)
+}
+
+#Auxiliary function: NNcp - Cumulative proportion of the nearest neighbor distances within distance r
+nnpair_distR <- function(coord, distances) {
+  D <- as.matrix(dist(coord))
+  diag(D) <- Inf 
+  n <- nrow(coord)
+
+  #Find the minimum distance for each row
+  minDist <- apply(D, 1, min)
+  
+  #ECDF of nn in function of distances
+  out <- rep(0, length(distances))
+  for (i in 1:length(distances)){
+    out[i] <- sum(minDist <= distances[i]) / n
+  }
+  
+  return(out)
+}
+
 
 ##################################################################################
 ##################################MAIN FUNCTIONS##################################
@@ -669,8 +693,7 @@ optim.cost <- function(samples, methods){
 #' @references Petchey, O.L. & Gaston, K.J. (2006) Functional diversity: back to basics and looking forward. Ecology Letters, 9, 741-758.
 #' @examples
 #' comm <- matrix(c(0,0,1,1,0,0,2,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
-#' trait = 1:5
-#' tree <- tree.build(trait)
+#' tree <- tree.build(dist(1:5))
 #' plot(tree, "u")
 #' alpha(comm)
 #' alpha(comm, raref = 0)
@@ -681,7 +704,7 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   #first organize the data
   if(!missing(tree)){
@@ -729,7 +752,7 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 #' @param runs Number of random permutations to be made to the sampling order. If not specified, default is 100.
 #' @param prog Present a text progress bar in the R console.
 #' @details Observed diversity often is an underestimation of true diversity. Several approaches have been devised to estimate species richness (TD) from incomplete sampling.
-#' These include: (1) fitting asymptotic functions to randomised accumulation curves (Soberon & Llorente 1993; Flather 1996; Cardoso et al. in prep.)
+#' These include: (1) fitting asymptotic functions to randomised accumulation curves (Soberon & Llorente 1993; Flather 1996; Cardoso et al. 2014)
 #' (2) the use of non-parametric estimators based on the incidence or abundance of rare species (Heltshe & Forrester 1983; Chao 1984, 1987; Colwell & Coddington 1994).
 #' A correction to non-parametric estimators has also been recently proposed, based on the proportion of singleton or unique species
 #' (species represented by a single individual or in a single sampling unit respectively; Lopez et al. 2012).
@@ -771,7 +794,7 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 #' @references Petchey, O.L. & Gaston, K.J. (2006) Functional diversity: back to basics and looking forward. Ecology Letters, 9, 741-758.
 #' @references Soberon, M.J. & Llorente, J. (1993) The use of species accumulation functions for the prediction of species richness. Conservation Biology, 7, 480-488.
 #' @examples comm <- matrix(c(1,1,0,0,0,0,2,1,0,0,0,0,2,1,0,0,0,0,2,1), nrow = 4, ncol = 5, byrow = TRUE)
-#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' tree <- tree.build(dist(c(1:5)))
 #' alpha.accum(comm)
 #' alpha.accum(comm, func = "nonparametric")
 #' alpha.accum(comm, tree, "completeness")
@@ -782,7 +805,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   #first organize the data
   if(!missing(tree)){
@@ -998,7 +1021,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 #' @references Petchey, O.L. & Gaston, K.J. (2002) Functional diversity (FD), species richness and community composition. Ecology Letters, 5, 402-411.
 #' @references Petchey, O.L. & Gaston, K.J. (2006) Functional diversity: back to basics and looking forward. Ecology Letters, 9, 741-758.
 #' @examples comm <- matrix(c(1,1,0,0,0,0,2,1,0,0,0,0,2,1,0,0,0,0,2,1), nrow = 4, ncol = 5, byrow = TRUE)
-#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' tree <- tree.build(dist(c(1:5)))
 #' alpha.estimate(comm)
 #' alpha.estimate(comm, tree)
 #' alpha.estimate(comm, tree, func = "completeness")
@@ -1010,7 +1033,7 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   #####function options:
   #####nonparametric (TD/PD/FD with non-parametric estimators)
@@ -1052,8 +1075,8 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
     if (missing(tree))
       stop("Completeness option not available without a tree...")
     results <- alpha.estimate(comm, tree, "nonparametric")
-    if(!is.null(tree$labels) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
-      comm <- comm[,match(tree$labels, colnames(comm))]
+    if(!is.null(tree$tip.label) && !is.null(colnames(comm))) ##if both tree and comm have species names match and reorder species (columns) in comm
+      comm <- comm[,match(tree$tip.label, colnames(comm))]
     tree <- xTree(tree)
     obs <- matrix(0,nrow(comm),1)
     for (s in 1:nrow(comm))
@@ -1086,7 +1109,7 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
 #' distance = dist(1:5)
 #' rao(comm)
 #' rao(comm, , distance)
-#' rao(comm, hclust(distance), raref = 1)
+#' rao(comm, tree.build(distance), raref = 1)
 #' @export
 rao <- function(comm, tree, distance, raref = 0, runs = 100){
   
@@ -1177,7 +1200,7 @@ hill <- function(comm, q = 0, raref = 0, runs = 100){
 }
 
 #' Mixture model.
-#' @description Mixture model by Hilario et al. subm.
+#' @description Mixture model by Hilario et al. (2025)
 #' @param comm A sites x species matrix, with abundance data.
 #' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree. Will only be used if q = 0, in which case phylogenetic or functional richness are calculated instead of species richness.
 #' @param q Hill number order: q(0) = species richness, q(1) ~ Shannon diversity, q(2) ~ Simpson diversity.
@@ -1189,10 +1212,10 @@ hill <- function(comm, q = 0, raref = 0, runs = 100){
 #' @details A tool to assess biodiversity in landscapes containing varying proportions of n environments.
 #' @return A matrix with expected diversity at each proportion of different habitats in a landscape.
 #' @references Chao et al. (2019) Proportional mixture of two rarefaction/extrapolation curves to forecast biodiversity changes under landscape transformation. Ecology Letters, 22: 1913-1922. https://doi.org/10.1111/ele.13322
-#' @references Hilario et al. (subm.) Function ‘mixture’: A new tool to quantify biodiversity change under landscape transformation.
+#' @references Hilario et al. (2025) Hilário, R. et al. (2025) A new tool to quantify biodiversity change under landscape transformation. Ecological Applications, 35: e3017.
 #' @author Renato Hilario & Pedro Cardoso
 #' @examples comm <- matrix(c(20,20,20,20,20,9,1,0,0,0,1,1,1,1,1), nrow = 3, ncol = 5, byrow = TRUE)
-#' tree = hclust(dist(1:5))
+#' tree = tree.build(dist(1:5))
 #' 
 #' hill(comm)
 #' alpha(comm, tree)
@@ -1209,7 +1232,7 @@ mixture <- function(comm, tree, q = 0, precision = 0.1, replace = TRUE, alpha = 
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   #create matrix of different habitat proportions
   prop = expand.grid(as.list(as.data.frame(matrix(rep(seq(0, 1, precision), nrow(comm)), nrow = (1/precision) + 1, ncol = nrow(comm)))))
@@ -1253,20 +1276,22 @@ mixture <- function(comm, tree, q = 0, precision = 0.1, replace = TRUE, alpha = 
 #' If not specified, default is 0.
 #' @param runs Number of resampling runs for rarefaction. If not specified, default is 100.
 #' @param comp Boolean indicating whether beta diversity components (shared and unique fractions) should be returned.
-#' @details The beta diversity measures used here follow the partitioning framework independently developed by Podani & Schmera (2011) and Carvalho et al. (2012)
-#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
+#' @details The beta diversity measures used here follow the partitioning frameworks developed by Podani & Schmera (2011), Carvalho et al. (2012) and Legendre (2019)
+#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich or Btotal = Bgain + Bloss.
 #' Btotal = total beta diversity, reflecting both species replacement and loss/gain;
-#' Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone.
+#' Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone;
+#' Bgain = beta diversity explained by species gain from T1 to T2; Bloss = beta diversity explained by species lost from T1 to T2.
 #' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
 #' The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001).
-#' @return Three distance matrices between sites, one per each of the three beta diversity measures (either "Obs" OR "Mean, Median, Min, LowerCL, UpperCL and Max").
+#' @return Five distance matrices between sites, one per each of the five beta diversity measures (either "Obs" OR "Mean, Median, Min, LowerCL, UpperCL and Max").  If comp = TRUE also three distance matrices with beta diversity components.
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 #' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
 #' @references Gotelli, N.J. & Colwell, R.K. (2001) Quantifying biodiversity: procedures and pitfalls in the measurement and comparison of species richness. Ecology Letters, 4, 379-391.
+#' @references Legendre, P. (2019) A temporal beta-diversity index to identify sites that have changed in exceptional ways in space–time surveys. Ecology and Evolution, 9: 3500-3514.
 #' @references Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
 #' @examples comm <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,2,2), nrow = 4, ncol = 5, byrow = TRUE)
-#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' tree <- tree.build(dist(c(1:5)))
 #' beta(comm)
 #' beta(comm, abund = FALSE, comp = TRUE)
 #' beta(comm, tree)
@@ -1277,7 +1302,7 @@ beta <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 1
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   #first organize the data
   if(!missing(tree)){
@@ -1290,19 +1315,19 @@ beta <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 1
   nComm <- nrow(comm)
   
   if(raref < 1){						# no rarefaction if 0 or negative
-    results <- array(0, dim=c(nComm, nComm, 3))
+    results <- array(0, dim=c(nComm, nComm, 5))
     rownames(results) = colnames(results) = rownames(comm)
-    comps <- results
+    comps <- results[,,1:3]
     for (i in 1:(nComm-1)){
       for (j in (i+1):nComm){
         commBoth <- as.matrix(rbind(comm[i,], comm[j,]))
         betaValues <- betaObs(commBoth, tree, func, abund, comp)
-        results[j,i,] <- unlist(betaValues)[1:3]
+        results[j,i,] <- unlist(betaValues)[1:5]
         if(comp)
-          comps[j,i,] <- unlist(betaValues)[4:6]
+          comps[j,i,] <- unlist(betaValues)[6:8]
       }
     }
-    results <- list(Btotal = as.dist(results[,,1]),Brepl = as.dist(results[,,2]),Brich = as.dist(results[,,3]))
+    results <- list(Btotal = as.dist(results[,,1]), Brepl = as.dist(results[,,2]), Brich = as.dist(results[,,3]), Bgain = as.dist(results[,,4]), Bloss = as.dist(results[,,5]))
     if (comp){
       results$Shared = round(as.dist(comps[,,1]),3)
       results$Unique_to_Cols = round(as.dist(comps[,,2]),3)
@@ -1312,19 +1337,21 @@ beta <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 1
   }
   if (raref == 1)
     raref <- nMin(comm)				# rarefy by minimum n among all communities
-  results <- array(0, dim=c(nComm, nComm, 3, 6))
+  results <- array(0, dim=c(nComm, nComm, 5, 6))
   
   for (i in 1:(nComm-1)){
     for (j in (i+1):nComm){
-      run <- matrix(0, runs, 3)
+      run <- matrix(0, runs, 5)
       for (r in 1:runs){
         commBoth <- as.matrix(rbind(rrarefy(comm[i,], raref), rrarefy(comm[j,], raref)))
         betaValues <- betaObs(commBoth, tree, func, abund)
         run[r,1] <- betaValues$Btotal
         run[r,2] <- betaValues$Brepl
         run[r,3] <- betaValues$Brich
+        run[r,4] <- betaValues$Bgain
+        run[r,5] <- betaValues$Bloss
       }
-      for (b in 1:3){
+      for (b in 1:5){
         results[j,i,b,1] <- mean(run[,b])
         results[j,i,b,2] <- quantile(run[,b], 0.5)
         results[j,i,b,3] <- min(run[,b])
@@ -1337,7 +1364,9 @@ beta <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 1
   results.total <- list(Btotal.mean = as.dist(results[,,1,1]), Btotal.median = as.dist(results[,,1,2]), Btotal.min = as.dist(results[,,1,3]), Btotal.lowCL = as.dist(results[,,1,4]), Btotal.upCL = as.dist(results[,,1,5]), Btotal.max = as.dist(results[,,1,6]))
   results.repl <- list(Brepl.mean = as.dist(results[,,2,1]), Brepl.median = as.dist(results[,,2,2]), Brepl.min = as.dist(results[,,2,3]), Brepl.lowCL = as.dist(results[,,2,4]), Brepl.upCL = as.dist(results[,,2,5]), Brepl.max = as.dist(results[,,2,6]))
   results.rich <- list(Brich.mean = as.dist(results[,,3,1]), Brich.median = as.dist(results[,,3,2]), Brich.min = as.dist(results[,,3,3]), Brich.lowCL = as.dist(results[,,3,4]), Brich.upCL = as.dist(results[,,3,5]), Brich.max = as.dist(results[,,3,6]))
-  results <- c(results.total, results.repl, results.rich)
+  results.gain <- list(Bgain.mean = as.dist(results[,,4,1]), Bgain.median = as.dist(results[,,4,2]), Bgain.min = as.dist(results[,,4,3]), Bgain.lowCL = as.dist(results[,,4,4]), Bgain.upCL = as.dist(results[,,4,5]), Bgain.max = as.dist(results[,,4,6]))
+  results.loss <- list(Bloss.mean = as.dist(results[,,5,1]), Bloss.median = as.dist(results[,,5,2]), Bloss.min = as.dist(results[,,5,3]), Bloss.lowCL = as.dist(results[,,5,4]), Bloss.upCL = as.dist(results[,,5,5]), Bloss.max = as.dist(results[,,5,6]))
+  results <- c(results.total, results.repl, results.rich, results.gain, results.loss)
   return (results)
 }
 
@@ -1352,21 +1381,22 @@ beta <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, runs = 1
 #' @param prog Present a text progress bar in the R console.
 #' @details As widely recognized for species richness, beta diversity is also biased when communities are undersampled.
 #' Beta diversity accumulation curves have been proposed by Cardoso et al. (2009) to test if beta diversity has approached an asymptote when comparing two undersampled sites.
-#' The beta diversity measures used here follow the partitioning framework independently developed by Podani & Schmera (2011) and Carvalho et al. (2012)
-#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
+#' The beta diversity measures used here follow the partitioning frameworks developed by Podani & Schmera (2011), Carvalho et al. (2012) and Legendre (2019)
+#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich or Btotal = Bgain + Bloss.
 #' Btotal = total beta diversity, reflecting both species replacement and loss/gain;
-#' Brepl = beta diversity explained by replacement of species alone;
-#' Brich = beta diversity explained by species loss/gain (richness differences) alone.
+#' Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone;
+#' Bgain = beta diversity explained by species gain from T1 to T2; Bloss = beta diversity explained by species lost from T1 to T2.
 #' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm1 and comm2 must be the same as in tree. Also, the number of sampling units should be similar in both sites.
-#' @return Three matrices of sampling units x diversity values, one per each of the three beta diversity measures (sampling units, individuals and observed diversity).
+#' @return Five matrices of sampling units x diversity values, one per each of the five beta diversity measures (sampling units, individuals and observed diversity).
 #' @references Cardoso, P., Borges, P.A.V. & Veech, J.A. (2009) Testing the performance of beta diversity measures based on incidence data: the robustness to undersampling. Diversity and Distributions, 15, 1081-1090.
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 #' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
+#' @references Legendre, P. (2019) A temporal beta-diversity index to identify sites that have changed in exceptional ways in space–time surveys. Ecology and Evolution, 9: 3500-3514.
 #' @references Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
 #' @examples comm1 <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, byrow = TRUE)
 #' comm2 <- matrix(c(1,1,0,0,0,0,2,1,0,0,0,0,2,1,0,0,0,0,2,1), nrow = 4, byrow = TRUE)
-#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' tree <- tree.build(dist(c(1:5)))
 #' beta.accum(comm1, comm2)
 #' beta.accum(comm1, comm2, func = "Soerensen")
 #' beta.accum(comm1, comm2, tree)
@@ -1382,7 +1412,7 @@ beta.accum <- function(comm1, comm2, tree, func = "jaccard", abund = TRUE, runs 
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   #first organize the data
   if(!missing(tree)){
@@ -1395,8 +1425,8 @@ beta.accum <- function(comm1, comm2, tree, func = "jaccard", abund = TRUE, runs 
   
   #now let's go for what matters
   nSamples <- nrow(comm1)
-  results <- matrix(0,nSamples, 4)
-  colnames(results) <- c("Sampl", "Btotal", "Brepl", "Brich")
+  results <- matrix(0,nSamples, 6)
+  colnames(results) <- c("Sampl", "Btotal", "Brepl", "Brich", "Bgain", "Bloss")
   if (prog) pb <- txtProgressBar(0, runs, style = 3)
   for (r in 1:runs){
     comm1 <- comm1[sample(nSamples),, drop=FALSE]			#shuffle sampling units of first community
@@ -1408,6 +1438,8 @@ beta.accum <- function(comm1, comm2, tree, func = "jaccard", abund = TRUE, runs 
       results[q,2] <- results[q,2] + betaValues$Btotal
       results[q,3] <- results[q,3] + betaValues$Brepl
       results[q,4] <- results[q,4] + betaValues$Brich
+      results[q,5] <- results[q,5] + betaValues$Bgain
+      results[q,6] <- results[q,6] + betaValues$Bloss
     }
     if (prog) setTxtProgressBar(pb, r)
   }
@@ -1429,20 +1461,21 @@ beta.accum <- function(comm1, comm2, tree, func = "jaccard", abund = TRUE, runs 
 #' If not specified, default is 0.
 #' @param runs Number of resampling runs for rarefaction. If not specified, default is 100.
 #' @details Beta diversity of multiple sites simultaneously is calculated as either the average or the variance among all pairwise comparisons (Legendre, 2014).
-#' The beta diversity measures used here follow the partitioning framework independently developed by Podani & Schmera (2011) and Carvalho et al. (2012)
-#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
+#' The beta diversity measures used here follow the partitioning frameworks developed by Podani & Schmera (2011), Carvalho et al. (2012) and Legendre (2019)
+#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich or Btotal = Bgain + Bloss.
 #' Btotal = total beta diversity, reflecting both species replacement and loss/gain;
-#' Brepl = beta diversity explained by replacement of species alone;
-#' Brich = beta diversity explained by species loss/gain (richness differences) alone.
+#' Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone;
+#' Bgain = beta diversity explained by species gain from T1 to T2; Bloss = beta diversity explained by species lost from T1 to T2.
 #' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in comm must be the same as in tree.
 #' @return A matrix of beta measures x diversity values (average and variance).
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 #' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
 #' @references Legendre, P. (2014) Interpreting the replacement and richness difference components of beta diversity. Global Ecology and Biogeography, 23: 1324-1334.
+#' @references Legendre, P. (2019) A temporal beta-diversity index to identify sites that have changed in exceptional ways in space–time surveys. Ecology and Evolution, 9: 3500-3514.
 #' @references Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
 #' @examples comm <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)
-#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' tree <- tree.build(dist(c(1:5)))
 #' beta.multi(comm)
 #' beta.multi(comm, func = "Soerensen")
 #' beta.multi(comm, tree)
@@ -1454,12 +1487,16 @@ beta.multi <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, ru
   Btotal.avg <- mean(pairwise$Btotal)
   Brepl.avg <- mean(pairwise$Brepl)
   Brich.avg <- mean(pairwise$Brich)
+  Bgain.avg <- mean(pairwise$Bgain)
+  Bloss.avg <- mean(pairwise$Bloss)
   Btotal.var <- sum(pairwise$Btotal)/(ncol(comm)*(ncol(comm)-1))
   Brepl.var <- sum(pairwise$Brepl)/(ncol(comm)*(ncol(comm)-1))
   Brich.var <- sum(pairwise$Brich)/(ncol(comm)*(ncol(comm)-1))
-  results <- matrix(c(Btotal.avg, Brepl.avg, Brich.avg, Btotal.var, Brepl.var, Brich.var), nrow = 3, ncol = 2)
+  Bgain.var <- sum(pairwise$Bgain)/(ncol(comm)*(ncol(comm)-1))
+  Bloss.var <- sum(pairwise$Bloss)/(ncol(comm)*(ncol(comm)-1))
+  results <- matrix(c(Btotal.avg, Brepl.avg, Brich.avg, Bgain.avg, Bloss.avg, Btotal.var, Brepl.var, Brich.var, Bgain.var, Bloss.var), nrow = 5, ncol = 2)
   colnames(results) <- c("Average", "Variance")
-  rownames(results) <- c("Btotal", "Brepl", "Brich")
+  rownames(results) <- c("Btotal", "Brepl", "Brich", "Bgain", "Bloss")
   return(results)
 }
 
@@ -1476,9 +1513,10 @@ beta.multi <- function(comm, tree, func = "jaccard", abund = TRUE, raref = 0, ru
 #' @return Distance matrix between sites.
 #' @references Bulla, L. (1994) An index of evenness and its associated diversity measure. Oikos, 70: 167-171.
 #' @references Camargo, J.A. (1993) Must dominance increase with the number of subordinate species in competitive interactions? Journal of Theoretical Biology, 161: 537-542.
-#' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
-#' distance <- dist(c(1:5), method = "euclidean")
-#' tree <- hclust(distance, method = "average")
+#' @examples
+#' comm <- matrix(c(1,2,0,0,1,1,0,0,0,2,2,0,1,1,1,100), nrow = 4, byrow = TRUE)
+#' tree <- tree.build(gower(comm))
+#' 
 #' beta.evenness(comm)
 #' beta.evenness(comm, tree)
 #' beta.evenness(comm, tree, method = "contribution")
@@ -1492,7 +1530,7 @@ beta.evenness <- function(comm, tree, distance, method = "expected", func = "cam
 #' @description Average dissimilarity between a species or individual and all others in a community.
 #' @param comm A sites x species matrix, with either abundance or incidence data. If missing, the originality using the full tree or distance matrix is calculated.
 #' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
-#' @param distance A dist object representing the phylogenetic or functional distance between species.
+#' @param distance A dist object representing the phylogenetic or functional distance between species. Only used if no tree is given.
 #' @param abund A boolean (T/F) indicating whether originality should be calculated per individual (T) or species (F).
 #' @param relative A boolean (T/F) indicating whether originality should be relative to the maximum distance between any two species in the tree or distance matrix.
 #' @details This is the originality measure of Pavoine et al. (2005) without replacement.
@@ -1500,8 +1538,7 @@ beta.evenness <- function(comm, tree, distance, method = "expected", func = "cam
 #' @references Pavoine, S., Ollier, S. & Dufour, A.-B. (2005) Is the originality of a species measurable? Ecology Letters, 8: 579-586.
 #' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
 #' distance <- dist(c(1:5), method="euclidean")
-#' tree = hclust(distance)
-#' 
+#' tree = tree.build(distance)
 #' originality(tree = tree)
 #' originality(distance = distance)
 #' originality(comm, tree)
@@ -1512,7 +1549,7 @@ originality <- function(comm, tree, distance, abund = FALSE, relative = FALSE){
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   if(missing(comm)){
     if(!missing(distance))
@@ -1560,15 +1597,14 @@ originality <- function(comm, tree, distance, abund = FALSE, relative = FALSE){
 #' @description Dissimilarity between each species and the single closest in a community.
 #' @param comm A sites x species matrix, with either abundance or incidence data. If missing, the uniqueness using the full tree or distance matrix is calculated.
 #' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
-#' @param distance A dist object representing the phylogenetic or functional distance between species.
+#' @param distance A dist object representing the phylogenetic or functional distance between species. Only used if no tree is given.
 #' @param relative A boolean (T/F) indicating whether uniqueness should be relative to the maximum distance between any two species in the tree or distance matrix.
 #' @details This is equivalent to the originality measure of Mouillot et al. (2013).
 #' @return A matrix of sites x species values.
 #' @references Mouillot, D., Graham, N.A., Villeger, S., Mason, N.W. & Bellwood, D.R. (2013) A functional approach reveals community responses to disturbances. Trends in Ecology and Evolution, 28: 167-177.
 #' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,0,1), nrow = 4, byrow = TRUE)
 #' distance <- dist(c(1:5), method="euclidean")
-#' tree <- hclust(distance, method="average")
-#' 
+#' tree <- tree.build(distance)
 #' uniqueness(tree = tree)
 #' uniqueness(distance = distance)
 #' uniqueness(comm, tree)
@@ -1577,7 +1613,7 @@ uniqueness <- function(comm, tree, distance, relative = FALSE){
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   if(missing(comm)){
     if(!missing(distance))
@@ -1627,7 +1663,7 @@ uniqueness <- function(comm, tree, distance, relative = FALSE){
 #' @references Isaac, N.J.B., Turvey, S.T., Collen, B., Waterman, C. & Baillie, J.E.M. (2007) Mammals on the EDGE: conservation priorities based on threat and phylogeny. PLoS One, 2: e296.
 #' @references Cadotte, M.W., Davies, T.J., Regetz, J., Kembel, S.W., Cleland, E. & Oakley, T.H. (2010) Phylogenetic diversity metrics for ecological communities: integrating species richness, abundance and evolutionary history. Ecology Letters, 13: 96-105.
 #' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,0,1), nrow = 4, byrow = TRUE)
-#' tree = tree.build(1:5)
+#' tree = tree.build(gower(1:5))
 #' 
 #' contribution(comm, tree)
 #' contribution(comm, tree, TRUE)
@@ -1637,7 +1673,7 @@ contribution <- function(comm, tree, abund = FALSE, relative = FALSE){
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   if(missing(comm))
     comm = rep(1, length(tree$order))
@@ -1658,7 +1694,7 @@ contribution <- function(comm, tree, abund = FALSE, relative = FALSE){
         comm <- comm[,match(tree$labels, colnames(comm))]
     }
   } else {
-    tree = nj(as.dist(matrix(1,ncol(comm),ncol(comm))))
+    tree = ape::nj(as.dist(matrix(1,ncol(comm),ncol(comm))))
   }
   
   contrib <- matrix(0, nrow(comm), ncol(comm))
@@ -1695,18 +1731,21 @@ contribution <- function(comm, tree, abund = FALSE, relative = FALSE){
 #' @description Average dissimilarity between any two species or individuals randomly chosen in a community.
 #' @param comm A sites x species matrix, with either abundance or incidence data. If missing, the dispersion using the full tree or distance matrix is calculated.
 #' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
-#' @param distance A dist object representing the phylogenetic or functional distance between species.
-#' @param func Calculate dispersion using originality (default), uniqueness or contribution.
+#' @param distance A dist object representing the phylogenetic or functional distance between species. Only used if no tree is given.
+#' @param func Calculate dispersion using originality (default; = MPD), uniqueness (= MNTD) or contribution.
 #' @param abund A boolean (T/F) indicating whether dispersion should be calculated using individuals (T) or species (F).
 #' @param relative A boolean (T/F) indicating whether dispersion should be relative to the maximum distance between any two species in the tree or distance matrix.
-#' @details If abundance data is used and a tree is given, dispersion is the quadratic entropy of Rao (1982).
+#' @details Many different metrics have been proposed to quantify dispersion.
+#' When func = "originality" this is equivalent to Mean Phylogenetic Diversity (MPD)
+#' When func = "uniqueness" dispersion is equivalent to Mean Nearest Taxon Distance (MNTD).
+#' If abundance data is used and a tree is given, dispersion is the quadratic entropy of Rao (1982).
 #' If abundance data is not used but a tree is given, dispersion is the phylogenetic dispersion measure of Webb et al. (2002).
 #' @return A vector of values per site (or a single value if no comm is given).
 #' @references Rao, C.R. (1982) Diversity and dissimilarity coefficients: a unified approach. Theoretical Population Biology, 21: 24-43.
 #' @references Webb, C.O., Ackerly, D.D., McPeek, M.A. & Donoghue, M.J. (2002) Phylogenies and community ecology. Annual Review of Ecology and Systematics, 33: 475-505.
 #' @examples comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
 #' distance <- dist(c(1:5), method="euclidean")
-#' tree <- hclust(distance, method="average")
+#' tree <- tree.build(distance)
 #' dispersion(tree = tree)
 #' dispersion(distance = distance)
 #' dispersion(comm, tree)
@@ -1717,7 +1756,7 @@ dispersion <- function(comm, tree, distance, func = "originality", abund = TRUE,
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   if(missing(comm)){
     if(!missing(distance))
@@ -1772,10 +1811,11 @@ dispersion <- function(comm, tree, distance, func = "originality", abund = TRUE,
 #' @references Bulla, L. (1994) An index of evenness and its associated diversity measure. Oikos, 70: 167-171.
 #' @references Camargo, J.A. (1993) Must dominance increase with the number of subordinate species in competitive interactions? Journal of Theoretical Biology, 161: 537-542.
 #' @examples
-#' comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
-#' distance <- dist(c(1:5), method = "euclidean")
-#' tree <- hclust(distance, method = "average")
+#' comm <- matrix(c(1,1,1,1,1,1,2,1,0,0,0,2,2,2,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
+#' tree <- tree.build(dist(c(1:5)), func = "upgma")
+#' 
 #' evenness(comm)
+#' evenness(tree = tree)
 #' evenness(tree = tree, func = "bulla")
 #' evenness(comm, tree)
 #' evenness(comm, tree, method = "contribution")
@@ -1785,7 +1825,7 @@ evenness <- function(comm, tree, distance, method = "expected", func = "camargo"
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   if(missing(comm))
     comm = rep(1, length(tree$order))
@@ -1798,10 +1838,9 @@ evenness <- function(comm, tree, distance, method = "expected", func = "camargo"
   if(!missing(tree)){
     comm = reorderComm(comm, tree)
   } else if (!missing(distance)){
-    tree = nj(distance)
+    tree = tree.build(distance)
   } else {
-    tree = nj(as.dist(matrix(1,ncol(comm),ncol(comm))))
-    tree$labels = colnames(comm)
+    tree = tree.build(as.dist(matrix(1,ncol(comm),ncol(comm))))
   }
   
   #calculate evenness
@@ -1813,11 +1852,12 @@ evenness <- function(comm, tree, distance, method = "expected", func = "camargo"
       evenness[i] = NA
       next
     }
-    thisTree = ape::as.phylo(tree)     #redo tree for thisComm
-    thisTree = keep.tip(thisTree, thisSpp)
+    thisTree = keep.tip(ape::as.phylo(tree), thisSpp) #redo tree for thisComm
+    thisTree$edge.length = thisTree$edge.length *2  #must do this as keep.tip halves the lengths for some reason
     if(method == "expected"){               #if expected
       thisTree = prep(thisComm, xTree(thisTree), abund)
       thisEdges = which(thisTree$lenBranch > 0 & thisTree$sampleBranch > 0)
+      nEdges = length(thisEdges)
       thisObs = c()
       for(j in thisEdges){											    			#cycle through all edges of this site/sample
         #calculate the observed values as avg abundance per species of edge / length of edge 
@@ -1826,11 +1866,10 @@ evenness <- function(comm, tree, distance, method = "expected", func = "camargo"
       thisObs = thisObs / sum(thisObs)
       if(func == "bulla"){
         ##calculate the expected values as avg length of tree edges
-        thisExp = 1 / length(thisEdges)
+        thisExp = 1 / nEdges
         #calculate evenness as the sum of minimum values between observed and expected with correction from Bulla, 1994
-        evenness[i] = (sum(apply(cbind(thisObs, rep(thisExp, length(thisObs))), 1, min)) - (1/length(thisEdges))) / (1-1/length(thisEdges))
+        evenness[i] = (sum(apply(cbind(thisObs, rep(thisExp, length(thisObs))), 1, min)) - thisExp) / (1 - thisExp)
       } else if(func == "camargo"){      #if Camargo
-        nEdges = length(thisObs)
         for(j in 1:(nEdges-1)){
           for(k in (j+1):nEdges){
             evenness[i] = evenness[i] + abs(thisObs[j] - thisObs[k])
@@ -1883,9 +1922,10 @@ evenness <- function(comm, tree, distance, method = "expected", func = "camargo"
 #' @return A matrix of sites x species (or a vector if no comm is given).
 #' @references Bulla, L. (1994) An index of evenness and its associated diversity measure. Oikos, 70: 167-171.
 #' @references Camargo, J.A. (1993) Must dominance increase with the number of subordinate species in competitive interactions? Journal of Theoretical Biology, 161: 537-542.
-#' @examples comm <- matrix(c(1,2,0,5,5,1,1,0,0,0,0,2,2,0,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
-#' distance <- dist(c(1:5), method = "euclidean")
-#' tree <- hclust(distance, method = "average")
+#' @examples
+#' comm <- matrix(c(1,2,1,5,5,1,1,1,0,0,0,2,2,1,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
+#' tree <- tree.build(dist(c(1:5)), func = "upgma")
+#' 
 #' evenness.contribution(comm)
 #' evenness.contribution(tree = tree, func = "bulla")
 #' evenness.contribution(comm, tree)
@@ -1905,15 +1945,14 @@ evenness.contribution <- function(comm, tree, distance, method = "expected", fun
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   if(!missing(tree)){
     comm = reorderComm(comm, tree)
   } else if (!missing(distance)){
-    tree = nj(distance)
+    tree = tree.build(distance)
   } else {
-    tree = nj(as.dist(matrix(1,ncol(comm),ncol(comm))))
-    tree$labels = colnames(comm)
+    tree = tree.build(as.dist(matrix(1,ncol(comm),ncol(comm))))
   }
   
   #extract total evenness
@@ -1958,7 +1997,7 @@ evenness.contribution <- function(comm, tree, distance, method = "expected", fun
 #' 
 #' hv = hull.build(comm[1,], trait)
 #' hull.alpha(hv)
-#' hvlist = hull.build(comm, trait, axes = 2)
+#' hvlist = hull.build(comm, trait)
 #' hull.alpha(hvlist)
 #' @export
 hull.alpha <- function(comm){
@@ -1986,12 +2025,17 @@ hull.alpha <- function(comm){
 #' @param comm A list of 'convhulln' objects, preferably built with function hull.build.
 #' @param func Partial match indicating whether the Jaccard (default) or Soerensen family of beta diversity measures should be used.
 #' @param comp Boolean indicating whether beta diversity components (shared and unique fractions) should be returned.
-#' @details Computes a pairwise decomposition of the overall differentiation among kernel hypervolumes into two components: the replacement (shifts) of space between hypervolumes and net differences between the amount of space enclosed by each hypervolume.
-#' The beta diversity measures used here follow the FD partitioning framework where Btotal = Breplacement + Brichness. Beta diversity ranges from 0 (when hypervolumes are identical) to 1 (when hypervolumes are fully dissimilar).
-#' See Carvalho & Cardoso (2020) and Mammola & Cardoso (2020) for the full formulas of beta diversity used here.
-#' @return Three pairwise distance matrices, one per each of the three beta diversity components.
-#' @references Carvalho, J.C. & Cardoso, P. (2020) Decomposing the causes for niche differentiation between species using hypervolumes. Frontiers in Ecology and Evolution. https://doi.org/10.3389/fevo.2020.00243
-#' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution. https://doi.org/10.1111/2041-210X.13424
+#' @details Computes a pairwise decomposition of the overall differentiation among convex hull hypervolumes.
+#' The beta diversity measures used here follow the partitioning frameworks developed by Podani & Schmera (2011), Carvalho et al. (2012) and Legendre (2019)
+#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich or Btotal = Bgain + Bloss.
+#' Btotal = total beta diversity, reflecting both species replacement and loss/gain;
+#' Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone;
+#' Bgain = beta diversity explained by species gain from T1 to T2; Bloss = beta diversity explained by species lost from T1 to T2.
+#' @return Five pairwise distance matrices, one per each of the five beta diversity metrics.  If comp = TRUE also three distance matrices with beta diversity components.
+#' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
+#' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
+#' @references Legendre, P. (2019) A temporal beta-diversity index to identify sites that have changed in exceptional ways in space–time surveys. Ecology and Evolution, 9: 3500-3514.
+#' @references Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
 #' @examples comm <- rbind(c(1,1,1,1,1), c(1,1,1,1,1), c(0,0,1,1,1),c(0,0,1,1,1))
 #' colnames(comm) = c("SpA","SpB","SpC","SpD", "SpE")
 #' rownames(comm) = c("Site 1","Site 2","Site 3","Site 4")
@@ -2002,7 +2046,6 @@ hull.alpha <- function(comm){
 #'
 #' hvlist = hull.build(comm, trait)
 #' hull.beta(hvlist)
-#' hvlist = hull.build(comm, trait, axes = 2)
 #' hull.beta(hvlist, comp = TRUE)
 #' @export
 hull.beta <- function(comm, func = "jaccard", comp = FALSE){
@@ -2013,31 +2056,34 @@ hull.beta <- function(comm, func = "jaccard", comp = FALSE){
   
   #create matrices to store results
   nComm <- length(comm)
-  Btotal <- Brepl <- Brich <- compA <- compB <- compC <- matrix(NA, nrow = nComm, ncol = nComm)
+  Btotal <- Brepl <- Brich <- Bgain <- Bloss <- compA <- compB <- compC <- matrix(NA, nrow = nComm, ncol = nComm)
   
   #calculate beta values
   for (i in 1:(nComm-1)){
     for(j in (i+1):nComm){
-      intersection <- geometry::intersectn(comm[[i]]$p, comm[[j]]$p, options = "FA")$ch$vol
-      unique1 <- comm[[i]]$vol - intersection
-      unique2 <- comm[[j]]$vol - intersection
-      union <- unique1 + unique2 + intersection
+      intersection = geometry::intersectn(comm[[i]]$p, comm[[j]]$p, options = "FA")$ch$vol
+      unique1 = comm[[i]]$vol - intersection
+      unique2 = comm[[j]]$vol - intersection
+      union = unique1 + unique2 + intersection
       if(comp){
         compA[j,i] = union - unique1 - unique2
         compB[j,i] = unique1
         compC[j,i] = unique2
       }
       if(tolower(substr(func, 1, 1)) == "s")
-        union <- 2 * union - unique1 - unique2
-      Btotal[j,i] <- (unique1 + unique2) / union
-      Brepl[j,i]  <- 2 * min(unique1, unique2) / union 
-      Brich[j,i]  <- abs(unique1 - unique2) / union 
+        union = 2 * union - unique1 - unique2
+      Btotal[j,i] = (unique1 + unique2) / union
+      Brepl[j,i] = 2 * min(unique1, unique2) / union 
+      Brich[j,i] = abs(unique1 - unique2) / union 
+      Bgain[j,i] = unique2 / union
+      Bloss[j,i] = unique1 / union 
     }
   }
   
   #finalize
   rownames(Btotal) <- colnames(Btotal) <- rownames(Brepl) <- colnames(Brepl) <- rownames(Brich) <- colnames(Brich) <- names(comm)
-  betaValues <- list(Btotal = round(as.dist(Btotal),3), Brepl = round(as.dist(Brepl),3), Brich = round(as.dist(Brich),3))
+  rownames(Bgain) <- colnames(Bgain) <- rownames(Bloss) <- colnames(Bloss) <- names(comm)
+  betaValues <- list(Btotal = round(as.dist(Btotal),3), Brepl = round(as.dist(Brepl),3), Brich = round(as.dist(Brich),3), Bgain = round(as.dist(Bgain),3), Bloss = round(as.dist(Bloss),3))
   if (comp){
     rownames(compA) <- colnames(compA) <- rownames(compB) <- colnames(compB) <- rownames(compC) <- colnames(compC) <- names(comm)
     betaValues$Shared = round(as.dist(compA),3)
@@ -2063,7 +2109,7 @@ hull.beta <- function(comm, func = "jaccard", comp = FALSE){
 #' 
 #' hv = hull.build(comm[1,], trait)
 #' hull.contribution(hv)
-#' hvlist = hull.build(comm, trait, axes = 2)
+#' hvlist = hull.build(comm, trait)
 #' hull.contribution(hvlist, relative = TRUE)
 #' @export
 hull.contribution = function(comm, relative = FALSE){
@@ -2158,12 +2204,20 @@ kernel.alpha <- function(comm){
 #' @param comm A 'HypervolumeList' object, preferably built using function kernel.build.
 #' @param func Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used.  If not specified, default is Jaccard.
 #' @param comp Boolean indicating whether beta diversity components (shared and unique fractions) should be returned
-#' @details Computes a pairwise decomposition of the overall differentiation among kernel hypervolumes into two components: the replacement (shifts) of space between hypervolumes and net differences between the amount of space enclosed by each hypervolume.
-#' The beta diversity measures used here follow the FD partitioning framework developed by Carvalho & Cardoso (2020), where Btotal = Breplacement + Brichness. Beta diversity ranges from 0 (when hypervolumes are identical) to 1 (when hypervolumes are fully dissimilar).
+#' @details Computes a pairwise decomposition of the overall differentiation among kernel density hypervolumes.
+#' The beta diversity measures used here follow the partitioning frameworks developed by Podani & Schmera (2011), Carvalho et al. (2012) and Legendre (2019)
+#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich or Btotal = Bgain + Bloss.
+#' Btotal = total beta diversity, reflecting both volume replacement and loss/gain;
+#' Brepl = beta diversity explained by replacement of volume alone; Brich = beta diversity explained by volume loss/gain (richness differences) alone;
+#' Bgain = beta diversity explained by volume gain from T1 to T2; Bloss = beta diversity explained by volume lost from T1 to T2.
 #' See Carvalho & Cardoso (2020) and Mammola & Cardoso (2020) for the full formulas of beta diversity used here.
-#' @return Three pairwise distance matrices, one per each of the three beta diversity components. If comp = TRUE also three distance matrices with beta diversity components.
+#' @return Five pairwise distance matrices, one per each of the five beta diversity components. If comp = TRUE also three distance matrices with beta diversity components.
 #' @references Carvalho, J.C. & Cardoso, P. (2020) Decomposing the causes for niche differentiation between species using hypervolumes. Frontiers in Ecology and Evolution, 8: 243.
+#' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
+#' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
+#' @references Legendre, P. (2019) A temporal beta-diversity index to identify sites that have changed in exceptional ways in space–time surveys. Ecology and Evolution, 9: 3500-3514.
 #' @references Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
+#' @references Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
 #' @examples \dontrun{
 #' comm <- rbind(c(1,1,1,1,1), c(1,1,1,1,1), c(0,0,1,1,1),c(0,0,1,1,1))
 #' colnames(comm) = c("SpA","SpB","SpC","SpD", "SpE")
@@ -2187,7 +2241,7 @@ kernel.beta = function(comm, func = "jaccard", comp = FALSE){
   
   #create matrices to store results
   nComm <- length(comm@HVList)
-  Btotal <- Brepl <- Brich <- compA <- compB <- compC <- matrix(NA, nrow = nComm, ncol = nComm)
+  Btotal <- Brepl <- Brich <- Bgain <- Bloss <- compA <- compB <- compC <- matrix(NA, nrow = nComm, ncol = nComm)
   
   #calculate beta values and give them a name
   commNames <- c()
@@ -2208,13 +2262,16 @@ kernel.beta = function(comm, func = "jaccard", comp = FALSE){
       Btotal[j,i] <- (unique1 + unique2) / union
       Brepl[j,i]  <- 2 * min(unique1, unique2) / union 
       Brich[j,i]  <- abs(unique1 - unique2) / union
+      Bgain[j,i]  <- unique2 / union
+      Bloss[j,i]  <- unique1 / union
     }
     commNames[i] <- comm@HVList[[i]]@Name
   }
   
   #finalize
   rownames(Btotal) <- colnames(Btotal) <- rownames(Brepl) <- colnames(Brepl) <- rownames(Brich) <- colnames(Brich) <- commNames
-  betaValues <- list(Btotal = round(as.dist(Btotal),3), Brepl = round(as.dist(Brepl),3), Brich = round(as.dist(Brich),3))
+  rownames(Bgain) <- colnames(Bgain) <- rownames(Bloss) <- colnames(Bloss) <- commNames
+  betaValues <- list(Btotal = round(as.dist(Btotal),3), Brepl = round(as.dist(Brepl),3), Brich = round(as.dist(Brich),3), Bgain = round(as.dist(Bgain),3), Bloss = round(as.dist(Bloss),3))
   if (comp){
     rownames(compA) <- colnames(compA) <- rownames(compB) <- colnames(compB) <- rownames(compC) <- colnames(compC) <- commNames
     betaValues$Shared = round(as.dist(compA),3)
@@ -2792,6 +2849,133 @@ kernel.hotspots <- function(comm, prop = 0.5){
   return(hot)
 }
 
+#' Functional arrangement of kernel density hypervolumes.
+#' @description Functional arrangement of a community, measuring the distribution of stochastic points within the total functional space at different distances.
+#' @param comm A 'Hypervolume' object, preferably built using function kernel.build.
+#' @param stat statistic to be calculated. One of c("rneig", "nnpair"), meaning "nearest neighbor" and "all neighbors" respectively.
+#' @param distance vector of distances to be considered in calculations
+#' @param pool Species pool coordinates to use for null model construction. 
+#'   When `NULL` (default), the function performs a random displacement null model using the environmental space defined in the hypervolume object. 
+#'   When specified (typically coordinates from `hyper.build` output), the function instead performs a random selection null model, drawing species randomly from the provided pool coordinates.
+#'   Must be a matrix or data.frame of coordinates matching the hypervolume dimensions.
+#' @param type Envelope type for testing significance. One of c("ecdf", "norm", "SES"), meaning "empirical cumulative distribution", "normalized envelope" (between 0-1, 0.5 indicate randomness, more than 0.5 - clustered; less than 0.5 - inhibition), and "standardized effect size" respectively.
+#' @param alpha alpha value to consider in significance testing (p-value).
+#' @param runs number of simulations for significance testing.
+#' @param plotValues Whether to plot "rneig" or "nnpair" values for all distances.
+#' @details This function measures the functional arrangement (Carvalho & Cardoso, subm.) of a n-dimensional hypervolume, namely the distribution of stochastic points within the total trait space from small to large functional distances.
+#' @return A list with observed rneig or nnpair values, the confidence limits and standard effect size.
+#' @references Carvalho, J.C. & Cardoso, P. (subm.) Quantifying species distribution within the functional space.
+#' @examples \dontrun{
+#' comm = c(100,3,0,5,3)
+#' names(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+#' 
+#' trait = data.frame(body = c(1,2,3,4,2), beak = c(1,5,4,1,2))
+#' rownames(trait) = names(comm)
+#' 
+#' hv = kernel.build(comm, trait, method.hv = "svm", svm.nu = 0.01, svm.gamma = 0.25)
+#' kernel.arrangement(hv)
+#' }
+#' @export
+kernel.arrangement <- function (comm, stat = "rneig", distance = seq(0,1,0.01), pool = NULL, type = "SES", alpha = 0.05, runs = 99, plotValues = TRUE){
+  
+  #check if right data is provided
+  if (!(class(comm) %in% c("Hypervolume")))
+    stop("A Hypervolume is needed as input data.")
+  
+  #get parameters
+  spp <- comm@Data
+  nSpp <- nrow(spp) # number of species in the community
+  
+  # Pool argument
+  if (is.null(pool)) {
+    space <- comm@RandomPoints
+  } else {
+    space <- pool
+  }
+  
+  stat <- match.arg (stat, c("rneig", "nnpair"))
+  type <- match.arg (type, c("ecdf", "norm", "SES"))
+  cl = -qnorm(alpha/2) #convert alpha to SD
+  maxDist <- max(distance)
+  
+  ##null models
+  env <- matrix (0, length(distance), runs) ## empty matrix for envelope
+  switch (stat,
+          rneig = {
+            obs <- rneig_distR(spp, distance)
+            for (i in 1:runs) {
+              print(paste("Simulation", i, "of", runs))
+              run <- space[sample(1:nrow(space), nSpp),]
+              env[,i] <- rneig_distR(run, distance)
+            }
+          },
+          nnpair = {
+            obs <- nnpair_distR(spp, distance) 
+            for (i in 1:runs) {
+              print (paste ("Simulation", i, "of", runs))
+              run <- space[sample(1:nrow(space), nSpp),]
+              env[,i] <- nnpair_distR(run, distance)
+            }
+          }
+  )
+  
+  ##envelope type
+  switch(type, 
+         
+   #using edcf
+   ecdf = {
+     lo <- apply(env, 1, min)
+     hi <- apply(env, 1, max)
+     
+     ## Plot the observed value in function of expected value under randomness assumption (average of simulations)
+     if(plotValues){
+       plot(distance, obs, xlim = c(0, maxDist), ylim = c(min(lo, obs),max(hi, obs)), type = "l", col = "blue")
+       abline (h = 0.5, lty = 2)
+       lines (distance, lo, lty = 3)
+       lines (distance, hi, lty = 3)
+     }
+   },
+   
+   #using norm
+   norm = {
+     avg <- apply(env, 1, mean)
+     H <- obs / avg
+     Hst <- H / (H+1)
+     lo <- apply(env / avg, 1, min)
+     hi <- apply(env / avg, 1, max)
+     Hlo <- lo / (lo+1)
+     Hhi <- hi / (hi+1)
+     
+     ## Plot the observed value in function of expected value under randomness assumption (average of simulations)
+     if(plotValues){
+       plot(distance, Hst, xlim = c(0, maxDist), ylim = c(min(na.omit(Hlo), na.omit(Hst)), max(na.omit(Hhi), na.omit(Hst))), type = "l", col = "blue")
+       abline (h = 0.5, lty = 2)
+       lines (distance, Hlo, lty = 3)
+       lines (distance, Hhi, lty = 3)
+     }
+   },
+   
+   #using Standard Effect Size
+   SES = {
+     env_avg <- apply(env, 1, mean)
+     env_sd <- apply(env, 1, sd)
+     ses_value <- (obs - env_avg) / env_sd #Standard Effect Size
+     
+     if(plotValues){
+       ymin <- min(min(ses_value[ses_value != -Inf], na.rm = TRUE), -cl)
+       ymax <- max(max(ses_value[ses_value != Inf], na.rm = TRUE), cl)
+       plot(distance, ses_value, ylim = c(ymin, ymax), xlab = "distance", ylab = "SES", type = "l", col = "blue")
+       abline (h = 0, lty = 3)
+       abline (h = cl, lty = 2)
+       abline (h = -cl, lty = 2)
+     }
+   }
+  )
+  
+  ##final output
+  return(list (obs, env, ses_value))
+}
+
 #' Gamma diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).
 #' @description Observed richness among multiple sites.
 #' @param comm A sites x species matrix, with either abundance or incidence data.
@@ -2804,11 +2988,9 @@ kernel.hotspots <- function(comm, prop = 0.5){
 #' @references Petchey, O.L. & Gaston, K.J. (2002) Functional diversity (FD), species richness and community composition. Ecology Letters, 5, 402-411.
 #' @references Petchey, O.L. & Gaston, K.J. (2006) Functional diversity: back to basics and looking forward. Ecology Letters, 9, 741-758.
 #' @examples comm <- matrix(c(0,0,1,1,0,0,2,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
-#' trait = 1:5
-#' tree <- hclust(dist(c(1:5), method = "euclidean"), method = "average")
+#' tree <- tree.build(gower(1:5))
 #' alpha(comm)
 #' gamma(comm)
-#' gamma(comm, trait)
 #' gamma(comm, tree)
 #' @export
 gamma <- function(comm, tree){
@@ -2832,7 +3014,7 @@ gamma <- function(comm, tree){
 #' hv = hull.build(comm[1,], trait)
 #' hull.alpha(hv)
 #' hull.gamma(hv)
-#' hvlist = hull.build(comm, trait, axes = 2)
+#' hvlist = hull.build(comm, trait)
 #' hull.alpha(hvlist)
 #' hull.gamma(hvlist)
 #' @export
@@ -3072,7 +3254,7 @@ cwe <- function(comm, trait, func = "camargo", abund = TRUE, na.rm = FALSE){
 #' @references Walther, B.A. & Moore, J.L. (2005) The concepts of bias, precision and accuracy, and their use in testing the performance of species richness estimators, with a literature reviewof estimator performance. Ecography, 28, 815-829.
 #' @examples comm1 <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)
 #' comm2 <- matrix(c(1,1,0,0,0,0,2,1,0,0,0,0,2,1,0,0,0,0,2,1), nrow = 4, ncol = 5, byrow = TRUE)
-#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' tree <- tree.build(gower(1:5))
 #' acc.alpha = alpha.accum(comm1)
 #' accuracy(acc.alpha)
 #' accuracy(acc.alpha, 10)
@@ -3081,7 +3263,7 @@ cwe <- function(comm, trait, func = "camargo", abund = TRUE, na.rm = FALSE){
 #' accuracy(acc.beta, c(1,1,0))
 #' @export
 accuracy <- function(accum, target = -1){
-  if(ncol(accum) > 5 || accum[nrow(accum), 3] > 1){		#if alpha
+  if(ncol(accum) > 7 || accum[nrow(accum), 3] > 1){		#if alpha
     if (target == -1)
       target <- accum[nrow(accum), 3]
     intensTotal = accum[nrow(accum), 2] / accum[nrow(accum), 3]	#sampling intensity = final n / final S
@@ -3100,8 +3282,7 @@ accuracy <- function(accum, target = -1){
       }
       rownames(smse) <- c("Raw", "Weighted")
       colnames(smse) <- c("Obs", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
-    }
-    else{                              #if curve
+    } else {                              #if curve
       smse <- matrix(0, 5, nrow = 2)
       for (i in 3:nrow(accum)){
         intensity = accum[i, 2] / accum[i, 3] / intensTotal
@@ -3118,14 +3299,14 @@ accuracy <- function(accum, target = -1){
     }
   } else {																						#if beta
     if (target[1] == -1)
-      target <- accum[nrow(accum), 2:4]
-    smse <- rep(0, 3)
+      target <- accum[nrow(accum), 2:6]
+    smse <- rep(0, 5)
     for (i in 1:nrow(accum)){
-      for (j in 1:3)
+      for (j in 1:5)
         smse[j] <- smse[j] + (accum[i,j+1] - target[j])^2
     }
     smse <- smse / nrow(accum)
-    smse <- list(Btotal=smse[1], Brepl=smse[2], Brich=smse[3])
+    smse <- list(Btotal=smse[1], Brepl=smse[2], Brich=smse[3], Bgain=smse[4], Bloss=smse[5])
     smse <- c(unlist(smse))
   }
   return(smse)
@@ -3140,14 +3321,14 @@ accuracy <- function(accum, target = -1){
 #' @references Cardoso, P., Pekar, S., Jocque, R. & Coddington, J.A. (2011) Global patterns of guild composition and functional diversity of spiders. PLoS One, 6, e21710.
 #' @examples comm1 <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)
 #' comm2 <- matrix(c(1,1,0,0,0,0,2,1,0,0,0,0,2,1,0,0,0,0,2,1), nrow = 4, ncol = 5, byrow = TRUE)
-#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' tree <- tree.build(gower(1:5))
 #' acc.alpha = alpha.accum(comm1)
 #' slope(acc.alpha)
 #' acc.beta = beta.accum(comm1, comm2, tree)
 #' slope(acc.beta)
 #' @export
 slope <- function(accum){
-  if(ncol(accum) > 5 || accum[nrow(accum), 3] > 1){			#if alpha
+  if(ncol(accum) > 7 || accum[nrow(accum), 3] > 1){			#if alpha
     sl <- accum[,-2]
     accum <- rbind(rep(0,ncol(accum)), accum)
     for (i in 1:nrow(sl)){
@@ -3177,7 +3358,7 @@ slope <- function(accum){
 #' @return A vector with coverage values per site.
 #' @references Chao, A. & Jost, L. (2012). Coverage-based rarefaction and extrapolation: standardizing samples by completeness rather than size. Ecology, 93: 2533-2547.
 #' @examples comm <- matrix(c(2,1,0,0,100,1,2,0,0,3,1,2,4,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)
-#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' tree <- tree.build(gower(1:5))
 #' coverage(comm)
 #' coverage(comm, tree)
 #' @export
@@ -3185,7 +3366,7 @@ coverage <- function(comm, tree){
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   if(!missing(tree))
     tree = xTree(tree)
@@ -3222,8 +3403,8 @@ coverage <- function(comm, tree){
 #' 
 #' methods <- data.frame(method = c("Met1","Met2","Met3"),
 #'            nSamples = c(1,2,1), fixcost = c(1,1,2), varCost = c(1,1,1))
-#' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-#' tree$labels <- colnames(comm)
+#' tree <- tree.build(dist(c(1:3)))
+#' tree$tip.label <- colnames(comm)
 #' 
 #' \dontrun{
 #'   optim.alpha(comm,,methods)
@@ -3254,8 +3435,8 @@ optim.alpha <- function(comm, tree, methods, base, seq = FALSE, runs = 1000, pro
 #' comm <- array(c(comm1, comm2), c(4,3,2))
 #' colnames(comm) <- c("Sp1","Sp2","Sp3")
 #' 
-#' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-#' tree$labels <- colnames(comm)
+#' tree <- tree.build(dist(c(1:3)))
+#' tree$tip.label <- colnames(comm)
 #' 
 #' methods <- data.frame(method = c("Met1","Met2","Met3"), nSamples = c(1,2,1))
 #' 
@@ -3266,7 +3447,7 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 1000){
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   if(sum(methods[, 2]) != nrow(comm))
     stop("sum of the methods must be the same as nrow(comm)")
@@ -3321,13 +3502,13 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 1000){
 #' @param runs Number of random permutations to be made to the sample order. Default is 1000.
 #' @param prog Present a text progress bar in the R console.
 #' @details Often, comparing differences between sites or the same site along time (i.e. measure beta diversity) it is not necessary to sample exhaustively. A minimum combination of samples targeting different sub-communities (that may behave differently) may be enough to perceive such differences, for example, for monitoring purposes.
-#' Cardoso et al. (in prep.) introduce and differentiate the concepts of alpha-sampling and beta-sampling. While alpha-sampling optimization implies maximizing local diversity sampled (Cardoso 2009), beta-sampling optimization implies minimizing differences in beta diversity values between partially and completely sampled communities.
-#' This function uses as beta diversity measures the Btotal, Brepl and Brich partitioning framework (Carvalho et al. 2012) and respective generalizations to PD and FD (Cardoso et al. 2014).
+#' Cardoso et al. (2024) introduce and differentiate the concepts of alpha-sampling and beta-sampling. While alpha-sampling optimization implies maximizing local diversity sampled (Cardoso 2009), beta-sampling optimization implies minimizing differences in beta diversity values between partially and completely sampled communities.
+#' This function uses as beta diversity measures the Btotal, Brepl, Brich, Bgain and Bloss partitioning frameworks (Carvalho et al. 2012; Legendre 2019) and respective generalizations to PD and FD (Cardoso et al. 2014).
 #' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
 #' @return A matrix of samples x methods (values being optimum number of samples per method). The last column is precision = (1 - average absolute difference from real beta).
 #' @references Cardoso, P. (2009) Standardization and optimization of arthropod inventories - the case of Iberian spiders. Biodiversity and Conservation, 18, 3949-3962.
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
-#' @references Cardoso, P., et al. (in prep.) Optimal inventorying and monitoring of taxon, phylogenetic and functional diversity.
+#' @references Cardoso et al. (2024) Optimal inventorying and monitoring of taxonomic, phylogenetic, and functional diversity. PLoS One, 19: 0307156.
 #' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
 #' @examples comm1 <- matrix(c(1,1,0,2,4,0,0,1,2,0,0,3), nrow = 4, ncol = 3, byrow = TRUE)
 #' comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
@@ -3337,14 +3518,14 @@ optim.alpha.stats <- function(comm, tree, methods, samples, runs = 1000){
 #' 
 #' methods <- data.frame(method = c("Met1","Met2","Met3"),
 #'            nSamples = c(1,2,1), fixcost = c(1,1,2), varCost = c(1,1,1))
-#' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-#' tree$labels <- colnames(comm)
+#' tree <- tree.build(gower(1:3))
+#' tree$tip.label <- colnames(comm)
 #' 
 #' \dontrun{
 #'   optim.beta(comm,,methods)
 #'   optim.beta(comm,,methods, seq = TRUE)
 #'   optim.beta(comm, tree, methods)
-#'   optim.alpha(comm,, methods = methods, seq = TRUE, base = c(0,1,1))
+#'   optim.beta(comm,, methods = methods, seq = TRUE, base = c(0,1,1))
 #' }
 #' @export
 optim.beta <- function(comm, tree, methods, base, seq = FALSE, abund = TRUE, runs = 1000, prog = TRUE){
@@ -3371,8 +3552,8 @@ optim.beta <- function(comm, tree, methods, base, seq = FALSE, abund = TRUE, run
 #' comm <- array(c(comm1, comm2, comm3), c(4,3,3))
 #' colnames(comm) <- c("sp1","sp2","sp3")
 #' 
-#' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-#' tree$labels <- colnames(comm)
+#' tree <- tree.build(gower(1:3))
+#' tree$tip.label <- colnames(comm)
 #' 
 #' methods <- data.frame(method = c("Met1","Met2","Met3"), nSamples = c(1,2,1))
 #' 
@@ -3383,7 +3564,7 @@ optim.beta.stats <- function(comm, tree, methods, samples, abund = TRUE, runs = 
 
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   if(sum(methods[, 2]) != nrow(comm))
     stop("Sum of the methods must be the same as nrow(comm).")
@@ -3423,8 +3604,8 @@ optim.beta.stats <- function(comm, tree, methods, samples, abund = TRUE, runs = 
       }
     }
     sampleBeta <- beta(sumComm, tree, abund)
-    for(i in 1:3){
-      diff <- diff + mean(abs(sampleBeta[[i]] - true[[i]])) / 3 / runs
+    for(i in 1:5){
+      diff <- diff + mean(abs(sampleBeta[[i]] - true[[i]])) / 5 / runs
     }
   }
   
@@ -3490,13 +3671,16 @@ optim.spatial <- function(layers, n, latlong = TRUE, clusterMap = TRUE){
 #' @references Faith, D.P. (1992) Conservation evaluation and phylogenetic diversity. Biological Conservation, 61, 1-10.
 #' @references Petchey, O.L. & Gaston, K.J. (2002) Functional diversity (FD), species richness and community composition. Ecology Letters, 5, 402-411.
 #' @references Petchey, O.L. & Gaston, K.J. (2006) Functional diversity: back to basics and looking forward. Ecology Letters, 9, 741-758.
-#' @examples sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+#' @examples
+#' sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 #' sp2 <- terra::rast(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
 #' sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 #' spp <- c(sp1, sp2, sp3)
-#' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-#' tree$labels = c("Sp1", "Sp2", "Sp3")
-#' names(spp) = tree$labels
+#' names(spp) = c("Sp1", "Sp2", "Sp3")
+#' 
+#' tree <- tree.build(gower(1:3))
+#' tree$tip.label = names(spp)
+#' 
 #' raster.alpha(spp)
 #' raster.alpha(spp, tree)
 #' @export
@@ -3519,41 +3703,49 @@ raster.alpha <- function(layers, tree){
 #' @param layers A SpatRaster object of species distributions from package terra.
 #' @param tree A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.
 #' @param func Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used. If not specified, default is Jaccard.
-#' @param neighbour Either 8 (default) or 4 cells considered to calculate beta diversiy of each focal cell.
+#' @param neighbor Either 8 (default) or 4 cells considered to calculate beta diversiy of each focal cell.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis.
-#' @details The beta diversity measures used here follow the partitioning framework independently developed by Podani & Schmera (2011) and Carvalho et al. (2012)
-#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
-#' Btotal = total beta diversity, reflecting both species replacement and loss/gain;
-#' Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone.
+#' @details The beta diversity metrics follow the partitioning frameworks developed by Podani & Schmera (2011), Carvalho et al. (2012) and Legendre (2019)
+#' and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich or Btotal = Bgain + Bloss.
+#' Btotal = total beta diversity, reflecting both volume replacement and loss/gain;
+#' Brepl = beta diversity explained by replacement of volume alone; Brich = beta diversity explained by volume loss/gain (richness differences) alone;
+#' Bgain = beta diversity explained by volume gain from T1 to T2; Bloss = beta diversity explained by volume lost from T1 to T2.
 #' PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 #' The number and order of species in layers must be the same as in tree.
-#' @return A SpatRaster object with three layers representing Btotal, Brepl and Brich in space.
+#' @return A SpatRaster object with five layers representing Btotal, Brepl, Brich, Bgain and Bloss in space.
 #' @references Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 #' @references Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
 #' @references Gotelli, N.J. & Colwell, R.K. (2001) Quantifying biodiversity: procedures and pitfalls in the measurement and comparison of species richness. Ecology Letters, 4, 379-391.
 #' @references Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
-#' @examples sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,1,1,0), nrow = 3, ncol = 3, byrow = TRUE))
-#' sp2 <- terra::rast(matrix(c(0,0,0,1,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
-#' sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,1,1,0), nrow = 3, ncol = 3, byrow = TRUE))
+#' @examples
+#' sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+#' sp2 <- terra::rast(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
+#' sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 #' spp <- c(sp1, sp2, sp3)
-#' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-#' tree$labels = c("Sp1", "Sp2", "Sp3")
-#' names(spp) = tree$labels
+#' names(spp) = c("Sp1", "Sp2", "Sp3")
+#' 
+#' tree <- tree.build(gower(1:3))
+#' tree$tip.label = names(spp)
+#' 
 #' raster.beta(spp)
 #' raster.beta(spp, tree)
 #' @export
-raster.beta <- function(layers, tree, func = "jaccard", neighbour = 8, abund = FALSE){
+raster.beta <- function(layers, tree, func = "jaccard", neighbor = 8, abund = FALSE){
   resTotal = terra::rast(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
   resRepl = resTotal
   resRich = resTotal
+  resGain = resTotal
+  resLoss = resTotal
   for(c in 1:(terra::ncell(layers))){
     if(is.na(sum(layers[c]))){
       resTotal[c] = NA
       resRepl[c] = NA
       resRich[c] = NA
+      resGain[c] = NA
+      resLoss[c] = NA
     } else {
-      betaValue = matrix(ncol = 3)
-      adj = terra::adjacent(layers, c, neighbour)
+      betaValue = matrix(ncol = 5)
+      adj = terra::adjacent(layers, c, neighbor)
       adj = adj[!is.na(adj)]
       for(a in adj)
         if(!is.na(sum(layers[a])))
@@ -3562,18 +3754,20 @@ raster.beta <- function(layers, tree, func = "jaccard", neighbour = 8, abund = F
       resTotal[c] = mean(unlist(betaValue[, 1]))
       resRepl[c] = mean(unlist(betaValue[, 2]))
       resRich[c] = mean(unlist(betaValue[, 3]))
+      resGain[c] = mean(unlist(betaValue[, 4]))
+      resLoss[c] = mean(unlist(betaValue[, 5]))
     }
   }
-  res = c(resTotal, resRepl, resRich)
-  names(res) = c("Btotal", "Brepl", "Brich")
-  return(res)
+  results = c(resTotal, resRepl, resRich, resGain, resLoss)
+  names(results) = c("Btotal", "Brepl", "Brich", "Bgain", "Bloss")
+  return(results)
 }
 
 #' Maps of phylogenetic/functional dispersion of species or individuals.
 #' @description Average dissimilarity between any two species or individuals randomly chosen in a community using rasters of species distributions (presence/absence or abundance).
 #' @param layers A SpatRaster object of species distributions from package terra.
 #' @param tree A phylo or hclust object or alternatively a species x traits matrix or data.frame to build a functional tree.
-#' @param distance A dist object representing the phylogenetic or functional distance between species.
+#' @param distance A dist object representing the phylogenetic or functional distance between species. Only used if no tree is given.
 #' @param func Calculate dispersion using originality (default), uniqueness or contribution.
 #' @param abund A boolean (T/F) indicating whether dispersion should be calculated using individuals (T) or species (F).
 #' @param relative A boolean (T/F) indicating whether dispersion should be relative to the maximum distance between any two species in the tree or distance matrix.
@@ -3583,13 +3777,16 @@ raster.beta <- function(layers, tree, func = "jaccard", neighbour = 8, abund = F
 #' @return A SpatRaster object representing dispersion in space.
 #' @references Rao, C.R. (1982) Diversity and dissimilarity coefficients: a unified approach. Theoretical Population Biology, 21: 24-43.
 #' @references Webb, C.O., Ackerly, D.D., McPeek, M.A. & Donoghue, M.J. (2002) Phylogenies and community ecology. Annual Review of Ecology and Systematics, 33: 475-505.
-#' @examples sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+#' @examples
+#' sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 #' sp2 <- terra::rast(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
 #' sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 #' spp <- c(sp1, sp2, sp3)
-#' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-#' tree$labels = c("Sp1", "Sp2", "Sp3")
-#' names(spp) = tree$labels
+#' names(spp) = c("Sp1", "Sp2", "Sp3")
+#' 
+#' tree <- tree.build(gower(1:3))
+#' tree$tip.label = names(spp)
+#' 
 #' raster.dispersion(spp, tree)
 #' @export
 raster.dispersion <- function(layers, tree, distance, func = "originality", abund = FALSE, relative = FALSE){
@@ -3610,7 +3807,7 @@ raster.dispersion <- function(layers, tree, distance, func = "originality", abun
 #' @description Regularity of distance and abundance between any two species in a community using rasters of species distributions (presence/absence or abundance).
 #' @param layers A SpatRaster object of species distributions from package terra.
 #' @param tree A phylo or hclust object or alternatively a species x traits matrix or data.frame to build a functional tree.
-#' @param distance A dist object representing the phylogenetic or functional distance between species.
+#' @param distance A dist object representing the phylogenetic or functional distance between species. Only used if no tree is given.
 #' @param method Calculate dispersion using "expected" values (default) or values based on "contribution" of species to the tree.
 #' @param func Calculate dispersion using "Camargo" (1993; default) or "Bulla" (1994) index.
 #' @param abund A boolean (T/F) indicating whether evenness should be calculated using abundance data.
@@ -3619,13 +3816,16 @@ raster.dispersion <- function(layers, tree, distance, func = "originality", abun
 #' @return A SpatRaster object representing evenness in space.
 #' @references Bulla, L. (1994) An index of evenness and its associated diversity measure. Oikos, 70: 167-171.
 #' @references Camargo, J.A. (1993) Must dominance increase with the number of subordinate species in competitive interactions? Journal of Theoretical Biology, 161: 537-542.
-#' @examples sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+#' @examples
+#' sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 #' sp2 <- terra::rast(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
 #' sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 #' spp <- c(sp1, sp2, sp3)
-#' tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-#' tree$labels = c("Sp1", "Sp2", "Sp3")
-#' names(spp) = tree$labels
+#' names(spp) = c("Sp1", "Sp2", "Sp3")
+#' 
+#' tree <- tree.build(gower(1:3), func = "upgma")
+#' tree$tip.label = names(spp)
+#' 
 #' raster.evenness(spp)
 #' raster.evenness(spp, tree)
 #' @export
@@ -3655,13 +3855,13 @@ raster.evenness <- function(layers, tree, distance, method = "expected", func = 
 #' If raref > 1 rarefaction is made by the abundance indicated.
 #' If not specified, default is 0.
 #' @param runs Number of resampling runs for rarefaction. If not specified, default is 100.
-#' @details The Species Abundance Distribution describes the commonness and rarity in ecological systems. It was recently expanded to accomodate phylegenetic and functional differences between species (Matthews et al., subm.). Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
+#' @details The Species Abundance Distribution describes the commonness and rarity in ecological systems. It was recently expanded to accomodate phylegenetic and functional differences between species (Matthews et al., in prep.). Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
 #' @return A vector or matrix with the different values per class per community.
-#' @references Matthews et al. (subm.) Phylogenetic and functional dimensions of the species abundance distribution.
+#' @references Matthews et al. (in prep.) Phylogenetic and functional dimensions of the species abundance distribution.
 #' @examples comm1 <- c(20,1,3,100,30)
 #' comm2 <- c(1,2,12,0,45)
 #' comm <- rbind(comm1, comm2)
-#' tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+#' tree <- tree.build(gower(1:5))
 #' sad(comm1)
 #' sad(comm)
 #' sad(comm, octaves = FALSE)
@@ -3703,9 +3903,9 @@ sad <- function(comm, tree, octaves = TRUE, scale = FALSE, raref = 0, runs = 100
 #' If raref > 1 rarefaction is made by the abundance indicated.
 #' If not specified, default is 0.
 #' @param runs Number of resampling runs for rarefaction. If not specified, default is 100.
-#' @details The Species Abundance Distribution describes the commonness and rarity in ecological systems. It was recently expanded to accomodate phylegenetic and functional differences between species (Matthews et al., subm.). Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
+#' @details The Species Abundance Distribution describes the commonness and rarity in ecological systems. It was recently expanded to accomodate phylegenetic and functional differences between species (Matthews et al., in prep.). Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
 #' @return A vector or matrix with the different values per class per community.
-#' @references Matthews et al. (subm.) Phylogenetic and functional dimensions of the species abundance distribution.
+#' @references Matthews et al. (in prep.) Phylogenetic and functional dimensions of the species abundance distribution.
 #' @examples comm = rbind(c(1,3,0,5,3), c(3,2,5,1,0))
 #' colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
 #' rownames(comm) = c("Site 1", "Site 2")
@@ -3753,9 +3953,9 @@ hull.sad <- function(comm, octaves = TRUE, scale = FALSE, raref = 0, runs = 100)
 #' If raref > 1 rarefaction is made by the abundance indicated.
 #' If not specified, default is 0.
 #' @param runs Number of resampling runs for rarefaction. If not specified, default is 100.
-#' @details The Species Abundance Distribution describes the commonness and rarity in ecological systems. It was recently expanded to accomodate phylegenetic and functional differences between species (Matthews et al., subm.). Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
+#' @details The Species Abundance Distribution describes the commonness and rarity in ecological systems. It was recently expanded to accomodate phylegenetic and functional differences between species (Matthews et al., in prep.). Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
 #' @return A vector or matrix with the different values per class per community.
-#' @references Matthews et al. (subm.) Phylogenetic and functional dimensions of the species abundance distribution.
+#' @references Matthews et al. (in prep.) Phylogenetic and functional dimensions of the species abundance distribution.
 #' @examples \dontrun{
 #' comm = rbind(c(1,3,0,5,3), c(3,2,5,1,0))
 #' colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
@@ -3809,7 +4009,7 @@ kernel.sad <- function(comm, octaves = TRUE, scale = FALSE, raref = 0, runs = 10
 #' @references Whittaker, R.J., Rigal, F., Borges, P.A.V., Cardoso, P., Terzopoulou, S., Casanoves, F., Pla, L., Guilhaumon, F., Ladle, R. & Triantis, K.A. (2014) Functional biogeography of oceanic islands and the scaling of functional diversity in the Azores. Proceedings of the National Academy of Sciences USA, 111: 13709-13714.
 #' @examples div <- c(1,2,3,4,4)
 #' comm <- matrix(c(2,0,0,0,3,1,0,0,2,4,5,0,1,3,2,5,1,1,1,1), nrow = 5, ncol = 4, byrow = TRUE)
-#' tree <- hclust(dist(c(1:4), method="euclidean"), method="average")
+#' tree <- tree.build(gower(1:4))
 #' area <- c(10,40,80,160,160)
 #' sar(div,,area)
 #' sar(comm,,area)
@@ -3819,7 +4019,7 @@ sar <- function(comm, tree, area){
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   if(is.vector(comm)){
     div = comm
@@ -3880,7 +4080,7 @@ sar <- function(comm, tree, area){
 #' @references Whittaker, R.J., Triantis, K.A. & Ladle, R.J. (2008) A general dynamic theory of oceanic island biogeography. Journal of Biogeography, 35: 977-994.
 #' @examples div <- c(1,3,5,8,10)
 #' comm <- matrix(c(2,0,0,0,3,1,0,0,2,4,5,0,1,3,2,5,1,1,1,1), nrow = 5, ncol = 4, byrow = TRUE)
-#' tree <- hclust(dist(c(1:4), method="euclidean"), method="average")
+#' tree <- tree.build(gower(1:4))
 #' area <- c(10,40,80,160,160)
 #' time <- c(1,2,3,4,5)
 #' gdm(div,,area,time)
@@ -3891,7 +4091,7 @@ gdm <- function(comm, tree, area, time){
   
   #convert traits to a tree if needed
   if(!missing(tree) && (is.matrix(tree) || is.data.frame(tree) || is.vector(tree)))
-    tree = tree.build(tree)
+    tree = tree.build(gower(tree))
   
   if(missing(time))
     return(sar(comm,tree,area))
@@ -4351,16 +4551,21 @@ fill <- function(trait, method = "regression", group = NULL, weight = NULL, step
 #' Standardize variables.
 #' @description Standardize (or normalize) variables in different ways.
 #' @param trait A species x traits matrix or data.frame.
-#' @param method One of "standard" (standardize to mean = 0 and sd = 1, i.e., use z-score), "range" (rescale with range 0-1), or "rank" (rescale with range 0-1 after ranking).
+#' @param method One of "z" (mean = 0, sd = 1, i.e., z-score), "iqr" (x = x / interquartile_range(x)), "range" (rescale with range 0-1), or "rank" (rescale with range 0-1 after ranking).
 #' @param convert A vector of column numbers to be standardized. If NULL all will be standardized.
 #' @details Standardizing values allows to directly compare variables of interest with inherently different ranges, avoiding artificial distortions of distances between observations.
 #' @return A matrix with variables standardized.
-#' @examples trait = data.frame(body = c(20,40,60,30,10), beak = c(NA,4,6,3,1))
+#' @examples
+#' body = c(20,40,60,30,50)
+#' beak = c(NA,4,6,3,1)
+#' habitat = c("A", "B", "C", "A", "B")
+#' trait = data.frame(body, beak, habitat)
 #' standard(trait)
+#' standard(trait, method = "iqr")
 #' standard(trait, method = "range")
 #' standard(trait, method = "rank")
 #' @export
-standard <- function(trait, method = "standard", convert = NULL){
+standard <- function(trait, method = "z", convert = NULL){
   
   if(is.vector(trait))
     trait = matrix(trait, ncol = 1)
@@ -4369,21 +4574,29 @@ standard <- function(trait, method = "standard", convert = NULL){
   
   for(i in convert){
     
-    #if standardization with mean 0 and sd 1 
-    if(method == "standard"){
+    #do not standardize non-numeric traits
+    if(!is.numeric(trait[,i]))
+      next
+    
+    #if standardization with z-score 
+    if(method == "z"){
       trait[,i] = (trait[,i] - mean(trait[,i], na.rm = TRUE)) / sd(trait[,i], na.rm = TRUE)
       
-      #if standardization with range 0-1  
+    #if standardization with interquartile range  
+    } else if(method == "iqr"){
+      trait[,i] = (trait[,i] / IQR(trait[,i], na.rm = TRUE))
+      
+    #if standardization with range 0-1  
     } else if(method == "range"){
       trait[,i] = (trait[,i] - min(trait[,i], na.rm = TRUE)) / (max(trait[,i], na.rm = TRUE) - min(trait[,i], na.rm = TRUE))
       
-      #if standardization with ranking of values
+    #if standardization with ranking of values
     } else if(method == "rank"){
       trait[,i] = rank(trait[,i], ties.method = "average", na.last = "keep")
       trait[,i] = standard(trait[,i], method = "range")
       
     } else {
-      stop("Method not recognized, must be one of 'standard', 'range' or 'rank'.")
+      stop("Method not recognized, must be one of 'z', 'iqr', range', or 'rank'.")
     }
   }
   return(trait)
@@ -4393,17 +4606,24 @@ standard <- function(trait, method = "standard", convert = NULL){
 #' @description Calculates Gower distances between observations.
 #' @param trait A species x traits matrix or data.frame.
 #' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables.
+#' @param st Standardize variables before calculating Gower´s distance. One of "z" (mean = 0, sd = 1, i.e., z-score), "iqr" (x = x / interquartile_range(x)), "range" (rescale with range 0-1; default), or "rank" (rescale with range 0-1 after ranking). See BAT::standard for details.
 #' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait.
+#' @param square A boolean indicating whether to use Pavoine (2009) implementation that squares the trait distances (TRUE) or the original implementation by Gower (1971) as modified by Podani (1999) for ordinal variables (FALSE).
 #' @details The Gower distance allows continuous, ordinal, categorical or binary variables, with possible weighting (Pavoine et al. 2009).
 #' NAs are allowed as long as each pair of species has at least one trait value in common.
 #' If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters as values.
+#' Beware that for Gower´s distance to change between 0 and 1 traits must be standardized by range.
 #' @return A dist object with pairwise distances between species.
+#' @references Gower, J. C. (1971) A general coefficient of similarity and some of its properties. Biometrics, 27:857-871.
 #' @references Pavoine et al. (2009) On the challenge of treating various types of variables: application for improving the measurement of functional diversity. Oikos, 118: 391-402.
-#' @examples trait = data.frame(body = c(NA,2,3,4,4), beak = c(1,1,1,1,2))
+#' @references Podani, J. (1999) Extending Gower's general coefficient of similarity to ordinal characters. Taxon, 48:331-340.
+#' @examples trait = data.frame(body = c(NA,2,3,4,4), beak = c(1,1,1,1,2), habitat = c("A", "B", "C", "A", "B"))
 #' gower(trait)
-#' gower(trait, weight = c(1, 0))
+#' gower(trait, st = "z")
+#' gower(trait, square = FALSE)
+#' gower(trait, weight = c(1, 0, 0))
 #' @export
-gower <- function(trait, convert = NULL, weight = NULL){
+gower <- function(trait, convert = NULL, st = "range", weight = NULL, square = TRUE){
   
   #prepare data
   if(is.vector(trait))
@@ -4412,12 +4632,9 @@ gower <- function(trait, convert = NULL, weight = NULL){
     weight = rep(1, ncol(trait))
   spNames = rownames(trait)
   trait = as.data.frame(trait)
+  if(!is.null(st))
+    trait = standard(trait, method = st)
 
-  #dummify, standardize, and get weights
-  trait = dummy(trait, convert, weight = weight)
-  weight = trait$weight
-  trait = standard(trait$trait, method = "range")
-  
   #calculate gower
   nSp = nrow(trait)
   res = matrix(0, nrow = nSp, ncol = nSp)
@@ -4428,11 +4645,29 @@ gower <- function(trait, convert = NULL, weight = NULL){
         value1 = trait[i,t]
         value2 = trait[j,t]
         if(!any(is.na(c(value1, value2)))){
-          res[j,i] = res[j,i] + ((trait[i,t] - trait[j,t])^2 * weight[t])
+          
+          #special case of categorical traits
+          if(!is.numeric(trait[,t])){
+            if(value1 == value2){
+              value1 = 0
+              value2 = 0
+            } else {
+              value1 = 1
+              value2 = 0
+            }
+          }
+              
+          if(square)
+            res[j,i] = res[j,i] + ((value1 - value2)^2 * weight[t])
+          else
+            res[j,i] = res[j,i] + (abs((value1 - value2)) * weight[t])
           sumWeights = sumWeights + weight[t]
         }
       }
-      res[j,i] = (res[j,i] / sumWeights)^0.5
+      if(square)
+        res[j,i] = (res[j,i] / sumWeights)^0.5
+      else
+        res[j,i] = (res[j,i] / sumWeights)
     }
   }
   rownames(res) = colnames(res) = spNames
@@ -4556,70 +4791,50 @@ ses <- function(obs, est, param = TRUE, p = TRUE){
 }
 
 #' Build functional tree.
-#' @description Builds a functional tree from trait or distance data.
-#' @param trait A species x traits matrix or data.frame or, alternatively, a dist object.
-#' @param distance One of "gower" or "euclidean". Not used if trait is already a dist object.
+#' @description Builds a functional tree from distance data.
+#' @param distance A dist object.
 #' @param func One of "upgma", "mst", "nj", "bionj" or "best".
 #' @param fs Only used for func = "nj" OR "bionj". Argument s of the agglomerative criterion: it is coerced as an integer and must at least equal to one. 
-#' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables.  Not used if trait is already a dist object.
-#' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Not used if trait is already a dist object.
 #' @param root A numeric or character specifying the functional outgroup to root the tree.
-#' @details The tree will be built using one of four algorithms after traits are dummyfied (if needed) and standardized (always):
+#' @details The tree will be built using one of four algorithms:
 #' If func = "upgma" uses average linkage clustering (UPGMA, Cardoso et al. 2014).
 #' If func = "mst" uses minimum spanning trees, equivalent to single linkage clustering (Gower & Ross 1969).
-#' If func = "nj" uses the original neighbor-joining algorithm of Saitou & Nei (1987).
+#' If func = "nj" uses the original neighbor-joining algorithm of Saitou & Nei (1987) (default).
 #' If func = "bionj" uses the modified neighbor-joining algorithm of Gascuel (1997).
-#' Any of the neighbor-joining options is usually preferred as they keep distances between species better than UPGMA or MST (Cardoso et al. subm.).
+#' Any of the neighbor-joining options is usually preferred as they keep distances between species better than UPGMA or MST (Cardoso et al. 2024).
 #' If func = "best", chooses the best of the options above based on maximum tree.quality values.
 #' If NJ trees are built, the root will be set at the node closest to the midpoint between the two most dissimilar species in the tree or, if root not NULL, at the node provided in parameter root (Podani et al. 2000).
-#' Gower distance (Pavoine et al. 2009) allows continuous, ordinal, categorical or binary variables, with possible weighting.
-#' NAs are allowed as long as each pair of species has at least one trait value in common. For fs > 0 even if this condition is not met the Q* criterion by Criscuolo & Gascuel (2008) is used to fill missing data.
-#' If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters as values.
 #' @return A phylo object representing a functional tree.
 #' @references Cardoso et al. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41: 749-761.
-#' @references Cardoso et al. (subm.) Using neighbor-joining trees for functional diversity analyses.
+#' @references Cardoso et al. (2024) Calculating functional diversity metrics using neighbor-joining trees. Ecography, 2024: e07156.
 #' @references Criscuolo & Gascuel (2008) Fast NJ-like algorithms to deal with incomplete distance matrices. BMC Bioinformatics, 9: 166.
 #' @references Gascuel (1997) BIONJ: an improved version of the NJ algorithm based on a simple model of sequence data. Molecular Biology and Evolution, 14: 685–695.
-#' @references Gower & Ross (1969) Minimum spanning trees and single linkage cluster analysis. Journal of the Royal Statistical Society, 18: 54-64.
-#' @references Pavoine et al. (2009) On the challenge of treating various types of variables: application for improving the measurement of functional diversity. Oikos, 118: 391-402.
 #' @references Podani et al. (2000) Additive trees in the analysis of community data. Community Ecology, 1, 33–41.
 #' @references Saitou & Nei (1987) The neighbor-joining method: a new method for reconstructing phylogenetic trees. Molecular Biology and Evolution, 4, 406–425.
 #' @examples trait = data.frame(body = c(NA,2,3,4,4), beak = c(1,1,1,1,2))
-#' plot(tree.build(trait))
-#' plot(tree.build(trait, func = "bionj", fs = 1, weight = c(1, 0)), "u")
-#' plot(tree.build(trait, func = "best", root = 4))
+#' distance = gower(trait)
+#' plot(tree.build(distance), "u")
+#' plot(tree.build(distance, func = "bionj", fs = 1), "u")
+#' plot(tree.build(distance, func = "best", root = 4))
 #' @export
-tree.build <- function(trait, distance = "gower", func = "nj", fs = 0, convert = NULL, weight = NULL, root = NULL){
-  
-  #get distance matrix
-  if(is(trait, "dist")){
-    distmatrix = trait
-  } else {
-    if (distance == "gower"){
-      distmatrix = gower(trait, convert, weight)
-    } else if (distance == "euclidean"){
-      distmatrix = dist(trait, method = "euclidean")
-    } else {
-      stop("Distance should be one of gower or euclidean")
-    }
-  }
+tree.build <- function(distance, func = "nj", fs = 0, root = NULL){
   
   #build tree
   if(func == "upgma"){
-    tree = hclust(distmatrix, method = "average")
+    tree = hclust(distance, method = "average")
   } else if(func == "mst"){
-    tree = hclust(distmatrix, method = "single")
+    tree = hclust(distance, method = "single")
   } else if(func == "nj"){
     if(fs < 1){
-      tree = nj(distmatrix)
+      tree = ape::nj(distance)
     } else {
-      tree = njs(distmatrix, fs)
+      tree = ape::njs(distance, fs)
     }
   } else if(func == "bionj"){
     if(fs < 1){
-      tree = bionj(distmatrix)
+      tree = ape::bionj(distance)
     } else {
-      tree = bionjs(distmatrix, fs)
+      tree = ape::bionjs(distance, fs)
     }
   } else if(func == "best"){
     #build trees
@@ -4627,8 +4842,8 @@ tree.build <- function(trait, distance = "gower", func = "nj", fs = 0, convert =
     methods = c("upgma", "mst", "nj", "bionj")
     qual = c()
     for(i in 1:4){
-      trees[[i]] = tree.build(trait, distance, func = methods[i], fs, convert, weight, root = root)
-      qual[i] = tree.quality(distmatrix, trees[[i]])
+      trees[[i]] = tree.build(distance, func = methods[i], fs = fs, root = root)
+      qual[i] = tree.quality(distance, trees[[i]])
     }
     best_tree = which.max(qual)
     cat("The best tree is given by", methods[best_tree],"with a quality of", qual[best_tree])
@@ -4644,6 +4859,87 @@ tree.build <- function(trait, distance = "gower", func = "nj", fs = 0, convert =
       tree <- ape::root(tree, outgroup = root)
   }
 
+  return(as.phylo(tree))
+}
+
+#' Quality of tree.
+#' @description Assess the quality of a functional tree.
+#' @param distance A dist object representing the initial distances between species.
+#' @param tree A phylo or hclust object.
+#' @details The algorithm calculates the inverse of mean squared deviation between initial and cophenetic distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation.
+#' A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for a star tree, where all pairwise distances are 1.
+#' @return A single value of quality.
+#' @references Maire et al. (2015) How many dimensions are needed to accurately assess functional diversity? A pragmatic approach for assessing the quality of functional spaces. Global Ecology and Biogeography, 24: 728:740.
+#' @examples trait = data.frame(body = c(1,2,3,4,4), beak = c(1,1,1,1,2))
+#' distance = gower(trait)
+#' 
+#' tree = tree.build(distance)
+#' tree.quality(distance, tree)
+#' 
+#' tree = tree.build(distance, func = "bionj")
+#' tree.quality(distance, tree)
+#' 
+#' tree = tree.build(distance, func = "upgma")
+#' tree.quality(distance, tree)
+#' 
+#' tree = tree.build(distance, func = "mst")
+#' tree.quality(distance, tree)
+#' 
+#' tree = tree.build(distance, func = "best")
+#' 
+#' distance1 = distance
+#' distance1[] = 1
+#' tree = hclust(distance1)
+#' tree.quality(distance, tree)
+#' @export
+tree.quality <- function(distance, tree){
+  tree = as.dist(cophenetic(tree))
+  return(msd(distance, tree))
+}
+
+#' Add tips to a tree.
+#' @description Add tips (i.e., new taxa) to an existing tree using an edge of a given length.
+#' @param tree A phylo object.
+#' @param tip Vector of names of all sister species of new taxon to add.
+#' @param newTip A string with the name of taxon to add.
+#' @param len A numeric with the length of edge to add.
+#' @param minDist The minimum distance from the sister species to the new species.
+#' @details If len is smaller than the length of edges connecting all sister species to the new species, the minDist will be applied to the tree at a point above the connecting edge.
+#' @return A phylo object.
+#' @examples par(mfrow = c(1,3))
+#' tree = sim.tree(5, 100)
+#' tree$tip.label = c("Sp1", "Sp2", "Sp3", "Sp4", "Sp5")
+#' plot(tree)
+#' ape::edgelabels(round(tree$edge.length, 3))
+#' 
+#' newTree = tree.addTip(tree, c("Sp1"), "Sp6", 0.1)
+#' plot(newTree)
+#' ape::edgelabels(round(newTree$edge.length, 3))
+#' 
+#' newTree = tree.addTip(tree, c("Sp1", "Sp2"), "Sp7", 0.2, 0.01)
+#' plot(newTree)
+#' ape::edgelabels(round(newTree$edge.length, 3))
+#' @export
+tree.addTip <- function (tree, tip, newTip, len, minDist = 0){
+  if(length(tip) == 1){
+    newPlace = match(tip, tree$tip.label)
+    tree = AddTip(tree, newPlace, label = newTip, edgeLength = len, lengthBelow = len)
+  } else {
+    ancestor = getMRCA(tree, tip) #get most recent ancestor
+    timeAncestor = branching.times(tree)[which(names(branching.times(tree)) == ancestor)] #time of MRCA
+    above = tree$edge[which(tree$edge[,2] == ancestor), 1]
+    timeAbove = branching.times(tree)[which(names(branching.times(tree)) == above)] #time of node above MRCA
+    if(len < timeAncestor){
+      lenBelow = minDist
+      len = timeAncestor + minDist
+    } else if (len > timeAbove){
+      lenBelow = timeAbove - timeAncestor - minDist
+      len = timeAbove - minDist
+    } else {
+      lenBelow = len - timeAncestor
+    }
+    tree = AddTip(tree, ancestor, label = newTip, edgeLength = len, lengthBelow = lenBelow)
+  }
   return(tree)
 }
 
@@ -4688,141 +4984,84 @@ tree.zero <- function (tree){
   return(tree)
 }
 
-#' Quality of tree.
-#' @description Assess the quality of a functional tree.
-#' @param distance A dist object representing the initial distances between species.
-#' @param tree A phylo or hclust object.
-#' @details The algorithm calculates the inverse of mean squared deviation between initial and cophenetic distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation.
-#' A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for a star tree, where all pairwise distances are 1.
-#' @return A single value of quality.
-#' @references Maire et al. (2015) How many dimensions are needed to accurately assess functional diversity? A pragmatic approach for assessing the quality of functional spaces. Global Ecology and Biogeography, 24: 728:740.
-#' @examples trait = data.frame(body = c(1,2,3,4,4), beak = c(1,1,1,1,2))
-#' distance = gower(trait)
-#' 
-#' tree = tree.build(trait)
-#' tree.quality(distance, tree)
-#' 
-#' tree = tree.build(trait, func = "bionj")
-#' tree.quality(distance, tree)
-#' 
-#' tree = tree.build(trait, func = "upgma")
-#' tree.quality(distance, tree)
-#' 
-#' tree = tree.build(trait, func = "mst")
-#' tree.quality(distance, tree)
-#' 
-#' tree = tree.build(trait, func = "best")
-#' 
-#' distance1 = distance
-#' distance1[] = 1
-#' tree = hclust(distance1)
-#' tree.quality(distance, tree)
-#' @export
-tree.quality <- function(distance, tree){
-  tree = as.dist(cophenetic(tree))
-  return(msd(distance, tree))
-}
-
 #' Build hyperspace.
-#' @description Builds hyperspace by transforming trait or distance data to use with either hull.build or kernel.build.
-#' @param trait A species x traits matrix or data.frame or, alternatively, a dist object.
-#' @param distance One of "gower" or "euclidean". Not used if trait is a dist object.
-#' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0 and if trait is not a dist object.
-#' @param axes If 0, no transformation of data is done.
-#' If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
-#' If axes > 1 these many axes are selected.
-#' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0 and if trait is not a dist object.
-#' @details The hyperspace can be constructed with the given data or data can be transformed using PCoA after traits are dummyfied (if needed) and standardized (always).
-#' Gower distance (Pavoine et al. 2009) allows continuous, ordinal, categorical or binary variables, with possible weighting.
-#' NAs are allowed as long as each pair of species has at least one trait value in common.
-#' If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters as values.
-#' Note that each community should have at least 3 species and more species than traits or axes (if axes > 0) to build convex hull hypervolumes.
+#' @description Builds hyperspace using distance data for hull.build or kernel.build.
+#' @param distance A dist object representing the distances between species.
+#' @param ord Method used to reduce the dimensionality of variables using either of the ordination methods "pcoa" or "nmds".
+#' @param axes If 0 < axes <= 1 a PCoA is done and as many axes as needed to achieve this proportion of variance explained are selected.
+#' If axes > 1 these many axes are selected for either PCoA or NMDS.
+#' @param stats If TRUE and ord = TRUE, stats for each dimension are returned.
+#' @details Note that each community should have at least 3 species and more species than traits or axes (if axes > 0) to build convex hull hypervolumes.
 #' Transformation of traits is recommended if (Carvalho & Cardoso, 2020):
 #' 1) Some traits are not continuous;
 #' 2) Some traits are correlated; or
 #' 3) There are less species than traits + 1, in which case the number of axes should be smaller.
-#' @return A matrix with the coordinates of each species in hyperspace.
+#' @return Either a matrix with the coordinates of each species in hyperspace or a list containing this matrix plus the stats for each dimension.
 #' @references Carvalho, J.C. & Cardoso, P. (2020) Decomposing the causes for niche differentiation between species using hypervolumes. Frontiers in Ecology and Evolution, 8: 243.
-#' @references Pavoine et al. (2009) On the challenge of treating various types of variables: application for improving the measurement of functional diversity. Oikos, 118: 391-402.
 #' @examples
 #' trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
 #' rownames(trait) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+#' distance = gower(trait)
 #' 
-#' hs = hyper.build(trait, weight = c(1,2), axes = 2)
-#' plot(hs)
+#' hs = hyper.build(distance, axes = 0.8, stats = TRUE)
+#' plot(hs$trait)
+#' hs$stats
+#' hs = hyper.build(distance, ord = "nmds", axes = 2, stats = TRUE)
+#' plot(hs$trait)
+#' hs$stats
 #' @export
-hyper.build <- function(trait, distance = "gower", weight = NULL, axes = 1, convert = NULL){
+hyper.build <- function(distance, ord = "pcoa", axes = 1, stats = FALSE){
   
-  #do gower/euclidean and pcoa if axes is larger than 0
-  if(is(trait, "dist") || axes > 0){
-    
-    #get distance matrix
-    if(!is(trait, "dist")){
-      if (distance == "gower"){
-        trait = gower(trait, convert, weight)
-      } else if (distance == "euclidean"){
-        trait = dist(trait, method = "euclidean")
-      } else {
-        stop("Distance should be one of gower or euclidean")
-      }
-    }
-    trait = ape::pcoa(trait)
-    
-    if(axes <= 1){
-      selAxes = cumVar = 0
-      while(cumVar < axes){
-        selAxes = selAxes + 1
-        cumVar = cumVar + trait$values$Relative_eig[selAxes]
-      }
-      axes = selAxes
+  if(ord == "nmds" & axes > 1){
+    space = vegan::metaMDS(distance, k = axes)
+    stress = space$stress
+    trait = space$points
+  } else {
+    space = ape::pcoa(distance)
+    if (axes == 1){
+      axes = nrow(space$values)
+    } else if (axes < 1){
+      axes = which(space$values$Cumul_eig >= axes)[1]
     } else {
-      axes = min(axes, ncol(trait$vectors))
+      axes = min(axes, ncol(space$vectors))
     }
-    
-    trait = trait$vectors[,(1:axes)]
+    stress = data.frame("Axes" = 1:length(space$values$Cumul_eig), "Cumulative eigenvalues" = space$values$Cumul_eig)
+    trait = space$vectors[,(1:axes),drop = FALSE]
   }
   
   colnames(trait) = paste("Axis", 1:ncol(trait), sep = "")
   if(is.null(rownames(trait)))
     rownames(trait) = paste("Sp", 1:nrow(trait), sep = "")
   
-  return(trait)
+  if(!stats){
+    return(trait)
+  } else {
+    return(list("traits" = trait, "stats" = stress))
+  }
 }
 
 #' Quality of hyperspace.
 #' @description Assess the quality of a functional hyperspace.
 #' @param distance A dist object representing the initial distances between species.
-#' @param hyper A matrix with coordinates data from function hyper.build.
+#' @param trait A trait matrix, often resulting from hyper.build.
 #' @details This is used for any representation using hyperspaces, including convex hull and kernel-density hypervolumes. The algorithm calculates the inverse of the squared deviation between initial and euclidean distances (Maire et al. 2015) after standardization of all values between 0 and 1 for simplicity of interpretation. A value of 1 corresponds to maximum quality of the functional representation. A value of 0 corresponds to the expected value for an hyperspace where all distances between species are 1.
 #' @return A single value of quality.
 #' @references Maire et al. (2015) How many dimensions are needed to accurately assess functional diversity? A pragmatic approach for assessing the quality of functional spaces. Global Ecology and Biogeography, 24: 728:740.
 #' @examples trait = data.frame(body = c(1,2,3,4,4), beak = c(1,1,1,1,2))
 #' distance = gower(trait)
 #' 
-#' hyper = hyper.build(trait, axes = 2)
-#' hyper.quality(distance, hyper)
-#' 
-#' hyper = hyper.build(trait, axes = 0)
-#' hyper.quality(distance, hyper)
+#' trait = hyper.build(distance, axes = 0.9)
+#' hyper.quality(distance, trait)
 #' @export
-hyper.quality <- function(distance, hyper){
-  hyper = dist(hyper)
-  return(msd(distance, hyper))
+hyper.quality <- function(distance, trait){
+  trait = dist(trait)
+  return(msd(distance, trait))
 }
 
 #' Build convex hull hypervolumes.
 #' @description Builds convex hull hypervolumes for each community from incidence and trait data.
 #' @param comm A sites x species matrix, data.frame or vector, with incidence data about the species in the community.
-#' @param trait A species x traits or axes matrix or data.frame (often from hyper.build) or, alternatively, a dist object.
-#' @param distance One of "gower" or "euclidean". Not used if trait is a dist object.
-#' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0 and if trait is not a dist object.
-#' @param axes If 0, no transformation of data is done.
-#' If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
-#' If axes > 1 these many axes are selected.
-#' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0 and if trait is not a dist object.
-#' @details The hypervolumes can be constructed with the given data or data can be transformed using PCoA after traits are dummyfied (if needed) and standardized (always).
-#' Beware that if transformations are required, all communities to be compared should be built simultaneously to guarantee comparability. In such case, one might want to first run hyper.build and use the resulting data in different runs of hull.build.
-#' See function hyper.build for more details.
+#' @param trait A trait matrix, often resulting from hyper.build.
 #' @return A 'convhulln' object or a list, representing the hypervolumes of each community.
 #' @examples comm = rbind(c(1,3,0,5,3), c(3,2,5,0,0))
 #' colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
@@ -4831,20 +5070,20 @@ hyper.quality <- function(distance, hyper){
 #' trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
 #' rownames(trait) = colnames(comm)
 #' 
+#' distance = gower(trait)
+#' trait = hyper.build(distance)
+#' 
 #' hv = hull.build(comm[1,], trait)
 #' plot(hv)
 #' hvlist = hull.build(comm, trait)
-#' plot(hvlist[[2]])
-#' hvlist = hull.build(comm, trait, axes = 2, weight = c(1,2))
 #' plot(hvlist[[1]])
+#' plot(hvlist[[2]])
 #' @export
-hull.build <- function(comm, trait, distance = "gower", weight = NULL, axes = 0, convert = NULL){
+hull.build <- function(comm, trait){
   
-  trait = hyper.build(trait, distance, weight, axes, convert)
   if(is.vector(comm))
     comm = matrix(comm, nrow = 1)
-  trait = reorderTrait(comm, trait)
-
+  
   #check if there are communities with less species than traits + 1 and remove them
   fewSpp = as.vector(which(rowSums(ifelse(comm > 0, 1, 0)) <= ncol(trait)))
   if(length(fewSpp) > 0){
@@ -4880,45 +5119,38 @@ hull.build <- function(comm, trait, distance = "gower", weight = NULL, axes = 0,
 }
 
 #' Build kernel hypervolumes.
-#' @description Builds kernel density hypervolumes from trait data.
+#' @description Builds kernel density n-dimensional hypervolumes from trait data.
 #' @param comm A sites x species matrix, data.frame or vector, with incidence or abundance data about the species in the community.
-#' @param trait A species x traits or axes matrix or data.frame (often from hyper.build) or, alternatively, a dist object.
-#' @param distance One of "gower" or "euclidean". Not used if trait is a dist object.
+#' @param trait A trait matrix, often resulting from hyper.build.
 #' @param method.hv Method for constructing the 'Hypervolume' object. One of "gaussian" (Gaussian kernel density estimation, default), "box" (box kernel density estimation), or "svm" (one-class support vector machine). See respective functions of the hypervolume R package for details.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used as weights in hypervolume construction. Only works if method.hv = "gaussian".
-#' @param weight A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0 and if trait is not a dist object.
-#' @param axes If 0, no transformation of data is done.
-#' If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
-#' If axes > 1 these many axes are selected.
-#' @param convert A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0 and if trait is not a dist object.
 #' @param cores Number of cores to be used in parallel processing. If = 0 all available cores are used. Beware that multicore for Windows is not optimized yet and it often takes longer than single core.
 #' @param ... further arguments to be passed to hypervolume::hypervolume
-#' @details The hypervolumes can be constructed with the given data or data can be transformed using PCoA after traits are dummyfied (if needed) and standardized (always).
-#' Beware that if transformations are required, all communities to be compared should be built simultaneously to guarantee comparability. In such case, one might want to first run hyper.build and use the resulting data in different runs of kernel.build.
-#' See function hyper.build for more details.
 #' @return A 'Hypervolume' or 'HypervolumeList', representing the hypervolumes of each community.
 #' @examples \dontrun{
 #' comm = rbind(c(1,1,0,5,1), c(3,2,5,0,0))
 #' colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
 #' rownames(comm) = c("Site1", "Site2")
 #' 
-#' trait = data.frame(body = c(1,2,3,1,2), beak = c(1,2,3,2,1))
+#' trait = data.frame(body = c(1,2,3,1,2), beak = c(1,2,4,2,1))
 #' rownames(trait) = colnames(comm)
+#' 
+#' distance = gower(trait)
+#' trait = hyper.build(distance)
 #' 
 #' hv = kernel.build(comm[1,], trait)
 #' plot(hv)
-#' hvlist = kernel.build(comm, trait, abund = FALSE, cores = 2)
+#' hvlist = kernel.build(comm, trait, abund = FALSE, cores = 0)
 #' plot(hvlist)
-#' hvlist = kernel.build(comm, trait, method.hv = "box", weight = c(1,2), axes = 2)
+#' hvlist = kernel.build(comm, trait, method.hv = "box", cores = 2)
 #' plot(hvlist)
 #' }
 #' @export
-kernel.build <- function(comm, trait, distance = "gower", method.hv = "gaussian", abund = TRUE, weight = NULL, axes = 0, convert = NULL, cores = 1, ... ){
+kernel.build <- function(comm, trait, method.hv = "gaussian", abund = TRUE, cores = 1, ... ){
   
-  trait = hyper.build(trait, distance, weight, axes, convert)
+  #needed for when mf R drops dimensions, when will they fix this bug???
   if(is.vector(comm))
     comm = matrix(comm, nrow = 1)
-  trait = reorderTrait(comm, trait)
   
   #check if there are communities with no species
   fewSpp = as.vector(which(rowSums(comm) == 0))
@@ -5212,19 +5444,19 @@ sim.sample <- function(comm, cells = 100, samples = 0){
 #' @param s number of species.
 #' @param m a structural parameter defining the average difference between species. Default is 100. Lower numbers create trees dominated by increasingly similar species, higher numbers by increasingly dissimilar species.
 #' @details A very simple tree based on random genes/traits.
-#' @return An hclust object.
+#' @return A phylo object.
 #' @examples tree <- sim.tree(10)
-#' plot(as.dendrogram(tree))
+#' plot(tree)
 #' tree <- sim.tree(100,10)
-#' plot(as.dendrogram(tree))
+#' plot(tree)
 #' tree <- sim.tree(100,1000)
-#' plot(as.dendrogram(tree))
+#' plot(tree)
 #' @export
 sim.tree <- function(s, m = 100){
   sim.matrix <- matrix(sample(0:m, ceiling(s*m/50), replace = TRUE), nrow = s, ncol = m)
-  tree <- hclust(dist(sim.matrix), method = "average")
-  tree$height <- tree$height / max(tree$height)
-  return(tree)
+  tree <- hclust(dist(sim.matrix))
+  tree$height <- tree$height / max(tree$height) *2
+  return(as.phylo(tree))
 }
 
 #' Sample data of spiders in Arrabida (Portugal)

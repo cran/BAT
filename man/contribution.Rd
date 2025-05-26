@@ -26,7 +26,7 @@ Contribution is equivalent to the evolutionary distinctiveness index (ED) of Isa
 }
 \examples{
 comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,0,1), nrow = 4, byrow = TRUE)
-tree = tree.build(1:5)
+tree = tree.build(gower(1:5))
 
 contribution(comm, tree)
 contribution(comm, tree, TRUE)

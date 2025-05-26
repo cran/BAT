@@ -30,13 +30,13 @@ A vector or matrix with the different values per class per community.
 Fits the SAD to community abundance data, also using trees and with possible rarefaction.
 }
 \details{
-The Species Abundance Distribution describes the commonness and rarity in ecological systems. It was recently expanded to accomodate phylegenetic and functional differences between species (Matthews et al., subm.). Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
+The Species Abundance Distribution describes the commonness and rarity in ecological systems. It was recently expanded to accomodate phylegenetic and functional differences between species (Matthews et al., in prep.). Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
 }
 \examples{
 comm1 <- c(20,1,3,100,30)
 comm2 <- c(1,2,12,0,45)
 comm <- rbind(comm1, comm2)
-tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+tree <- tree.build(gower(1:5))
 sad(comm1)
 sad(comm)
 sad(comm, octaves = FALSE)
@@ -44,5 +44,5 @@ sad(comm, tree, scale = TRUE)
 sad(comm, raref = 1)
 }
 \references{
-Matthews et al. (subm.) Phylogenetic and functional dimensions of the species abundance distribution.
+Matthews et al. (in prep.) Phylogenetic and functional dimensions of the species abundance distribution.
 }

@@ -35,8 +35,8 @@ Variable scores in a biplot
 Estimation of missing trait values (NA) based on different methods.
 }
 \details{
-Inputs missing data in the trait matrix based on different methods (see Taugourdeau et al. 2014; Johnson et al. 2021 for comparisons among the performance of different methods). 
-The simplest approach is the average imputation ("mean" or "median"), calculating the mean/median of the values for that trait based on all the observations that are non-missing. It has the advantage of keeping the same mean and the same sample size, but many disadvantages. 
+Inputs missing data in the trait matrix based on different methods (see Taugourdeau et al. 2014; Johnson et al. 2021 for comparisons among the performance of different methods).
+The simplest approach is the average imputation ("mean" or "median"), calculating the mean/median of the values for that trait based on all the observations that are non-missing. It has the advantage of keeping the same mean and the same sample size, but many disadvantages.
 The "similar" method inputs a systematically chosen value from the closest species who has similar values on other variables.
 The default method is linear regression ("regression"), where the predicted value is obtained by regressing the missing variable on other variables. This preserves relationships among variables involved in the imputation model, but not variability around predicted values (i.e., may lead to extrapolations).
 The "w_regression" takes into account the relative distance among species in the imputation of missing traits, based on the phylogenetic or functional distance between missing and non-missing species.

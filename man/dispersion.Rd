@@ -18,9 +18,9 @@ dispersion(
 
 \item{tree}{A phylo or hclust object (used only for PD or FD) or alternatively a species x traits matrix or data.frame to build a functional tree.}
 
-\item{distance}{A dist object representing the phylogenetic or functional distance between species.}
+\item{distance}{A dist object representing the phylogenetic or functional distance between species. Only used if no tree is given.}
 
-\item{func}{Calculate dispersion using originality (default), uniqueness or contribution.}
+\item{func}{Calculate dispersion using originality (default; = MPD), uniqueness (= MNTD) or contribution.}
 
 \item{abund}{A boolean (T/F) indicating whether dispersion should be calculated using individuals (T) or species (F).}
 
@@ -33,13 +33,16 @@ A vector of values per site (or a single value if no comm is given).
 Average dissimilarity between any two species or individuals randomly chosen in a community.
 }
 \details{
+Many different metrics have been proposed to quantify dispersion.
+When func = "originality" this is equivalent to Mean Phylogenetic Diversity (MPD)
+When func = "uniqueness" dispersion is equivalent to Mean Nearest Taxon Distance (MNTD).
 If abundance data is used and a tree is given, dispersion is the quadratic entropy of Rao (1982).
 If abundance data is not used but a tree is given, dispersion is the phylogenetic dispersion measure of Webb et al. (2002).
 }
 \examples{
 comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,1,1), nrow = 4, byrow = TRUE)
 distance <- dist(c(1:5), method="euclidean")
-tree <- hclust(distance, method="average")
+tree <- tree.build(distance)
 dispersion(tree = tree)
 dispersion(distance = distance)
 dispersion(comm, tree)

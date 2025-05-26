@@ -39,9 +39,9 @@ Note that the contribution of a species or individual can be negative, if the re
 If no tree or distance is provided the result is calculated for taxonomic evenness using the original index.
 }
 \examples{
-comm <- matrix(c(1,2,0,5,5,1,1,0,0,0,0,2,2,0,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
-distance <- dist(c(1:5), method = "euclidean")
-tree <- hclust(distance, method = "average")
+comm <- matrix(c(1,2,1,5,5,1,1,1,0,0,0,2,2,1,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
+tree <- tree.build(dist(c(1:5)), func = "upgma")
+
 evenness.contribution(comm)
 evenness.contribution(tree = tree, func = "bulla")
 evenness.contribution(comm, tree)

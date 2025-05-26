@@ -38,9 +38,9 @@ This measure is simply the pairwise difference of evenness calculated based on t
 If no tree or distance is provided the result is the original index.
 }
 \examples{
-comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
-distance <- dist(c(1:5), method = "euclidean")
-tree <- hclust(distance, method = "average")
+comm <- matrix(c(1,2,0,0,1,1,0,0,0,2,2,0,1,1,1,100), nrow = 4, byrow = TRUE)
+tree <- tree.build(gower(comm))
+
 beta.evenness(comm)
 beta.evenness(comm, tree)
 beta.evenness(comm, tree, method = "contribution")

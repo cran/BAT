@@ -34,23 +34,24 @@ If not specified, default is 0.}
 \item{comp}{Boolean indicating whether beta diversity components (shared and unique fractions) should be returned.}
 }
 \value{
-Three distance matrices between sites, one per each of the three beta diversity measures (either "Obs" OR "Mean, Median, Min, LowerCL, UpperCL and Max").
+Five distance matrices between sites, one per each of the five beta diversity measures (either "Obs" OR "Mean, Median, Min, LowerCL, UpperCL and Max").  If comp = TRUE also three distance matrices with beta diversity components.
 }
 \description{
 Beta diversity with possible rarefaction, multiple sites simultaneously.
 }
 \details{
-The beta diversity measures used here follow the partitioning framework independently developed by Podani & Schmera (2011) and Carvalho et al. (2012)
-and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
+The beta diversity measures used here follow the partitioning frameworks developed by Podani & Schmera (2011), Carvalho et al. (2012) and Legendre (2019)
+and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich or Btotal = Bgain + Bloss.
 Btotal = total beta diversity, reflecting both species replacement and loss/gain;
-Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone.
+Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone;
+Bgain = beta diversity explained by species gain from T1 to T2; Bloss = beta diversity explained by species lost from T1 to T2.
 PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 The number and order of species in comm must be the same as in tree.
 The rarefaction option is useful to compare communities with much different numbers of individuals sampled, which might bias diversity comparisons (Gotelli & Colwell 2001).
 }
 \examples{
 comm <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,1,2,2), nrow = 4, ncol = 5, byrow = TRUE)
-tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+tree <- tree.build(dist(c(1:5)))
 beta(comm)
 beta(comm, abund = FALSE, comp = TRUE)
 beta(comm, tree)
@@ -63,6 +64,8 @@ Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J
 Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
 
 Gotelli, N.J. & Colwell, R.K. (2001) Quantifying biodiversity: procedures and pitfalls in the measurement and comparison of species richness. Ecology Letters, 4, 379-391.
+
+Legendre, P. (2019) A temporal beta-diversity index to identify sites that have changed in exceptional ways in space–time surveys. Ecology and Evolution, 9: 3500-3514.
 
 Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
 }

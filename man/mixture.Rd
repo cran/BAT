@@ -36,14 +36,14 @@ mixture(
 A matrix with expected diversity at each proportion of different habitats in a landscape.
 }
 \description{
-Mixture model by Hilario et al. subm.
+Mixture model by Hilario et al. (2025)
 }
 \details{
 A tool to assess biodiversity in landscapes containing varying proportions of n environments.
 }
 \examples{
 comm <- matrix(c(20,20,20,20,20,9,1,0,0,0,1,1,1,1,1), nrow = 3, ncol = 5, byrow = TRUE)
-tree = hclust(dist(1:5))
+tree = tree.build(dist(1:5))
 
 hill(comm)
 alpha(comm, tree)
@@ -54,7 +54,7 @@ mixture(comm, tree, replace = TRUE, runs = 10)
 \references{
 Chao et al. (2019) Proportional mixture of two rarefaction/extrapolation curves to forecast biodiversity changes under landscape transformation. Ecology Letters, 22: 1913-1922. https://doi.org/10.1111/ele.13322
 
-Hilario et al. (subm.) Function ‘mixture’: A new tool to quantify biodiversity change under landscape transformation.
+Hilario et al. (2025) Hilário, R. et al. (2025) A new tool to quantify biodiversity change under landscape transformation. Ecological Applications, 35: e3017.
 }
 \author{
 Renato Hilario & Pedro Cardoso

@@ -16,7 +16,7 @@ A vector or matrix with the contribution values of each species or individual fo
 Contribution of each species or individual to the evenness of one or more kernel hypervolumes.
 }
 \details{
-The contribution of each observation (species or individual) to the total evenness of a kernel hypervolume. Contribution to evenness is calculated as the difference in evenness between the total hypervolume and a second hypervolume lacking this specific observation (i.e., leave-one-out approach; Mammola & Cardoso, 2020). 
+The contribution of each observation (species or individual) to the total evenness of a kernel hypervolume. Contribution to evenness is calculated as the difference in evenness between the total hypervolume and a second hypervolume lacking this specific observation (i.e., leave-one-out approach; Mammola & Cardoso, 2020).
 Note that the contribution of a species or individual can be negative, if the removal of an observation increases the total evenness.
 }
 \examples{

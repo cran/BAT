@@ -14,15 +14,18 @@ hull.beta(comm, func = "jaccard", comp = FALSE)
 \item{comp}{Boolean indicating whether beta diversity components (shared and unique fractions) should be returned.}
 }
 \value{
-Three pairwise distance matrices, one per each of the three beta diversity components.
+Five pairwise distance matrices, one per each of the five beta diversity metrics.  If comp = TRUE also three distance matrices with beta diversity components.
 }
 \description{
 Pairwise beta diversity partitioning into replacement and net difference in amplitude components of convex hulls.
 }
 \details{
-Computes a pairwise decomposition of the overall differentiation among kernel hypervolumes into two components: the replacement (shifts) of space between hypervolumes and net differences between the amount of space enclosed by each hypervolume.
-The beta diversity measures used here follow the FD partitioning framework where Btotal = Breplacement + Brichness. Beta diversity ranges from 0 (when hypervolumes are identical) to 1 (when hypervolumes are fully dissimilar).
-See Carvalho & Cardoso (2020) and Mammola & Cardoso (2020) for the full formulas of beta diversity used here.
+Computes a pairwise decomposition of the overall differentiation among convex hull hypervolumes.
+The beta diversity measures used here follow the partitioning frameworks developed by Podani & Schmera (2011), Carvalho et al. (2012) and Legendre (2019)
+and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich or Btotal = Bgain + Bloss.
+Btotal = total beta diversity, reflecting both species replacement and loss/gain;
+Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone;
+Bgain = beta diversity explained by species gain from T1 to T2; Bloss = beta diversity explained by species lost from T1 to T2.
 }
 \examples{
 comm <- rbind(c(1,1,1,1,1), c(1,1,1,1,1), c(0,0,1,1,1),c(0,0,1,1,1))
@@ -35,11 +38,14 @@ rownames(trait) = colnames(comm)
 
 hvlist = hull.build(comm, trait)
 hull.beta(hvlist)
-hvlist = hull.build(comm, trait, axes = 2)
 hull.beta(hvlist, comp = TRUE)
 }
 \references{
-Carvalho, J.C. & Cardoso, P. (2020) Decomposing the causes for niche differentiation between species using hypervolumes. Frontiers in Ecology and Evolution. https://doi.org/10.3389/fevo.2020.00243
+Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 
-Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution. https://doi.org/10.1111/2041-210X.13424
+Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
+
+Legendre, P. (2019) A temporal beta-diversity index to identify sites that have changed in exceptional ways in space–time surveys. Ecology and Evolution, 9: 3500-3514.
+
+Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
 }

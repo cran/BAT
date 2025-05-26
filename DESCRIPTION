@@ -1,9 +1,9 @@
 Package: BAT
 Title: Biodiversity Assessment Tools
-Version: 2.9.6
-Date: 2024-02-16
+Version: 2.10.0
+Date: 2025-05-12
 Authors@R: c(
-    person("Pedro", "Cardoso", email = "pmcardoso@fc.ul.pt", role = c("aut", "cre")),
+    person("Pedro", "Cardoso", email = "pmcardoso@ciencias.ulisboa.pt", role = c("aut", "cre")),
     person("Stefano", "Mammola", role = c("aut")),
     person("Francois", "Rigal", role = c("aut")),
     person("Jose", "Carvalho", role = c("aut")))
@@ -16,17 +16,17 @@ Description: Includes algorithms to assess alpha and beta diversity
     Cardoso et al. (2015) <doi:10.1111/2041-210X.12310>.
 Depends: R (>= 3.0.0)
 Imports: ape, geometry, graphics, hypervolume, MASS, methods, nls2,
-        parallel, phytools, stats, terra, utils, vegan
+        parallel, phytools, stats, terra, TreeTools, utils, vegan
 Encoding: UTF-8
 License: GPL-3
 LazyData: true
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.2
 NeedsCompilation: no
-Packaged: 2024-02-16 16:58:08 UTC; ungol
+Packaged: 2025-05-12 15:42:20 UTC; ungol
 Author: Pedro Cardoso [aut, cre],
   Stefano Mammola [aut],
   Francois Rigal [aut],
   Jose Carvalho [aut]
-Maintainer: Pedro Cardoso <pmcardoso@fc.ul.pt>
+Maintainer: Pedro Cardoso <pmcardoso@ciencias.ulisboa.pt>
 Repository: CRAN
-Date/Publication: 2024-02-17 21:50:02 UTC
+Date/Publication: 2025-05-26 17:40:06 UTC

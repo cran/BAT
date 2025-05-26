@@ -28,7 +28,7 @@ A vector or matrix with the different values per class per community.
 Fits the SAD to community abundance data based on n-dimensional hypervolumes.
 }
 \details{
-The Species Abundance Distribution describes the commonness and rarity in ecological systems. It was recently expanded to accomodate phylegenetic and functional differences between species (Matthews et al., subm.). Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
+The Species Abundance Distribution describes the commonness and rarity in ecological systems. It was recently expanded to accomodate phylegenetic and functional differences between species (Matthews et al., in prep.). Classes defined as n = 1, 2-3, 4-7, 8-15, .... Rarefaction allows comparison of sites with different total abundances.
 }
 \examples{
 \dontrun{
@@ -46,5 +46,5 @@ kernel.sad(hv, raref = TRUE)
 }
 }
 \references{
-Matthews et al. (subm.) Phylogenetic and functional dimensions of the species abundance distribution.
+Matthews et al. (in prep.) Phylogenetic and functional dimensions of the species abundance distribution.
 }

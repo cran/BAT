@@ -77,7 +77,7 @@ Estimation of alpha diversity of a single site with accumulation of sampling uni
 }
 \details{
 Observed diversity often is an underestimation of true diversity. Several approaches have been devised to estimate species richness (TD) from incomplete sampling.
-These include: (1) fitting asymptotic functions to randomised accumulation curves (Soberon & Llorente 1993; Flather 1996; Cardoso et al. in prep.)
+These include: (1) fitting asymptotic functions to randomised accumulation curves (Soberon & Llorente 1993; Flather 1996; Cardoso et al. 2014)
 (2) the use of non-parametric estimators based on the incidence or abundance of rare species (Heltshe & Forrester 1983; Chao 1984, 1987; Colwell & Coddington 1994).
 A correction to non-parametric estimators has also been recently proposed, based on the proportion of singleton or unique species
 (species represented by a single individual or in a single sampling unit respectively; Lopez et al. 2012).
@@ -89,7 +89,7 @@ The number and order of species in comm must be the same as in tree.
 }
 \examples{
 comm <- matrix(c(1,1,0,0,0,0,2,1,0,0,0,0,2,1,0,0,0,0,2,1), nrow = 4, ncol = 5, byrow = TRUE)
-tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+tree <- tree.build(dist(c(1:5)))
 alpha.accum(comm)
 alpha.accum(comm, func = "nonparametric")
 alpha.accum(comm, tree, "completeness")

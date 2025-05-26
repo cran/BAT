@@ -4,14 +4,18 @@
 \alias{gower}
 \title{Gower distance.}
 \usage{
-gower(trait, convert = NULL, weight = NULL)
+gower(trait, convert = NULL, st = "range", weight = NULL, square = TRUE)
 }
 \arguments{
 \item{trait}{A species x traits matrix or data.frame.}
 
 \item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables.}
 
+\item{st}{Standardize variables before calculating Gower´s distance. One of "z" (mean = 0, sd = 1, i.e., z-score), "iqr" (x = x / interquartile_range(x)), "range" (rescale with range 0-1; default), or "rank" (rescale with range 0-1 after ranking). See BAT::standard for details.}
+
 \item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait.}
+
+\item{square}{A boolean indicating whether to use Pavoine (2009) implementation that squares the trait distances (TRUE) or the original implementation by Gower (1971) as modified by Podani (1999) for ordinal variables (FALSE).}
 }
 \value{
 A dist object with pairwise distances between species.
@@ -23,12 +27,19 @@ Calculates Gower distances between observations.
 The Gower distance allows continuous, ordinal, categorical or binary variables, with possible weighting (Pavoine et al. 2009).
 NAs are allowed as long as each pair of species has at least one trait value in common.
 If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters as values.
+Beware that for Gower´s distance to change between 0 and 1 traits must be standardized by range.
 }
 \examples{
-trait = data.frame(body = c(NA,2,3,4,4), beak = c(1,1,1,1,2))
+trait = data.frame(body = c(NA,2,3,4,4), beak = c(1,1,1,1,2), habitat = c("A", "B", "C", "A", "B"))
 gower(trait)
-gower(trait, weight = c(1, 0))
+gower(trait, st = "z")
+gower(trait, square = FALSE)
+gower(trait, weight = c(1, 0, 0))
 }
 \references{
+Gower, J. C. (1971) A general coefficient of similarity and some of its properties. Biometrics, 27:857-871.
+
 Pavoine et al. (2009) On the challenge of treating various types of variables: application for improving the measurement of functional diversity. Oikos, 118: 391-402.
+
+Podani, J. (1999) Extending Gower's general coefficient of similarity to ordinal characters. Taxon, 48:331-340.
 }

@@ -4,7 +4,7 @@
 \alias{raster.beta}
 \title{Maps of beta diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).}
 \usage{
-raster.beta(layers, tree, func = "jaccard", neighbour = 8, abund = FALSE)
+raster.beta(layers, tree, func = "jaccard", neighbor = 8, abund = FALSE)
 }
 \arguments{
 \item{layers}{A SpatRaster object of species distributions from package terra.}
@@ -13,32 +13,35 @@ raster.beta(layers, tree, func = "jaccard", neighbour = 8, abund = FALSE)
 
 \item{func}{Partial match indicating whether the Jaccard or Soerensen family of beta diversity measures should be used. If not specified, default is Jaccard.}
 
-\item{neighbour}{Either 8 (default) or 4 cells considered to calculate beta diversiy of each focal cell.}
+\item{neighbor}{Either 8 (default) or 4 cells considered to calculate beta diversiy of each focal cell.}
 
 \item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis.}
 }
 \value{
-A SpatRaster object with three layers representing Btotal, Brepl and Brich in space.
+A SpatRaster object with five layers representing Btotal, Brepl, Brich, Bgain and Bloss in space.
 }
 \description{
 Observed beta diversity using rasters of species distributions (presence/absence or abundance).
 }
 \details{
-The beta diversity measures used here follow the partitioning framework independently developed by Podani & Schmera (2011) and Carvalho et al. (2012)
-and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
-Btotal = total beta diversity, reflecting both species replacement and loss/gain;
-Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone.
+The beta diversity metrics follow the partitioning frameworks developed by Podani & Schmera (2011), Carvalho et al. (2012) and Legendre (2019)
+and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich or Btotal = Bgain + Bloss.
+Btotal = total beta diversity, reflecting both volume replacement and loss/gain;
+Brepl = beta diversity explained by replacement of volume alone; Brich = beta diversity explained by volume loss/gain (richness differences) alone;
+Bgain = beta diversity explained by volume gain from T1 to T2; Bloss = beta diversity explained by volume lost from T1 to T2.
 PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 The number and order of species in layers must be the same as in tree.
 }
 \examples{
-sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,1,1,0), nrow = 3, ncol = 3, byrow = TRUE))
-sp2 <- terra::rast(matrix(c(0,0,0,1,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
-sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,1,1,0), nrow = 3, ncol = 3, byrow = TRUE))
+sp1 <- terra::rast(matrix(c(NA,1,1,1,1,0,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
+sp2 <- terra::rast(matrix(c(0,0,0,0,1,1,1,1,1), nrow = 3, ncol = 3, byrow = TRUE))
+sp3 <- terra::rast(matrix(c(0,0,0,1,1,1,0,0,0), nrow = 3, ncol = 3, byrow = TRUE))
 spp <- c(sp1, sp2, sp3)
-tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-tree$labels = c("Sp1", "Sp2", "Sp3")
-names(spp) = tree$labels
+names(spp) = c("Sp1", "Sp2", "Sp3")
+
+tree <- tree.build(gower(1:3))
+tree$tip.label = names(spp)
+
 raster.beta(spp)
 raster.beta(spp, tree)
 }

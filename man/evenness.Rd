@@ -40,10 +40,11 @@ If no tree or distance is provided the result is the original index.
 If any site has < 2 species its value will be NA.
 }
 \examples{
-comm <- matrix(c(1,2,0,0,0,1,1,0,0,0,0,2,2,0,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
-distance <- dist(c(1:5), method = "euclidean")
-tree <- hclust(distance, method = "average")
+comm <- matrix(c(1,1,1,1,1,1,2,1,0,0,0,2,2,2,0,1,1,1,1,100), nrow = 4, byrow = TRUE)
+tree <- tree.build(dist(c(1:5)), func = "upgma")
+
 evenness(comm)
+evenness(tree = tree)
 evenness(tree = tree, func = "bulla")
 evenness(comm, tree)
 evenness(comm, tree, method = "contribution")

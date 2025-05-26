@@ -4,47 +4,45 @@
 \alias{hyper.build}
 \title{Build hyperspace.}
 \usage{
-hyper.build(trait, distance = "gower", weight = NULL, axes = 1, convert = NULL)
+hyper.build(distance, ord = "pcoa", axes = 1, stats = FALSE)
 }
 \arguments{
-\item{trait}{A species x traits matrix or data.frame or, alternatively, a dist object.}
+\item{distance}{A dist object representing the distances between species.}
 
-\item{distance}{One of "gower" or "euclidean". Not used if trait is a dist object.}
+\item{ord}{Method used to reduce the dimensionality of variables using either of the ordination methods "pcoa" or "nmds".}
 
-\item{weight}{A vector of column numbers with weights for each variable. Its length must be equal to the number of columns in trait. Only used if axes > 0 and if trait is not a dist object.}
+\item{axes}{If 0 < axes <= 1 a PCoA is done and as many axes as needed to achieve this proportion of variance explained are selected.
+If axes > 1 these many axes are selected for either PCoA or NMDS.}
 
-\item{axes}{If 0, no transformation of data is done.
-If 0 < axes <= 1 a PCoA is done with Gower/euclidean distances and as many axes as needed to achieve this proportion of variance explained are selected.
-If axes > 1 these many axes are selected.}
-
-\item{convert}{A vector of column numbers, usually categorical variables, to be converted to dummy variables. Only used if axes > 0 and if trait is not a dist object.}
+\item{stats}{If TRUE and ord = TRUE, stats for each dimension are returned.}
 }
 \value{
-A matrix with the coordinates of each species in hyperspace.
+Either a matrix with the coordinates of each species in hyperspace or a list containing this matrix plus the stats for each dimension.
 }
 \description{
-Builds hyperspace by transforming trait or distance data to use with either hull.build or kernel.build.
+Builds hyperspace using distance data for hull.build or kernel.build.
 }
 \details{
-The hyperspace can be constructed with the given data or data can be transformed using PCoA after traits are dummyfied (if needed) and standardized (always).
-Gower distance (Pavoine et al. 2009) allows continuous, ordinal, categorical or binary variables, with possible weighting.
-NAs are allowed as long as each pair of species has at least one trait value in common.
-If convert is given the algorithm will convert these column numbers to dummy variables. Otherwise it will convert all columns with factors or characters as values.
 Note that each community should have at least 3 species and more species than traits or axes (if axes > 0) to build convex hull hypervolumes.
 Transformation of traits is recommended if (Carvalho & Cardoso, 2020):
-1) Some traits are not continuous;
-2) Some traits are correlated; or
-3) There are less species than traits + 1, in which case the number of axes should be smaller.
+\enumerate{
+\item Some traits are not continuous;
+\item Some traits are correlated; or
+\item There are less species than traits + 1, in which case the number of axes should be smaller.
+}
 }
 \examples{
 trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
 rownames(trait) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+distance = gower(trait)
 
-hs = hyper.build(trait, weight = c(1,2), axes = 2)
-plot(hs)
+hs = hyper.build(distance, axes = 0.8, stats = TRUE)
+plot(hs$trait)
+hs$stats
+hs = hyper.build(distance, ord = "nmds", axes = 2, stats = TRUE)
+plot(hs$trait)
+hs$stats
 }
 \references{
 Carvalho, J.C. & Cardoso, P. (2020) Decomposing the causes for niche differentiation between species using hypervolumes. Frontiers in Ecology and Evolution, 8: 243.
-
-Pavoine et al. (2009) On the challenge of treating various types of variables: application for improving the measurement of functional diversity. Oikos, 118: 391-402.
 }

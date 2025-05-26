@@ -4,12 +4,12 @@
 \alias{hyper.quality}
 \title{Quality of hyperspace.}
 \usage{
-hyper.quality(distance, hyper)
+hyper.quality(distance, trait)
 }
 \arguments{
 \item{distance}{A dist object representing the initial distances between species.}
 
-\item{hyper}{A matrix with coordinates data from function hyper.build.}
+\item{trait}{A trait matrix, often resulting from hyper.build.}
 }
 \value{
 A single value of quality.
@@ -24,11 +24,8 @@ This is used for any representation using hyperspaces, including convex hull and
 trait = data.frame(body = c(1,2,3,4,4), beak = c(1,1,1,1,2))
 distance = gower(trait)
 
-hyper = hyper.build(trait, axes = 2)
-hyper.quality(distance, hyper)
-
-hyper = hyper.build(trait, axes = 0)
-hyper.quality(distance, hyper)
+trait = hyper.build(distance, axes = 0.9)
+hyper.quality(distance, trait)
 }
 \references{
 Maire et al. (2015) How many dimensions are needed to accurately assess functional diversity? A pragmatic approach for assessing the quality of functional spaces. Global Ecology and Biogeography, 24: 728:740.

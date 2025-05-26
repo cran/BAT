@@ -34,8 +34,8 @@ comm2 <- matrix(c(2,2,0,3,1,0,0,0,5,0,0,2), nrow = 4, ncol = 3, byrow = TRUE)
 comm <- array(c(comm1, comm2), c(4,3,2))
 colnames(comm) <- c("Sp1","Sp2","Sp3")
 
-tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-tree$labels <- colnames(comm)
+tree <- tree.build(dist(c(1:3)))
+tree$tip.label <- colnames(comm)
 
 methods <- data.frame(method = c("Met1","Met2","Met3"), nSamples = c(1,2,1))
 

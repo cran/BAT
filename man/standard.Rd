@@ -4,12 +4,12 @@
 \alias{standard}
 \title{Standardize variables.}
 \usage{
-standard(trait, method = "standard", convert = NULL)
+standard(trait, method = "z", convert = NULL)
 }
 \arguments{
 \item{trait}{A species x traits matrix or data.frame.}
 
-\item{method}{One of "standard" (standardize to mean = 0 and sd = 1, i.e., use z-score), "range" (rescale with range 0-1), or "rank" (rescale with range 0-1 after ranking).}
+\item{method}{One of "z" (mean = 0, sd = 1, i.e., z-score), "iqr" (x = x / interquartile_range(x)), "range" (rescale with range 0-1), or "rank" (rescale with range 0-1 after ranking).}
 
 \item{convert}{A vector of column numbers to be standardized. If NULL all will be standardized.}
 }
@@ -23,8 +23,12 @@ Standardize (or normalize) variables in different ways.
 Standardizing values allows to directly compare variables of interest with inherently different ranges, avoiding artificial distortions of distances between observations.
 }
 \examples{
-trait = data.frame(body = c(20,40,60,30,10), beak = c(NA,4,6,3,1))
+body = c(20,40,60,30,50)
+beak = c(NA,4,6,3,1)
+habitat = c("A", "B", "C", "A", "B")
+trait = data.frame(body, beak, habitat)
 standard(trait)
+standard(trait, method = "iqr")
 standard(trait, method = "range")
 standard(trait, method = "rank")
 }

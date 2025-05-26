@@ -40,8 +40,8 @@ colnames(comm) <- c("Sp1","Sp2","Sp3")
 
 methods <- data.frame(method = c("Met1","Met2","Met3"),
            nSamples = c(1,2,1), fixcost = c(1,1,2), varCost = c(1,1,1))
-tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-tree$labels <- colnames(comm)
+tree <- tree.build(dist(c(1:3)))
+tree$tip.label <- colnames(comm)
 
 \dontrun{
   optim.alpha(comm,,methods)

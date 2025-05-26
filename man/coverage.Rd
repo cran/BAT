@@ -22,7 +22,7 @@ Calculated as the estimated proportion of individuals that belong to the species
 }
 \examples{
 comm <- matrix(c(2,1,0,0,100,1,2,0,0,3,1,2,4,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)
-tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+tree <- tree.build(gower(1:5))
 coverage(comm)
 coverage(comm, tree)
 }

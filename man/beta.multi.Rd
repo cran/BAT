@@ -31,17 +31,17 @@ Beta diversity with possible rarefaction - multiple sites measure calculated as 
 }
 \details{
 Beta diversity of multiple sites simultaneously is calculated as either the average or the variance among all pairwise comparisons (Legendre, 2014).
-The beta diversity measures used here follow the partitioning framework independently developed by Podani & Schmera (2011) and Carvalho et al. (2012)
-and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich.
+The beta diversity measures used here follow the partitioning frameworks developed by Podani & Schmera (2011), Carvalho et al. (2012) and Legendre (2019)
+and later expanded to PD and FD by Cardoso et al. (2014), where Btotal = Brepl + Brich or Btotal = Bgain + Bloss.
 Btotal = total beta diversity, reflecting both species replacement and loss/gain;
-Brepl = beta diversity explained by replacement of species alone;
-Brich = beta diversity explained by species loss/gain (richness differences) alone.
+Brepl = beta diversity explained by replacement of species alone; Brich = beta diversity explained by species loss/gain (richness differences) alone;
+Bgain = beta diversity explained by species gain from T1 to T2; Bloss = beta diversity explained by species lost from T1 to T2.
 PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric). The path to the root of the tree is always included in calculations of PD and FD.
 The number and order of species in comm must be the same as in tree.
 }
 \examples{
 comm <- matrix(c(2,2,0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,2,2), nrow = 4, ncol = 5, byrow = TRUE)
-tree <- hclust(dist(c(1:5), method="euclidean"), method="average")
+tree <- tree.build(dist(c(1:5)))
 beta.multi(comm)
 beta.multi(comm, func = "Soerensen")
 beta.multi(comm, tree)
@@ -54,6 +54,8 @@ Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J
 Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
 
 Legendre, P. (2014) Interpreting the replacement and richness difference components of beta diversity. Global Ecology and Biogeography, 23: 1324-1334.
+
+Legendre, P. (2019) A temporal beta-diversity index to identify sites that have changed in exceptional ways in space–time surveys. Ecology and Evolution, 9: 3500-3514.
 
 Podani, J. & Schmera, D. (2011) A new conceptual and methodological framework for exploring and explaining pattern in presence-absence data. Oikos, 120, 1625-1638.
 }

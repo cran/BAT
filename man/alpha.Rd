@@ -33,8 +33,7 @@ The rarefaction option is useful to compare communities with much different numb
 }
 \examples{
 comm <- matrix(c(0,0,1,1,0,0,2,1,0,0), nrow = 2, ncol = 5, byrow = TRUE)
-trait = 1:5
-tree <- tree.build(trait)
+tree <- tree.build(dist(1:5))
 plot(tree, "u")
 alpha(comm)
 alpha(comm, raref = 0)

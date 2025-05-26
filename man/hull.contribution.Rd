@@ -30,7 +30,7 @@ rownames(trait) = colnames(comm)
 
 hv = hull.build(comm[1,], trait)
 hull.contribution(hv)
-hvlist = hull.build(comm, trait, axes = 2)
+hvlist = hull.build(comm, trait)
 hull.contribution(hvlist, relative = TRUE)
 }
 \references{

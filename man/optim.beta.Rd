@@ -40,8 +40,8 @@ Optimization of beta diversity sampling protocols when different methods and mul
 }
 \details{
 Often, comparing differences between sites or the same site along time (i.e. measure beta diversity) it is not necessary to sample exhaustively. A minimum combination of samples targeting different sub-communities (that may behave differently) may be enough to perceive such differences, for example, for monitoring purposes.
-Cardoso et al. (in prep.) introduce and differentiate the concepts of alpha-sampling and beta-sampling. While alpha-sampling optimization implies maximizing local diversity sampled (Cardoso 2009), beta-sampling optimization implies minimizing differences in beta diversity values between partially and completely sampled communities.
-This function uses as beta diversity measures the Btotal, Brepl and Brich partitioning framework (Carvalho et al. 2012) and respective generalizations to PD and FD (Cardoso et al. 2014).
+Cardoso et al. (2024) introduce and differentiate the concepts of alpha-sampling and beta-sampling. While alpha-sampling optimization implies maximizing local diversity sampled (Cardoso 2009), beta-sampling optimization implies minimizing differences in beta diversity values between partially and completely sampled communities.
+This function uses as beta diversity measures the Btotal, Brepl, Brich, Bgain and Bloss partitioning frameworks (Carvalho et al. 2012; Legendre 2019) and respective generalizations to PD and FD (Cardoso et al. 2014).
 PD and FD are calculated based on a tree (hclust or phylo object, no need to be ultrametric).
 }
 \examples{
@@ -53,14 +53,14 @@ colnames(comm) <- c("sp1","sp2","sp3")
 
 methods <- data.frame(method = c("Met1","Met2","Met3"),
            nSamples = c(1,2,1), fixcost = c(1,1,2), varCost = c(1,1,1))
-tree <- hclust(dist(c(1:3), method="euclidean"), method="average")
-tree$labels <- colnames(comm)
+tree <- tree.build(gower(1:3))
+tree$tip.label <- colnames(comm)
 
 \dontrun{
   optim.beta(comm,,methods)
   optim.beta(comm,,methods, seq = TRUE)
   optim.beta(comm, tree, methods)
-  optim.alpha(comm,, methods = methods, seq = TRUE, base = c(0,1,1))
+  optim.beta(comm,, methods = methods, seq = TRUE, base = c(0,1,1))
 }
 }
 \references{
@@ -68,7 +68,7 @@ Cardoso, P. (2009) Standardization and optimization of arthropod inventories - t
 
 Cardoso, P., Rigal, F., Carvalho, J.C., Fortelius, M., Borges, P.A.V., Podani, J. & Schmera, D. (2014) Partitioning taxon, phylogenetic and functional beta diversity into replacement and richness difference components. Journal of Biogeography, 41, 749-761.
 
-Cardoso, P., et al. (in prep.) Optimal inventorying and monitoring of taxon, phylogenetic and functional diversity.
+Cardoso et al. (2024) Optimal inventorying and monitoring of taxonomic, phylogenetic, and functional diversity. PLoS One, 19: 0307156.
 
 Carvalho, J.C., Cardoso, P. & Gomes, P. (2012) Determining the relative roles of species replacement and species richness differences in generating beta-diversity patterns. Global Ecology and Biogeography, 21, 760-771.
 }
