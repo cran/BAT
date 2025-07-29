@@ -34,6 +34,8 @@ Jack2ab - Second order jackknife estimator for abundance data;
 
 Chao1 - Chao estimator for abundance data.
 
+ACE - Abundance-based coverage estimator  (not yet implemented using trees).
+
 The P-corrected version of all estimators is also provided.
 }
 \description{

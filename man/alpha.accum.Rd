@@ -60,6 +60,10 @@ Chao1 - Chao estimator for abundance data;
 
 Chao2 - Chao estimator for incidence data;
 
+ACE - Abundance-based coverage estimator (not yet implemented using trees);
+
+ICE - Incidence-based coverage estimator (not yet implemented using trees);
+
 Clench - Clench or Michaelis-Menten curve;
 
 Exponential - Exponential curve;

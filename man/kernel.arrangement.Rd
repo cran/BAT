@@ -6,43 +6,44 @@
 \usage{
 kernel.arrangement(
   comm,
-  stat = "rneig",
-  distance = seq(0, 1, 0.01),
-  pool = NULL,
+  stat = "PNCP",
+  distances = seq(0, 1, 0.01),
   type = "SES",
   alpha = 0.05,
   runs = 99,
-  plotValues = TRUE
+  plot = TRUE
 )
 }
 \arguments{
-\item{comm}{A 'Hypervolume' object, preferably built using function kernel.build.}
+\item{comm}{A 'Hypervolume' object, built using function kernel.build.}
 
-\item{stat}{statistic to be calculated. One of c("rneig", "nnpair"), meaning "nearest neighbor" and "all neighbors" respectively.}
+\item{stat}{statistic to be calculated. One of c("PNCP", "NNCP"), meaning
+"cumulative proportion of pairwise neighbors" and "cumulative proportion of nearest neighbors", respectively.}
 
-\item{distance}{vector of distances to be considered in calculations}
+\item{distances}{vector of distances to be considered in calculations}
 
-\item{pool}{Species pool coordinates to use for null model construction.
-When \code{NULL} (default), the function performs a random displacement null model using the environmental space defined in the hypervolume object.
-When specified (typically coordinates from \code{hyper.build} output), the function instead performs a random selection null model, drawing species randomly from the provided pool coordinates.
-Must be a matrix or data.frame of coordinates matching the hypervolume dimensions.}
-
-\item{type}{Envelope type for testing significance. One of c("ecdf", "norm", "SES"), meaning "empirical cumulative distribution", "normalized envelope" (between 0-1, 0.5 indicate randomness, more than 0.5 - clustered; less than 0.5 - inhibition), and "standardized effect size" respectively.}
+\item{type}{Envelope type for testing significance. One of c("ecdf", "norm", "SES"), meaning
+"empirical cumulative distribution", "normalized envelope" (between 0-1, 0.5 indicate randomness,
+more than 0.5 - clustered; less than 0.5 - inhibition), and "standardized effect size" respectively.}
 
 \item{alpha}{alpha value to consider in significance testing (p-value).}
 
-\item{runs}{number of simulations for significance testing.}
+\item{runs}{number of simulations for significance testing}
 
-\item{plotValues}{Whether to plot "rneig" or "nnpair" values for all distances.}
+\item{plot}{whether to plot the results}
 }
 \value{
-A list with observed rneig or nnpair values, the confidence limits and standard effect size.
+A list with observed PNCP or NNCP values, a matrix of simulated values at r distances (r x sim), and standard effect size.
 }
 \description{
-Functional arrangement of a community, measuring the distribution of stochastic points within the total functional space at different distances.
+Functional arrangement of a community, measuring the distribution of species
+within the total functional space at multiple spatial scales. This is a specific function
+to be used with an Hypervolume object, preferably, from kernel.build function.
 }
 \details{
-This function measures the functional arrangement (Carvalho & Cardoso, subm.) of a n-dimensional hypervolume, namely the distribution of stochastic points within the total trait space from small to large functional distances.
+This function measures the functional arrangement (Carvalho & Cardoso, 2025)
+of a n-dimensional hypervolume, namely the distribution of species within the total
+trait space at multiple spatial scales.
 }
 \examples{
 \dontrun{
@@ -57,5 +58,5 @@ kernel.arrangement(hv)
 }
 }
 \references{
-Carvalho, J.C. & Cardoso, P. (subm.) Quantifying species distribution within the functional space.
+Carvalho, J.C. & Cardoso, P. (2025) Quantifying species distribution within the functional space.
 }

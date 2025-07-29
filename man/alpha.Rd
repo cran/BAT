@@ -2,7 +2,8 @@
 % Please edit documentation in R/BAT.R
 \name{alpha}
 \alias{alpha}
-\title{Alpha diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).}
+\title{Auxiliary function, used only internally
+Alpha diversity (Taxon, Phylogenetic or Functional Diversity - TD, PD, FD).}
 \usage{
 alpha(comm, tree, raref = 0, runs = 100)
 }

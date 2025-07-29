@@ -1,13 +1,16 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.10.0 (2025-05-12)
-#####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Jose Carlos Carvalho
+#####Version 2.11.0 (2025-07-29)
+#####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Renato Hilario, Jose Carlos Carvalho
 #####Maintainer: pmcardoso@ciencias.ulisboa.pt
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.9.6:
+#####Changed from v2.10.0:
+#####Added function hyper.arrangement by Carvalho & Cardoso (2025)
 #####Added function kernel.arrangement by Carvalho & Cardoso (2025)
+#####Added function kernel.bandwidth by Carvalho & Cardoso (2025)
 #####Added function tree.addTip to add tips to a given tree
 #####alpha function works with relative abundances
+#####alpha.estimate and alpha.accum now include ACE and ICE estimators
 #####All *.beta functions work with relative abundances and TBI by Legendre (2019)
 #####standard function now with option to use IQR and does not try to standardize categorical variables
 #####hyper.build now allows NMDS and returns variance/stress values for ordination methods
@@ -15,6 +18,7 @@
 #####gower now implements both Podani and Pavoine versions and its output was corrected when any trait has more than 2 categories
 
 library("ape")
+library("boot")
 library("geometry")
 library("graphics")
 library("hypervolume")
@@ -39,6 +43,7 @@ library("vegan")
 #' @import TreeTools
 #' @import utils
 #' @import vegan
+#' @importFrom boot boot boot.ci
 #' @importFrom MASS stepAIC
 #' @importFrom phytools midpoint.root
 #' @importFrom terra adjacent cells extract global rast rasterize
@@ -322,6 +327,57 @@ jack2ab <- function(obs, s1, s2){
 jack2in <- function(obs, q1, q2, q){
   if (q > 1)	return(obs + (q1*(2*q-3)/q - q2*(q-2)^2/(q*(q-1))))
   else return(obs + 2*q1 - q2)
+}
+
+ACE <- function(comm) {
+  #comm is a sites x species matrix
+  tot.abund <- colSums(comm)
+  S.abund <- sum(tot.abund > 10)#number of abundant species
+  S.rare <- length(subset(tot.abund, tot.abund > 0 & tot.abund <= 10))#number of rare species
+  singletons <- sum(tot.abund == 1)#number of singletons
+  N.rare <- sum(tot.abund[tot.abund <= 10])#number of individuals in rare species
+  N.rare <- ifelse(N.rare==0,1,N.rare)
+  C <- 1 - singletons/N.rare
+  den <- C*N.rare*(N.rare-1)
+  den <- ifelse(den==0,1,den)
+  fun <- function (vec) {
+    v <-c(rep(0,9))
+    for(i in 2:10) {
+      v[i] <- i * (i-1) * sum(vec == i)
+    }
+    sum(v)
+  }
+  num <- S.rare * fun(tot.abund)
+  gamma <- max((num/den)-1, 0)
+  ACE <- S.abund + (S.rare/C) + ((singletons/C) * gamma)
+  return(ACE)
+}
+
+ICE <- function(comm) {
+  #comm is a sites x species matrix
+  comm <- ifelse(comm == 0, 0, 1)
+  n.sites.spp <- colSums(comm)
+  S.freq <- sum(n.sites.spp > 10)#number of frequent species
+  S.infr <- length(subset(n.sites.spp, n.sites.spp > 0 & n.sites.spp <= 10))#number of infrequent species
+  uniques <- sum(n.sites.spp == 1)#number of uniques
+  N.infr <- sum(n.sites.spp[n.sites.spp <= 10])#number of incidences of infrequent species
+  N.infr <- ifelse(N.infr==0,1,N.infr)
+  m.infr <- sum(rowSums(comm[,n.sites.spp > 0 & n.sites.spp <= 10, drop = FALSE]) > 0)
+  m.infr <- ifelse(m.infr==0,1,m.infr)
+  C <- 1 - uniques/N.infr
+  den <- C*(m.infr-1)*(N.infr^2)
+  den <- ifelse(den==0,1,den)
+  fun <- function (vec) {
+    v <-c(rep(0,9))
+    for(i in 2:10) {
+      v[i] <- i * (i-1) * sum(vec == i)
+    }
+    sum(v)
+  }
+  num <- S.infr * m.infr * fun(n.sites.spp)
+  gamma <- max((num/den)-1, 0)
+  ICE <- S.freq + (S.infr/C) + ((uniques/C) * gamma)
+  return(ICE)
 }
 
 pcorr <- function(obs, s1){
@@ -667,6 +723,42 @@ nnpair_distR <- function(coord, distances) {
   return(out)
 }
 
+#Auxiliary function for kernel.bandwidth
+.compute_sigma <- function(data_matrix, scale_it) {
+  if (scale_it) {
+    data_matrix <- scale(data_matrix, center = TRUE, scale = TRUE)
+  }
+  
+  d <- as.vector(stats::dist(data_matrix, method = "euclidean"))
+  d <- d[d > 0]  # Drop self-pairs
+  if (!length(d)) stop("All pairwise distances are zero")
+  
+  h <- stats::median(d^2)
+  1 / h  # Return 1 / median(dist^2)
+}
+
+#' Auxiliary function, used only internally
+#print.sigma_bootstrap_result <- function(x, ...) {
+#  ci_mat <- switch(
+#    tolower(x$ci_type),
+#    norm  = x$ci$normal[, 2:3],
+#    basic = x$ci$basic[, 4:5],
+#    stud  = x$ci$student[, 4:5],
+#    perc  = x$ci$percent[, 4:5],
+#    bca   = x$ci$bca[, 4:5]
+#  )
+#  
+#  cat("Kernel Bandwidth Estimation (Median Heuristic + Bootstrap CI)\n")
+#  cat("============================================================\n")
+#  cat("Data scaling        :", if (x$scale_data) "center & scale" else "none", "\n")
+#  cat("Bootstrap replicates:", x$n_bootstrap, "\n\n")
+#  cat(sprintf("Original sigma      : %.6f\n", x$sigma_original))
+#  cat(sprintf("Bootstrap mean      : %.6f\n", x$sigma_bootstrap))
+#  cat(sprintf("Bootstrap s.e.      : %.6f\n", x$bootstrap_se))
+#  cat(sprintf("%s %.0f%% CI        : [%.6f, %.6f]\n",
+#              toupper(x$ci_type), x$conf_level * 100, ci_mat[1], ci_mat[2]))
+#  invisible(x)
+#}
 
 ##################################################################################
 ##################################MAIN FUNCTIONS##################################
@@ -776,6 +868,8 @@ alpha <- function(comm, tree, raref = 0, runs = 100){
 #' @return Jack2in - Second order jackknife estimator for incidence data;
 #' @return Chao1 - Chao estimator for abundance data;
 #' @return Chao2 - Chao estimator for incidence data;
+#' @return ACE - Abundance-based coverage estimator (not yet implemented using trees);
+#' @return ICE - Incidence-based coverage estimator (not yet implemented using trees);
 #' @return Clench - Clench or Michaelis-Menten curve;
 #' @return Exponential - Exponential curve;
 #' @return Rational - Rational function;
@@ -822,16 +916,16 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
   
   #####nonparametric (TD/PD/FD with non-parametric estimators)
   switch(func, nonparametric = {
-    resultsArray <- array(0, dim = c(nrow(comm), 19, runs))
+    resultsArray <- array(0, dim = c(nrow(comm), 23, runs))
     if(target > -2){
-      smse <- matrix(0, runs, 19)
+      smse <- matrix(0, runs, 23)
       smsew <-  smse
     }
     if (prog) pb <- txtProgressBar(0, runs, style = 3)
     for (r in 1:runs){
       comm <- comm[sample(nrow(comm)),, drop=FALSE]			#shuffle rows (sampling units)
       data <- matrix(0,1,ncol(comm))
-      runData <- matrix(0,nrow(comm),19)
+      runData <- matrix(0,nrow(comm),23)
       colnames(data) = colnames(comm)
       for (q in 1:nrow(comm)){
         data <- rbind(data, comm[q,])
@@ -854,7 +948,15 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
         c1P <- c1 * pcorr(obs, s1)
         c2 <- chao(obs, q1, q2, mb)
         c2P <- c2 * pcorr(obs, q1)
-        runData[q,] <- c(q, n, obs, s1, s2, q1, q2, j1ab, j1abP, j1in, j1inP, j2ab, j2abP, j2in, j2inP, c1, c1P, c2, c2P)
+        if(missing(tree)){
+          ace1 <- ACE(data)
+          ace1P <- ace1 * pcorr(obs, s1)
+          ice1 <- ICE(data)
+          ice1P <-ice1 * pcorr(obs, q1)
+        } else {
+          ace1 <- ace1P <- ice1 <- ice1P <- NA
+        }
+        runData[q,] <- c(q, n, obs, s1, s2, q1, q2, j1ab, j1abP, j1in, j1inP, j2ab, j2abP, j2in, j2inP, c1, c1P, c2, c2P, ace1, ace1P, ice1, ice1P)
       }
       resultsArray[,,r] <- runData
       if(exists("smse")){					##if accuracy is to be calculated
@@ -867,19 +969,19 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
         }
         s <- accuracy(runData, truediv)
         smse[r,3] <- s[1,1]
-        smse[r,8:19] <- s[1,-1]
+        smse[r,8:23] <- s[1,-1]
         smsew[r,3] <- s[2,1]
-        smsew[r,8:19] <- s[2,-1]
+        smsew[r,8:23] <- s[2,-1]
       }
       if (prog) setTxtProgressBar(pb, r)
     }
     if (prog) close(pb)
     
     #####calculate averages or medians of all runs
-    results <- matrix(0,nrow(comm),19)
+    results <- matrix(0,nrow(comm),23)
     v <- array(0, dim = c(runs))
     for (i in 1:nrow(comm)){
-      for (j in 1:19){
+      for (j in 1:23){
         for (k in 1:runs){
           v[k] <- resultsArray[i,j,k]
         }
@@ -907,7 +1009,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
       }
     }
     obs <- obs / runs
-    for (i in 8:19)
+    for (i in 8:23)
       results[,i] <- obs * (results[,i] / results[,3])
     results[,3] <- obs
     
@@ -973,7 +1075,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
     colnames(results) <- c("Sampl", "Ind", "Obs", "Clench", "Exponential", "Rational", "Weibull")
     return (results)
   })
-  colnames(results) <- c("Sampl", "Ind", "Obs", "S1", "S2", "Q1", "Q2", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
+  colnames(results) <- c("Sampl", "Ind", "Obs", "S1", "S2", "Q1", "Q2", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P", "ACE", "ACEP", "ICE", "ICEP")
   if(exists("smse")){
     smse <- rbind(smse, smsew)
     colnames(smse) <- colnames(results)
@@ -1010,6 +1112,7 @@ alpha.accum <- function(comm, tree, func = "nonparametric", target = -2, runs = 
 #' @return Jack1ab - First order jackknife estimator for abundance data;
 #' @return Jack2ab - Second order jackknife estimator for abundance data;
 #' @return Chao1 - Chao estimator for abundance data.
+#' @return ACE - Abundance-based coverage estimator  (not yet implemented using trees).
 #' @return The P-corrected version of all estimators is also provided.
 #' @references Cardoso, P., Rigal, F., Borges, P.A.V. & Carvalho, J.C. (2014) A new frontier in biodiversity inventory: a proposal for estimators of phylogenetic and functional diversity. Methods in Ecology and Evolution, 5: 452-461.
 #' @references Chao, A. (1984) Nonparametric estimation of the number of classes in a population. Scandinavian Journal of Statistics, 11, 265-270.
@@ -1050,7 +1153,7 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
     }
     
     #now let's go for what matters
-    results <- matrix(0,0,10)
+    results <- matrix(0,0,12)
     for (s in 1:nrow(comm)){
       data <- comm[s,,drop = FALSE]
       obs <- sobs(data, tree)
@@ -1064,7 +1167,13 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
       j2abP <- j2ab * pcorr(obs, s1)
       c1 <- chao(obs, s1, s2, mb)
       c1P <- c1 * pcorr(obs, s1)
-      results <- rbind(results, c(n, obs, s1, s2, j1ab, j1abP, j2ab, j2abP, c1, c1P))
+      if(missing(tree)){
+        ace1 <- ACE(data)
+        ace1P <- ace1 * pcorr(obs, s1)
+      } else {
+        ace1 <- ace1P <- NA
+      }
+      results <- rbind(results, c(n, obs, s1, s2, j1ab, j1abP, j2ab, j2abP, c1, c1P, ace1, ace1P))
     }
     
     #####completeness (PD/FD with TD completeness correction)
@@ -1081,12 +1190,12 @@ alpha.estimate <- function(comm, tree, func = "nonparametric"){
     obs <- matrix(0,nrow(comm),1)
     for (s in 1:nrow(comm))
       obs[s,1] <- obs[s,1] + sobs(comm[s,], tree)
-    for (i in 5:10)
+    for (i in 5:12)
       results[,i] <- obs[,1] * (results[,i] / results[,2])
     results[,2] <- obs[,1]
   })
   rownames(results) <- rownames(comm)
-  colnames(results) <- c("Ind", "Obs", "S1", "S2", "Jack1ab", "Jack1abP", "Jack2ab", "Jack2abP", "Chao1", "Chao1P")
+  colnames(results) <- c("Ind", "Obs", "S1", "S2", "Jack1ab", "Jack1abP", "Jack2ab", "Jack2abP", "Chao1", "Chao1P", "ACE", "ACE1P")
   return(results)
 }
 
@@ -2850,21 +2959,24 @@ kernel.hotspots <- function(comm, prop = 0.5){
 }
 
 #' Functional arrangement of kernel density hypervolumes.
-#' @description Functional arrangement of a community, measuring the distribution of stochastic points within the total functional space at different distances.
-#' @param comm A 'Hypervolume' object, preferably built using function kernel.build.
-#' @param stat statistic to be calculated. One of c("rneig", "nnpair"), meaning "nearest neighbor" and "all neighbors" respectively.
-#' @param distance vector of distances to be considered in calculations
-#' @param pool Species pool coordinates to use for null model construction. 
-#'   When `NULL` (default), the function performs a random displacement null model using the environmental space defined in the hypervolume object. 
-#'   When specified (typically coordinates from `hyper.build` output), the function instead performs a random selection null model, drawing species randomly from the provided pool coordinates.
-#'   Must be a matrix or data.frame of coordinates matching the hypervolume dimensions.
-#' @param type Envelope type for testing significance. One of c("ecdf", "norm", "SES"), meaning "empirical cumulative distribution", "normalized envelope" (between 0-1, 0.5 indicate randomness, more than 0.5 - clustered; less than 0.5 - inhibition), and "standardized effect size" respectively.
+#' @description Functional arrangement of a community, measuring the distribution of species 
+#' within the total functional space at multiple spatial scales. This is a specific function 
+#' to be used with an Hypervolume object, preferably, from kernel.build function.
+#' @param comm A 'Hypervolume' object, built using function kernel.build.
+#' @param stat statistic to be calculated. One of c("PNCP", "NNCP"), meaning 
+#' "cumulative proportion of pairwise neighbors" and "cumulative proportion of nearest neighbors", respectively. 
+#' @param distances vector of distances to be considered in calculations
+#' @param type Envelope type for testing significance. One of c("ecdf", "norm", "SES"), meaning 
+#' "empirical cumulative distribution", "normalized envelope" (between 0-1, 0.5 indicate randomness, 
+#' more than 0.5 - clustered; less than 0.5 - inhibition), and "standardized effect size" respectively.
 #' @param alpha alpha value to consider in significance testing (p-value).
-#' @param runs number of simulations for significance testing.
-#' @param plotValues Whether to plot "rneig" or "nnpair" values for all distances.
-#' @details This function measures the functional arrangement (Carvalho & Cardoso, subm.) of a n-dimensional hypervolume, namely the distribution of stochastic points within the total trait space from small to large functional distances.
-#' @return A list with observed rneig or nnpair values, the confidence limits and standard effect size.
-#' @references Carvalho, J.C. & Cardoso, P. (subm.) Quantifying species distribution within the functional space.
+#' @param runs number of simulations for significance testing
+#' @param plot whether to plot the results
+#' @details This function measures the functional arrangement (Carvalho & Cardoso, 2025) 
+#' of a n-dimensional hypervolume, namely the distribution of species within the total 
+#' trait space at multiple spatial scales.
+#' @return A list with observed PNCP or NNCP values, a matrix of simulated values at r distances (r x sim), and standard effect size.
+#' @references Carvalho, J.C. & Cardoso, P. (2025) Quantifying species distribution within the functional space.
 #' @examples \dontrun{
 #' comm = c(100,3,0,5,3)
 #' names(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
@@ -2876,7 +2988,7 @@ kernel.hotspots <- function(comm, prop = 0.5){
 #' kernel.arrangement(hv)
 #' }
 #' @export
-kernel.arrangement <- function (comm, stat = "rneig", distance = seq(0,1,0.01), pool = NULL, type = "SES", alpha = 0.05, runs = 99, plotValues = TRUE){
+kernel.arrangement <- function (comm, stat = "PNCP", distances = seq(0,1,0.01), type = "SES", alpha = 0.05, runs = 99, plot = TRUE){
   
   #check if right data is provided
   if (!(class(comm) %in% c("Hypervolume")))
@@ -2885,36 +2997,29 @@ kernel.arrangement <- function (comm, stat = "rneig", distance = seq(0,1,0.01), 
   #get parameters
   spp <- comm@Data
   nSpp <- nrow(spp) # number of species in the community
-  
-  # Pool argument
-  if (is.null(pool)) {
-    space <- comm@RandomPoints
-  } else {
-    space <- pool
-  }
-  
-  stat <- match.arg (stat, c("rneig", "nnpair"))
+  space <- comm@RandomPoints
+  stat <- match.arg (stat, c("PNCP", "NNCP"))
   type <- match.arg (type, c("ecdf", "norm", "SES"))
   cl = -qnorm(alpha/2) #convert alpha to SD
-  maxDist <- max(distance)
+  maxDist <- max(distances)
   
   ##null models
-  env <- matrix (0, length(distance), runs) ## empty matrix for envelope
+  env <- matrix (0, length(distances), runs) ## empty matrix for envelope
   switch (stat,
-          rneig = {
-            obs <- rneig_distR(spp, distance)
+          PNCP = {
+            obs <- rneig_distR(spp, distances)
             for (i in 1:runs) {
               print(paste("Simulation", i, "of", runs))
               run <- space[sample(1:nrow(space), nSpp),]
-              env[,i] <- rneig_distR(run, distance)
+              env[,i] <- rneig_distR(run, distances)
             }
           },
-          nnpair = {
-            obs <- nnpair_distR(spp, distance) 
+          NNCP = {
+            obs <- nnpair_distR(spp, distances) 
             for (i in 1:runs) {
               print (paste ("Simulation", i, "of", runs))
               run <- space[sample(1:nrow(space), nSpp),]
-              env[,i] <- nnpair_distR(run, distance)
+              env[,i] <- nnpair_distR(run, distances)
             }
           }
   )
@@ -2922,57 +3027,195 @@ kernel.arrangement <- function (comm, stat = "rneig", distance = seq(0,1,0.01), 
   ##envelope type
   switch(type, 
          
-   #using edcf
-   ecdf = {
-     lo <- apply(env, 1, min)
-     hi <- apply(env, 1, max)
-     
-     ## Plot the observed value in function of expected value under randomness assumption (average of simulations)
-     if(plotValues){
-       plot(distance, obs, xlim = c(0, maxDist), ylim = c(min(lo, obs),max(hi, obs)), type = "l", col = "blue")
-       abline (h = 0.5, lty = 2)
-       lines (distance, lo, lty = 3)
-       lines (distance, hi, lty = 3)
-     }
-   },
-   
-   #using norm
-   norm = {
-     avg <- apply(env, 1, mean)
-     H <- obs / avg
-     Hst <- H / (H+1)
-     lo <- apply(env / avg, 1, min)
-     hi <- apply(env / avg, 1, max)
-     Hlo <- lo / (lo+1)
-     Hhi <- hi / (hi+1)
-     
-     ## Plot the observed value in function of expected value under randomness assumption (average of simulations)
-     if(plotValues){
-       plot(distance, Hst, xlim = c(0, maxDist), ylim = c(min(na.omit(Hlo), na.omit(Hst)), max(na.omit(Hhi), na.omit(Hst))), type = "l", col = "blue")
-       abline (h = 0.5, lty = 2)
-       lines (distance, Hlo, lty = 3)
-       lines (distance, Hhi, lty = 3)
-     }
-   },
-   
-   #using Standard Effect Size
-   SES = {
-     env_avg <- apply(env, 1, mean)
-     env_sd <- apply(env, 1, sd)
-     ses_value <- (obs - env_avg) / env_sd #Standard Effect Size
-     
-     if(plotValues){
-       ymin <- min(min(ses_value[ses_value != -Inf], na.rm = TRUE), -cl)
-       ymax <- max(max(ses_value[ses_value != Inf], na.rm = TRUE), cl)
-       plot(distance, ses_value, ylim = c(ymin, ymax), xlab = "distance", ylab = "SES", type = "l", col = "blue")
-       abline (h = 0, lty = 3)
-       abline (h = cl, lty = 2)
-       abline (h = -cl, lty = 2)
-     }
-   }
+         #using edcf
+         ecdf = {
+           lo <- apply(env, 1, min)
+           hi <- apply(env, 1, max)
+           
+           ## Plot the observed value in function of expected value under randomness assumption (average of simulations)
+           if(plot){
+             plot(distances, obs, xlim = c(0, maxDist), ylim = c(min(lo, obs),max(hi, obs)), type = "l", col = "blue")
+             abline (h = 0.5, lty = 2)
+             lines (distances, lo, lty = 3)
+             lines (distances, hi, lty = 3)
+           }
+         },
+         
+         #using norm
+         norm = {
+           avg <- apply(env, 1, mean)
+           H <- obs / avg
+           Hst <- H / (H+1)
+           lo <- apply(env / avg, 1, min)
+           hi <- apply(env / avg, 1, max)
+           Hlo <- lo / (lo+1)
+           Hhi <- hi / (hi+1)
+           
+           ## Plot the observed value in function of expected value under randomness assumption (average of simulations)
+           if(plot){
+            plot(distances, Hst, xlim = c(0, maxDist), ylim = c(min(na.omit(Hlo), na.omit(Hst)), max(na.omit(Hhi), na.omit(Hst))), type = "l", col = "blue")
+            abline (h = 0.5, lty = 2)
+            lines (distances, Hlo, lty = 3)
+            lines (distances, Hhi, lty = 3)
+           }
+         },
+         
+         #using Standard Effect Size
+         SES = {
+           env_avg <- apply(env, 1, mean)
+           env_sd <- apply(env, 1, sd)
+           ses_value <- (obs - env_avg) / env_sd #Standard Effect Size
+           
+           ## Plot
+           if(plot){
+             ymin <- min(min(ses_value[ses_value != -Inf], na.rm = TRUE), -cl)
+             ymax <- max(max(ses_value[ses_value != Inf], na.rm = TRUE), cl)
+             plot(distances, ses_value, ylim = c(ymin, ymax), xlab = "distance", ylab = "SES", type = "l", col = "blue")
+             abline (h = 0, lty = 3)
+             abline (h = cl, lty = 2)
+             abline (h = -cl, lty = 2)
+           }
+         }
   )
   
   ##final output
+  return(list (obs, env, ses_value))
+}
+
+#' Functional arrangement within a functional space (generic function).
+#' @description Functional arrangement of a community, measuring the distribution of 
+#' species within the total functional space at multiple spatial scales. This is a 
+#' generic function to be used with any functional volume building method, as long as 
+#' the functional space can be represented by stochastic points. 
+#' @param comm Coordinates of species within the functional space.
+#' @param space Coordinates of stochastic points representing the functional space. 
+#' These will be used to perform a random displacement null model.
+#' @param pool Species pool coordinates. When specified (typically coordinates from
+#'  `hyper.build` output), the function performs a random selection null model,
+#'   drawing species randomly from the provided pool coordinates. When `NULL` (default), 
+#'   the function performs a random displacement null model using the stochastic points from space argument.
+#'   Must be a matrix or data.frame of coordinates matching the functional space dimensions.
+#' @param stat statistic to be calculated. One of c("PNCP", "NNCP"), meaning
+#' "cumulative proportion of pairwise neighbors" and "cumulative proportion of nearest neighbors", respectively.
+#' @param distances vector of distances to be considered in calculations
+#' @param type Envelope type for testing significance. One of c("ecdf", "norm", "SES"), meaning 
+#' "empirical cumulative distribution", "normalized envelope" (between 0-1, 0.5 indicate randomness, 
+#' more than 0.5 - clustered; less than 0.5 - inhibition), and "standardized effect size", respectively.
+#' @param alpha alpha value to consider in significance testing (p-value) when type = "SES"
+#' @param runs number of simulations for significance testing
+#' @param plot whether to plot the results
+#' @details This function measures the functional arrangement (Carvalho & Cardoso, 2025) 
+#' of a n-dimensional functional space, namely the distribution of species within the total 
+#' trait at multiple spatial scales. Species coordinates are typically obtained through ordination methods. 
+#' The functional space can be constructed using one-class support vector machines (e.g., as implemented 
+#' in the hyper.build function or as implemented in other packages, such as kernlab or e1071) or alternative approaches,
+#' as long as they can represent the functional space through stochastic points.
+#' @return A list with observed PNCP or NNCP values, a matrix of simulated values at r distances (r x sim), and standard effect size (if type = "SES").
+#' @references Carvalho, J.C. & Cardoso, P. (2025) Quantifying species distribution within the functional space.
+#' @examples \dontrun{
+#' comm = c(100,3,0,5,3)
+#' names(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
+#'
+#' trait = data.frame(body = c(1,2,3,4,2), beak = c(1,5,4,1,2))
+#' rownames(trait) = names(comm)
+#'
+#' hv = kernel.build(comm, trait, method.hv = "svm", svm.nu = 0.01, svm.gamma = 0.25)
+#' hyper.arrangement(comm = hv@Data, space = hv@RandomPoints)
+#' }
+#' @export
+hyper.arrangement <- function(comm, space, pool = NULL, stat = "PNCP", distances = seq(0,1,0.01), type = "SES", alpha = 0.05, runs = 99, plot = TRUE){
+  
+  #get parameters
+  nSpp <- nrow(comm) # number of species in the community
+  
+  # Pool argument
+  if (is.null(pool)) {
+    space <- space
+  } else {
+    space <- pool
+  }
+  
+  stat <- match.arg (stat, c("PNCP", "NNCP"))
+  type <- match.arg (type, c("ecdf", "norm", "SES"))
+  cl = -qnorm(alpha/2) #convert alpha to SD
+  maxDist <- max(distances)
+  
+  ##null models
+  env <- matrix (0, length(distances), runs) ## empty matrix for envelope
+  switch (stat,
+          PNCP = {
+            obs <- rneig_distR(comm, distances)
+            for (i in 1:runs) {
+              print(paste("Simulation", i, "of", runs))
+              run <- space[sample(1:nrow(space), nSpp),]
+              env[,i] <- rneig_distR(run, distances)
+            }
+          },
+          NNCP = {
+            obs <- nnpair_distR(comm, distances)
+            for (i in 1:runs) {
+              print (paste ("Simulation", i, "of", runs))
+              run <- space[sample(1:nrow(space), nSpp),]
+              env[,i] <- nnpair_distR(run, distances)
+            }
+          }
+  )
+  
+  ##envelope type
+  switch(type,
+         
+         #using edcf
+         ecdf = {
+           lo <- apply(env, 1, min)
+           hi <- apply(env, 1, max)
+           
+           ## Plot the observed value in function of expected value under randomness assumption (average of simulations)
+           if (plot) {
+             plot(distances, obs, xlim = c(0, maxDist), ylim = c(min(lo, obs),max(hi, obs)), type = "l", col = "blue")
+             abline (h = 0.5, lty = 2)
+             lines (distances, lo, lty = 3)
+             lines (distances, hi, lty = 3)
+           }
+         },
+         
+         #using norm
+         norm = {
+           avg <- apply(env, 1, mean)
+           H <- obs / avg
+           Hst <- H / (H+1)
+           lo <- apply(env / avg, 1, min)
+           hi <- apply(env / avg, 1, max)
+           Hlo <- lo / (lo+1)
+           Hhi <- hi / (hi+1)
+           
+           ## Plot the observed value in function of expected value under randomness assumption (average of simulations)
+           if (plot) {
+             plot(distances, Hst, xlim = c(0, maxDist), ylim = c(min(na.omit(Hlo), na.omit(Hst)), max(na.omit(Hhi), na.omit(Hst))), type = "l", col = "blue")
+             abline (h = 0.5, lty = 2)
+             lines (distances, Hlo, lty = 3)
+             lines (distances, Hhi, lty = 3)
+           }
+         },
+         
+         #using Standard Effect Size
+         SES = {
+           env_avg <- apply(env, 1, mean)
+           env_sd <- apply(env, 1, sd)
+           ses_value <- (obs - env_avg) / env_sd #Standard Effect Size
+           
+           ## Plot
+           if (plot) {
+             ymin <- min(min(ses_value[ses_value != -Inf], na.rm = TRUE), -cl)
+             ymax <- max(max(ses_value[ses_value != Inf], na.rm = TRUE), cl)
+             plot(distances, ses_value, ylim = c(ymin, ymax), xlab = "distance", ylab = "SES", type = "l", col = "blue")
+             abline (h = 0, lty = 3)
+             abline (h = cl, lty = 2)
+             abline (h = -cl, lty = 2)
+           }
+         }
+  )
+  
+  ## final output
   return(list (obs, env, ses_value))
 }
 
@@ -3268,20 +3511,22 @@ accuracy <- function(accum, target = -1){
       target <- accum[nrow(accum), 3]
     intensTotal = accum[nrow(accum), 2] / accum[nrow(accum), 3]	#sampling intensity = final n / final S
     if(ncol(accum) > 10){              #if non-parametric
-      smse <- matrix(0, 13, nrow = 2)
+      smse <- matrix(0, 17, nrow = 2)
       for (i in 1:nrow(accum)){
         intensity = accum[i, 2] / accum[i, 3] / intensTotal
         error = (accum[i,3] - target)^2 / (target^2 * nrow(accum))
         smse[1,1] <- smse[1,1] + error
         smse[2,1] <- smse[2,1] + error * intensity
-        for (j in 2:13){
+        for (j in 2:17){
           error = (accum[i,j+6] - target)^2 / (target^2 * nrow(accum))
+          if(is.na(error))
+            error = 0
           smse[1,j] <- smse[1,j] + error
           smse[2,j] <- smse[2,j] + error * intensity
         }
       }
       rownames(smse) <- c("Raw", "Weighted")
-      colnames(smse) <- c("Obs", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P")
+      colnames(smse) <- c("Obs", "Jack1ab", "Jack1abP", "Jack1in", "Jack1inP", "Jack2ab", "Jack2abP", "Jack2in", "Jack2inP", "Chao1", "Chao1P", "Chao2", "Chao2P", "ACE", "ACEP", "ICE", "ICEP")
     } else {                              #if curve
       smse <- matrix(0, 5, nrow = 2)
       for (i in 3:nrow(accum)){
@@ -5224,6 +5469,91 @@ kernel.build <- function(comm, trait, method.hv = "gaussian", abund = TRUE, core
   
   return(hv)
   
+}
+
+#' Kernel bandwidth estimation by median heuristic method with bootstrap CI
+#' @description Computes the Gaussian-kernel (Radial Basis Function) bandwidth \eqn{\sigma}
+#' using the median-heuristic (inverse of the median of squared Euclidean distances),
+#' and returns a bootstrap confidence interval. This assumes the kernel is
+#' parameterized as \eqn{k(x_i, x_j) = \exp(-\sigma ||x_i - x_j||^2)}.
+#' @param comm A numeric matrix or data frame.
+#' @param scale_data Logical; if `TRUE`, variables are centered and scaled
+#'   before distances are computed.
+#' @param ci_type Character; passed to \code{\link[boot]{boot.ci}}.
+#'   One of `"norm"`, `"basic"`, `"stud"`, `"perc"`, or `"bca"`.
+#' @param runs Integer; number of bootstrap resamples.
+#' @param conf Confidence level for the CI (between 0 and 1).
+#' @param cores Number of cores to be used in parallel processing. If = 0 all available cores are used.
+#' @return An object of class \code{sigma_bootstrap_result} containing:
+#'   \item{sigma_original}{Point estimate from the full data.}
+#'   \item{sigma_bootstrap}{Bootstrap mean estimate.}
+#'   \item{bootstrap_se}{Bootstrap standard error.}
+#'   \item{ci}{Confidence interval object from \code{boot.ci}.}
+#'   \item{bootstrap_distribution}{Vector of bootstrap values.}
+#'   \item{boot_object}{The full boot object from \code{boot()}.}
+#' @references Carvalho, J.C. & Cardoso, P. (2025) Quantifying species distribution within the functional space.
+#' @examples
+#' set.seed(1)
+#' comm <- matrix(rexp(200, rate = 0.1), ncol = 4)
+#' res <- kernel.bandwidth(comm, runs = 99)
+#' print(res)
+#' @seealso \code{\link[boot]{boot}}, \code{\link[boot]{boot.ci}}
+#' @export
+kernel.bandwidth <- function(comm, scale_data = FALSE, ci_type = "bca", runs = 1000, conf = 0.95, cores = 1){
+  
+  ##Argument checks
+  stopifnot(is.numeric(conf), conf > 0, conf < 1)
+  stopifnot(is.logical(scale_data), length(scale_data) == 1)
+  stopifnot(is.numeric(runs))
+  
+  ##Coerce input
+  if (!is.matrix(comm))
+    comm <- as.matrix(comm)
+  
+  ##Original estimate
+  sigma_hat <- .compute_sigma(comm, scale_data)
+  
+  ##Bootstrap logic
+  boot_fn <- function(data, indices) {
+    .compute_sigma(data[indices, , drop = FALSE], scale_data)
+  }
+  
+  if(cores == 0){
+    cores = detectCores()
+  } else {
+    cores = min(cores, detectCores())
+  }
+  
+  boot_res <- boot::boot(data = comm, statistic = boot_fn, R = runs,
+                         parallel = if (cores != 1) "multicore" else "no", ncpus = cores)
+  
+  ##CI computation
+  ci <- tryCatch(
+    boot::boot.ci(boot_res, conf = conf, type = ci_type),
+    error = function(e){
+      warning(
+        "boot.ci failed for type '", ci_type,
+        "'. Falling back to percentile interval."
+      )
+      boot::boot.ci(boot_res, conf = conf, type = "perc")
+    }
+  )
+  
+  ##Return results
+  out <- list(
+    sigma_original         = sigma_hat,
+    sigma_bootstrap        = mean(boot_res$t),
+    bootstrap_se           = sd(boot_res$t),
+    ci                     = ci,
+    bootstrap_distribution = boot_res$t,
+    runs                   = runs,
+    ci_type                = ci_type,
+    conf_level             = conf,
+    scale_data             = scale_data,
+    boot_object            = boot_res
+  )
+  #class(out) <- "sigma_bootstrap_result"
+  return(out)
 }
 
 #' Simulation of species abundance distributions (SAD).

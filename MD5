@@ -1,6 +1,6 @@
-47a8446e855e5f3fd6ebc46f8fc85a1c *DESCRIPTION
-9388d9b096f08116f7b4203d9b1e9356 *NAMESPACE
-c6c02ea9a34dce2c720bd8fdd12aa17b *R/BAT.R
+12f2073f64cf31743d4094bf23732a14 *DESCRIPTION
+32242f09f7370ce0a23d531371c443f4 *NAMESPACE
+ff6776dddf9a8dd55aa19f38cd0ea114 *R/BAT.R
 dcaed1578113ec8d3e2f349487e7fffc *data/arrabida.rda
 dd86dc6c6bea68a3b8ff605352919747 *data/functree.rda
 8beb17284bf3e4069b3dd1105cf8f269 *data/geres.rda
@@ -8,9 +8,9 @@ dd86dc6c6bea68a3b8ff605352919747 *data/functree.rda
 e2c9e6339463c22cbe90acc4fe4d13fc *data/phylotree.rda
 9a19905f1485a49c5a5688bcbc8a93a3 *man/accuracy.Rd
 39dee1de8381b00b041591faa8827e08 *man/aic.Rd
-4004a43ffa1bac52a8e0b27d9d550c48 *man/alpha.Rd
-6a1d022e25fcec71378d6365f8e78987 *man/alpha.accum.Rd
-3322758dcf3316ae5e7f861bfe8f42b4 *man/alpha.estimate.Rd
+b75e7d2739be9db80325edb7e7a52c28 *man/alpha.Rd
+3fb0ebf426f7b6f7c9f9f01683994db7 *man/alpha.accum.Rd
+1903abccbe69799eecdb3ec4dbc35390 *man/alpha.estimate.Rd
 ea38ff271114e67c70898f75f5aa78a4 *man/arrabida.Rd
 57b9fe4f2538f53ff3c0c51d3f829e25 *man/beta.Rd
 fc068a4b7f1db0873c3ce2f2c92143cb *man/beta.accum.Rd
@@ -39,11 +39,13 @@ d3eb635e763756becf60227075963a50 *man/hull.build.Rd
 6cf948a00f3913cc0383feabc9bb422a *man/hull.contribution.Rd
 605204b013b711d4fc6b13d884208dfc *man/hull.gamma.Rd
 f032d2c0634265c1cab6077e3d7ff6de *man/hull.sad.Rd
+c4add8503fd23b3dde84fd0a3e6eda93 *man/hyper.arrangement.Rd
 d18679c280d4a5696ed870eebd418a06 *man/hyper.build.Rd
 5cc6c8a11fbc623c3fa10d4dea0e57e7 *man/hyper.quality.Rd
 dfceced54e0ed397e4b09dfb17189a65 *man/iaor.Rd
 abb0b28d79ac795e72cc62d5253fdeae *man/kernel.alpha.Rd
-1730046865459441b19c024fa93598ce *man/kernel.arrangement.Rd
+00ddbd247d37d4ab248d13a13187f013 *man/kernel.arrangement.Rd
+93bfd7346913ed3d4a3d2894a3f2d43f *man/kernel.bandwidth.Rd
 c2fb5bdfa3d5e9d9234e3e2103dc8ca0 *man/kernel.beta.Rd
 a7b1fa6c8f6845f838b1676c58c38ea1 *man/kernel.beta.evenness.Rd
 dc1ebacc51f19400b1b232b29bea7694 *man/kernel.build.Rd
