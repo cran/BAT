@@ -1,6 +1,6 @@
-12f2073f64cf31743d4094bf23732a14 *DESCRIPTION
+c10822f21c74304c0a68d4a50ed44971 *DESCRIPTION
 32242f09f7370ce0a23d531371c443f4 *NAMESPACE
-ff6776dddf9a8dd55aa19f38cd0ea114 *R/BAT.R
+1b929af2d1fa91130d14c8f342d796be *R/BAT.R
 dcaed1578113ec8d3e2f349487e7fffc *data/arrabida.rda
 dd86dc6c6bea68a3b8ff605352919747 *data/functree.rda
 8beb17284bf3e4069b3dd1105cf8f269 *data/geres.rda
@@ -20,7 +20,7 @@ fc068a4b7f1db0873c3ce2f2c92143cb *man/beta.accum.Rd
 3253cc3caf21b1149102026c3a2faec0 *man/coverage.Rd
 58b181ee53a0a04e6f5bbee5d73dd42d *man/cwd.Rd
 7c170d015bf34e8a209a08f9b0a7aabe *man/cwe.Rd
-1c89e566713f8a6bf907d844b251e63d *man/cwm.Rd
+ebc29ca5c80f484918c2827177da0f5e *man/cwm.Rd
 07bcdf26e9d2801c0f07b8adc1104865 *man/dispersion.Rd
 5395fb8a828c8295b6811997ac6d8b51 *man/dummy.Rd
 8eba504e8b94b7abc5aeac2848393e7e *man/evenness.Rd
@@ -40,7 +40,7 @@ d3eb635e763756becf60227075963a50 *man/hull.build.Rd
 605204b013b711d4fc6b13d884208dfc *man/hull.gamma.Rd
 f032d2c0634265c1cab6077e3d7ff6de *man/hull.sad.Rd
 c4add8503fd23b3dde84fd0a3e6eda93 *man/hyper.arrangement.Rd
-d18679c280d4a5696ed870eebd418a06 *man/hyper.build.Rd
+e9e4508dd0730dac4fd4ee8e79d0aec1 *man/hyper.build.Rd
 5cc6c8a11fbc623c3fa10d4dea0e57e7 *man/hyper.quality.Rd
 dfceced54e0ed397e4b09dfb17189a65 *man/iaor.Rd
 abb0b28d79ac795e72cc62d5253fdeae *man/kernel.alpha.Rd
@@ -48,7 +48,7 @@ abb0b28d79ac795e72cc62d5253fdeae *man/kernel.alpha.Rd
 93bfd7346913ed3d4a3d2894a3f2d43f *man/kernel.bandwidth.Rd
 c2fb5bdfa3d5e9d9234e3e2103dc8ca0 *man/kernel.beta.Rd
 a7b1fa6c8f6845f838b1676c58c38ea1 *man/kernel.beta.evenness.Rd
-dc1ebacc51f19400b1b232b29bea7694 *man/kernel.build.Rd
+6076983ba52cd0796b88bcc23a9e4dd0 *man/kernel.build.Rd
 562e73ff0c694e2f24a3017f151a729e *man/kernel.contribution.Rd
 beff4dd4bf2176b746f3f150a5467c03 *man/kernel.dispersion.Rd
 70bbc21d5c1f86ed73463256bc49359b *man/kernel.evenness.Rd
@@ -82,7 +82,7 @@ a5acb30a103f790e6f3d6ff1174f7e57 *man/sim.sad.Rd
 e6d6aa1d817d5adad674bc0b36cd2a83 *man/sim.spatial.Rd
 e74d9e6314b5a69ab73d3a155eaa99f5 *man/sim.tree.Rd
 ab4963e12176ece86b0ba1bb36afca3b *man/slope.Rd
-2054df409a0e8dfd485c6ed6ac13bd6a *man/standard.Rd
+ff852d7c7575174ffebd773b8faffc35 *man/standard.Rd
 fd750d506adcafe7b8b0549936b1e323 *man/tree.addTip.Rd
 c3cdead8a25a291759585d2c62149b3e *man/tree.build.Rd
 490988e24f9e868b8b37d95651a16347 *man/tree.quality.Rd

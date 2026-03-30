@@ -7,7 +7,8 @@
 hyper.build(distance, ord = "pcoa", axes = 1, stats = FALSE)
 }
 \arguments{
-\item{distance}{A dist object representing the distances between species.}
+\item{distance}{A dist object representing the distances between species (or, in alternative, a trait data.frame,
+in which case no ordination will be done, but only standardization of traits using the z-score).}
 
 \item{ord}{Method used to reduce the dimensionality of variables using either of the ordination methods "pcoa" or "nmds".}
 
@@ -35,6 +36,9 @@ Transformation of traits is recommended if (Carvalho & Cardoso, 2020):
 trait = data.frame(body = c(1,2,3,4,4), beak = c(1,5,4,1,2))
 rownames(trait) = c("SpA", "SpB", "SpC", "SpD", "SpE")
 distance = gower(trait)
+
+hs = hyper.build(trait)
+plot(hs)
 
 hs = hyper.build(distance, axes = 0.8, stats = TRUE)
 plot(hs$trait)

@@ -29,6 +29,5 @@ habitat = c("A", "B", "C", "A", "B")
 trait = data.frame(body, beak, habitat)
 standard(trait)
 standard(trait, method = "iqr")
-standard(trait, method = "range")
 standard(trait, method = "rank")
 }

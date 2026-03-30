@@ -4,7 +4,7 @@
 \alias{cwm}
 \title{Community Weighted Mean.}
 \usage{
-cwm(comm, trait, abund = TRUE, na.rm = FALSE)
+cwm(comm, trait, abund = TRUE, geo = FALSE, na.rm = FALSE)
 }
 \arguments{
 \item{comm}{A sites x species matrix, with incidence or abundance data about the species in the community.}
@@ -12,6 +12,8 @@ cwm(comm, trait, abund = TRUE, na.rm = FALSE)
 \item{trait}{A species x traits matrix, with trait values for each species in comm.}
 
 \item{abund}{A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.}
+
+\item{geo}{Calculate using geometric instead of arithmetic mean (Liu et al. 2026)?}
 
 \item{na.rm}{Remove NA values before calculating cwm.}
 }
@@ -32,4 +34,8 @@ trait <- data.frame(Trait1 = c(1,0,0,2,0), Trait2 = c(rep("A",2), rep("B",3)))
 rownames(trait) = colnames(comm)
 cwm(comm, trait)
 cwm(comm, trait, FALSE)
+cwm(comm, trait, geo = TRUE)
+}
+\references{
+Liu, C., Yang, X. & He, N. (2026) Rethinking community-weighted means: why geometric averages matter. Oikos, in press.
 }

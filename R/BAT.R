@@ -1,21 +1,15 @@
 #####BAT - Biodiversity Assessment Tools
-#####Version 2.11.0 (2025-07-29)
+#####Version 2.11.1 (2026-03-30)
 #####By Pedro Cardoso, Stefano Mammola, Francois Rigal, Renato Hilario, Jose Carlos Carvalho
 #####Maintainer: pmcardoso@ciencias.ulisboa.pt
 #####Reference: Cardoso, P., Rigal, F. & Carvalho, J.C. (2015) BAT - Biodiversity Assessment Tools, an R package for the measurement and estimation of alpha and beta taxon, phylogenetic and functional diversity. Methods in Ecology and Evolution, 6: 232-236.
 #####Reference: Mammola, S. & Cardoso, P. (2020) Functional diversity metrics using kernel density n-dimensional hypervolumes. Methods in Ecology and Evolution, 11: 986-995.
-#####Changed from v2.10.0:
-#####Added function hyper.arrangement by Carvalho & Cardoso (2025)
-#####Added function kernel.arrangement by Carvalho & Cardoso (2025)
-#####Added function kernel.bandwidth by Carvalho & Cardoso (2025)
-#####Added function tree.addTip to add tips to a given tree
-#####alpha function works with relative abundances
-#####alpha.estimate and alpha.accum now include ACE and ICE estimators
-#####All *.beta functions work with relative abundances and TBI by Legendre (2019)
-#####standard function now with option to use IQR and does not try to standardize categorical variables
-#####hyper.build now allows NMDS and returns variance/stress values for ordination methods
-#####hull.build and kernel.build are simplified, do not perform ordination anymore
-#####gower now implements both Podani and Pavoine versions and its output was corrected when any trait has more than 2 categories
+#####Changed from v2.11.0:
+#####Added geometric mean to CWM
+#####hyper.build now also outputs raw trait hypervolumes
+#####Added coordinates and progress bar to raster.*
+#####Corrected rare error in function gower
+#####Added matching of species names in hull.build and kernel.build
 
 library("ape")
 library("boot")
@@ -3247,7 +3241,8 @@ gamma <- function(comm, tree){
 #' @details Estimates the functional richness (gamma FD) of multiple communities using convex hull hypervolumes.
 #' Functional richness is expressed as the total volume of the convex hull.
 #' @return A single value of gamma.
-#' @examples comm = rbind(c(1,3,0,5,3), c(3,2,5,0,0))
+#' @examples
+#' comm = rbind(c(1,3,0,5,3), c(3,2,5,0,0))
 #' colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
 #' rownames(comm) = c("Site 1", "Site 2")
 #' 
@@ -3265,11 +3260,14 @@ hull.gamma <- function(comm){
   if(is(comm, "convhulln"))
     return(hull.alpha(comm))
   if(is.list(comm)){
+    namesComm = names(comm[[1]]$comm)
     traits = c()
     for(i in 1:length(comm))
       traits = rbind(traits, comm[[i]]$p)
     traits = unique(traits)
-    comm = hull.build(comm = rep(1, nrow(traits)), trait = traits)
+    comm = rep(1, nrow(traits))
+    names(comm) = namesComm
+    comm = hull.build(comm, trait = traits)
     return(hull.alpha(comm))
   }
 }
@@ -3316,30 +3314,41 @@ kernel.gamma <- function(comm){
 #' @param comm A sites x species matrix, with incidence or abundance data about the species in the community.
 #' @param trait A species x traits matrix, with trait values for each species in comm.
 #' @param abund A boolean (T/F) indicating whether abundance data should be used (TRUE) or converted to incidence (FALSE) before analysis. If not specified, default is TRUE.
+#' @param geo Calculate using geometric instead of arithmetic mean (Liu et al. 2026)?
 #' @param na.rm Remove NA values before calculating cwm.
 #' @details Community weighted mean is used to compare communities in terms of their "typical" trait values.
 #' @return A sites x trait matrix with mean value per site and trait.
-#' @examples comm <- matrix(c(2,5,0,0,0,1,1,0,0,0,0,1,2,0,0,0,0,0,10,1), nrow = 4, ncol = 5, byrow = TRUE)
+#' @references Liu, C., Yang, X. & He, N. (2026) Rethinking community-weighted means: why geometric averages matter. Oikos, in press.
+#' @examples
+#' comm <- matrix(c(2,5,0,0,0,1,1,0,0,0,0,1,2,0,0,0,0,0,10,1), nrow = 4, ncol = 5, byrow = TRUE)
 #' rownames(comm) = c("Site1","Site2","Site3","Site4")
 #' colnames(comm) = c("Sp1","Sp2","Sp3","Sp4","Sp5")
 #' trait <- data.frame(Trait1 = c(1,0,0,2,0), Trait2 = c(rep("A",2), rep("B",3)))
 #' rownames(trait) = colnames(comm)
 #' cwm(comm, trait)
 #' cwm(comm, trait, FALSE)
+#' cwm(comm, trait, geo = TRUE)
 #' @export
-cwm <- function(comm, trait, abund = TRUE, na.rm = FALSE){
+cwm <- function(comm, trait, abund = TRUE, geo = FALSE, na.rm = FALSE){
   trait = dummy(trait)
   if(!abund)
     comm[comm > 1] = 1
+  for(i in 1:nrow(comm)) #convert to proportions
+    comm[i,] = comm[i,] / sum(comm[i,])
   nSites = nrow(comm)
   nTraits = ncol(trait)
   nSp = rowSums(comm)
   results = matrix(NA, nrow = nSites, ncol = nTraits)
   rownames(results) = rownames(comm)
   colnames(results) = colnames(trait)
-  for (s in 1:nSites)
-    for (t in 1:nTraits)
-      results[s, t] = sum(comm[s,] * trait[,t], na.rm = na.rm) / nSp[s]
+  for (s in 1:nSites){
+    for (t in 1:nTraits){
+      if(geo)
+        results[s, t] = exp(sum(comm[s,] * log(trait[,t]), na.rm = na.rm))
+      else
+        results[s, t] = sum(comm[s,] * trait[,t], na.rm = na.rm)
+    }
+  }
   return(results)
 }
 
@@ -3930,9 +3939,11 @@ optim.spatial <- function(layers, n, latlong = TRUE, clusterMap = TRUE){
 #' raster.alpha(spp, tree)
 #' @export
 raster.alpha <- function(layers, tree){
-  res = terra::rast(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  res = layers[[1]]
   names(res) = "alpha"
+  pb <- txtProgressBar(min = 0, max = nrow(layers), style = 3)
   for(r in 1:nrow(layers)){
+    setTxtProgressBar(pb, r)    
     for(c in 1:ncol(layers)){
       if(is.na(sum(layers[r,c])))
         res[r,c] = NA
@@ -3940,6 +3951,7 @@ raster.alpha <- function(layers, tree){
         res[r,c] = alpha(layers[r,c], tree)
     }
   }
+  cat("\n")
   return(res)
 }
 
@@ -3976,12 +3988,14 @@ raster.alpha <- function(layers, tree){
 #' raster.beta(spp, tree)
 #' @export
 raster.beta <- function(layers, tree, func = "jaccard", neighbor = 8, abund = FALSE){
-  resTotal = terra::rast(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  resTotal = layers[[1]]
   resRepl = resTotal
   resRich = resTotal
   resGain = resTotal
   resLoss = resTotal
+  pb <- txtProgressBar(min = 0, max = terra::ncell(layers), style = 3)
   for(c in 1:(terra::ncell(layers))){
+    setTxtProgressBar(pb, c)    
     if(is.na(sum(layers[c]))){
       resTotal[c] = NA
       resRepl[c] = NA
@@ -4005,6 +4019,7 @@ raster.beta <- function(layers, tree, func = "jaccard", neighbor = 8, abund = FA
   }
   results = c(resTotal, resRepl, resRich, resGain, resLoss)
   names(results) = c("Btotal", "Brepl", "Brich", "Bgain", "Bloss")
+  cat("\n")
   return(results)
 }
 
@@ -4035,9 +4050,11 @@ raster.beta <- function(layers, tree, func = "jaccard", neighbor = 8, abund = FA
 #' raster.dispersion(spp, tree)
 #' @export
 raster.dispersion <- function(layers, tree, distance, func = "originality", abund = FALSE, relative = FALSE){
-  res = terra::rast(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  res = layers[[1]]
   names(res) = "dispersion"
+  pb <- txtProgressBar(min = 0, max = nrow(layers), style = 3)
   for(r in 1:nrow(layers)){
+    setTxtProgressBar(pb, r)    
     for(c in 1:ncol(layers)){
       if(is.na(sum(layers[r,c])))
         res[r,c] = NA
@@ -4045,6 +4062,7 @@ raster.dispersion <- function(layers, tree, distance, func = "originality", abun
         res[r,c] = dispersion(layers[r,c], tree, distance, func, abund, relative)
     }
   }
+  cat("\n")
   return(res)
 }
 
@@ -4075,9 +4093,11 @@ raster.dispersion <- function(layers, tree, distance, func = "originality", abun
 #' raster.evenness(spp, tree)
 #' @export
 raster.evenness <- function(layers, tree, distance, method = "expected", func = "camargo", abund = TRUE){
-  res = terra::rast(matrix(NA, nrow = nrow(layers), ncol = ncol(layers)))
+  res = layers[[1]]
   names(res) = "evenness"
+  pb <- txtProgressBar(min = 0, max = nrow(layers), style = 3)
   for(r in 1:nrow(layers)){
+    setTxtProgressBar(pb, r)    
     for(c in 1:ncol(layers)){
       if(is.na(sum(layers[r,c])) || sum(ifelse(layers[r,c] > 0, 1, 0)) < 2)
         res[r,c] = NA
@@ -4085,6 +4105,7 @@ raster.evenness <- function(layers, tree, distance, method = "expected", func = 
         res[r,c] = evenness(layers[r,c], tree, distance, method, func, abund)
     }
   }
+  cat("\n")
   return(res)
 }
 
@@ -4807,7 +4828,6 @@ fill <- function(trait, method = "regression", group = NULL, weight = NULL, step
 #' trait = data.frame(body, beak, habitat)
 #' standard(trait)
 #' standard(trait, method = "iqr")
-#' standard(trait, method = "range")
 #' standard(trait, method = "rank")
 #' @export
 standard <- function(trait, method = "z", convert = NULL){
@@ -4827,7 +4847,7 @@ standard <- function(trait, method = "z", convert = NULL){
     if(method == "z"){
       trait[,i] = (trait[,i] - mean(trait[,i], na.rm = TRUE)) / sd(trait[,i], na.rm = TRUE)
       
-    #if standardization with interquartile range  
+    #if standardization with IQR
     } else if(method == "iqr"){
       trait[,i] = (trait[,i] / IQR(trait[,i], na.rm = TRUE))
       
@@ -4862,7 +4882,8 @@ standard <- function(trait, method = "z", convert = NULL){
 #' @references Gower, J. C. (1971) A general coefficient of similarity and some of its properties. Biometrics, 27:857-871.
 #' @references Pavoine et al. (2009) On the challenge of treating various types of variables: application for improving the measurement of functional diversity. Oikos, 118: 391-402.
 #' @references Podani, J. (1999) Extending Gower's general coefficient of similarity to ordinal characters. Taxon, 48:331-340.
-#' @examples trait = data.frame(body = c(NA,2,3,4,4), beak = c(1,1,1,1,2), habitat = c("A", "B", "C", "A", "B"))
+#' @examples
+#' trait = data.frame(body = c(NA,2,3,4,4), beak = c(1,1,1,1,2), habitat = c("A", "B", "C", "A", "B"))
 #' gower(trait)
 #' gower(trait, st = "z")
 #' gower(trait, square = FALSE)
@@ -4916,7 +4937,10 @@ gower <- function(trait, convert = NULL, st = "range", weight = NULL, square = T
     }
   }
   rownames(res) = colnames(res) = spNames
-  return(as.dist(res))
+  res = as.dist(res)
+  a <- attributes(res)
+  attributes(res) <- a[c(2,1,3:length(a))]
+  return(res)
 }
 
 #' Model R2.
@@ -5231,7 +5255,8 @@ tree.zero <- function (tree){
 
 #' Build hyperspace.
 #' @description Builds hyperspace using distance data for hull.build or kernel.build.
-#' @param distance A dist object representing the distances between species.
+#' @param distance A dist object representing the distances between species (or, in alternative, a trait data.frame,
+#' in which case no ordination will be done, but only standardization of traits using the z-score).
 #' @param ord Method used to reduce the dimensionality of variables using either of the ordination methods "pcoa" or "nmds".
 #' @param axes If 0 < axes <= 1 a PCoA is done and as many axes as needed to achieve this proportion of variance explained are selected.
 #' If axes > 1 these many axes are selected for either PCoA or NMDS.
@@ -5248,6 +5273,9 @@ tree.zero <- function (tree){
 #' rownames(trait) = c("SpA", "SpB", "SpC", "SpD", "SpE")
 #' distance = gower(trait)
 #' 
+#' hs = hyper.build(trait)
+#' plot(hs)
+#' 
 #' hs = hyper.build(distance, axes = 0.8, stats = TRUE)
 #' plot(hs$trait)
 #' hs$stats
@@ -5257,6 +5285,10 @@ tree.zero <- function (tree){
 #' @export
 hyper.build <- function(distance, ord = "pcoa", axes = 1, stats = FALSE){
   
+  if(is.data.frame(distance)){
+    return(standard(distance))
+  }
+
   if(ord == "nmds" & axes > 1){
     space = vegan::metaMDS(distance, k = axes)
     stress = space$stress
@@ -5308,7 +5340,8 @@ hyper.quality <- function(distance, trait){
 #' @param comm A sites x species matrix, data.frame or vector, with incidence data about the species in the community.
 #' @param trait A trait matrix, often resulting from hyper.build.
 #' @return A 'convhulln' object or a list, representing the hypervolumes of each community.
-#' @examples comm = rbind(c(1,3,0,5,3), c(3,2,5,0,0))
+#' @examples
+#' comm = rbind(c(1,3,0,5,3), c(3,2,5,0,0))
 #' colnames(comm) = c("SpA", "SpB", "SpC", "SpD", "SpE")
 #' rownames(comm) = c("Site 1", "Site 2")
 #' 
@@ -5326,9 +5359,15 @@ hyper.quality <- function(distance, trait){
 #' @export
 hull.build <- function(comm, trait){
   
-  if(is.vector(comm))
+  if(is.vector(comm)){
+    commNames = names(comm)
     comm = matrix(comm, nrow = 1)
+    colnames(comm) = commNames
+  }
   
+  #reorder comm to match traits
+  comm = comm[, match(rownames(trait), colnames(comm)), drop = FALSE]
+
   #check if there are communities with less species than traits + 1 and remove them
   fewSpp = as.vector(which(rowSums(ifelse(comm > 0, 1, 0)) <= ncol(trait)))
   if(length(fewSpp) > 0){
@@ -5382,6 +5421,7 @@ hull.build <- function(comm, trait){
 #' 
 #' distance = gower(trait)
 #' trait = hyper.build(distance)
+#' trait = hyper.build(trait)
 #' 
 #' hv = kernel.build(comm[1,], trait)
 #' plot(hv)
@@ -5396,7 +5436,10 @@ kernel.build <- function(comm, trait, method.hv = "gaussian", abund = TRUE, core
   #needed for when mf R drops dimensions, when will they fix this bug???
   if(is.vector(comm))
     comm = matrix(comm, nrow = 1)
-  
+
+  #reorder comm to match traits
+  comm = comm[, match(rownames(trait), colnames(comm))]
+
   #check if there are communities with no species
   fewSpp = as.vector(which(rowSums(comm) == 0))
   if(length(fewSpp) > 0){

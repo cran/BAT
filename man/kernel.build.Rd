@@ -36,6 +36,7 @@ rownames(trait) = colnames(comm)
 
 distance = gower(trait)
 trait = hyper.build(distance)
+trait = hyper.build(trait)
 
 hv = kernel.build(comm[1,], trait)
 plot(hv)
